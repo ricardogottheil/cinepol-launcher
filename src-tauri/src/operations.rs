@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 
+use launcher_core::domain::instance::InstanceId;
+use launcher_core::domain::launch::RunningGames;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::AppError;
@@ -17,6 +19,14 @@ pub struct OperationRegistry {
 impl OperationRegistry {
     /// Registers an operation id chosen by the frontend and returns its token.
     pub fn start(&self, id: &str) -> Result<CancellationToken, AppError> {
+        let token = CancellationToken::new();
+        self.adopt(id, token.clone())?;
+        Ok(token)
+    }
+
+    /// Registers `id` with a token that already exists, so cancelling `id`
+    /// also stops whatever that token stops.
+    pub fn adopt(&self, id: &str, token: CancellationToken) -> Result<(), AppError> {
         validate_id(id)?;
         let mut running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
         if running.contains_key(id) {
@@ -24,9 +34,8 @@ impl OperationRegistry {
                 "operation {id} is already running"
             )));
         }
-        let token = CancellationToken::new();
-        running.insert(id.to_owned(), token.clone());
-        Ok(token)
+        running.insert(id.to_owned(), token);
+        Ok(())
     }
 
     /// Forgets a finished operation.
@@ -41,6 +50,17 @@ impl OperationRegistry {
     pub fn cancel(&self, id: &str) -> bool {
         let running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
         running.get(id).map(CancellationToken::cancel).is_some()
+    }
+}
+
+/// The running-games registry, keyed by instance id, seen by the core.
+impl RunningGames for OperationRegistry {
+    fn claim(&self, instance: &InstanceId, kill: &CancellationToken) -> bool {
+        self.adopt(instance.as_str(), kill.clone()).is_ok()
+    }
+
+    fn release(&self, instance: &InstanceId) {
+        self.finish(instance.as_str());
     }
 }
 
@@ -90,5 +110,22 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    #[test]
+    fn a_claimed_instance_is_stopped_through_the_games_registry() {
+        let games = OperationRegistry::default();
+        let id = InstanceId::parse("cinepol").unwrap();
+        let session = CancellationToken::new();
+        assert!(games.claim(&id, &session));
+        assert!(
+            games.start("cinepol").is_err(),
+            "a launch from the instances page is refused"
+        );
+        assert!(!games.claim(&id, &CancellationToken::new()));
+        assert!(games.cancel("cinepol"), "kill_instance reaches the session");
+        assert!(session.is_cancelled());
+        games.release(&id);
+        assert!(games.start("cinepol").is_ok());
     }
 }

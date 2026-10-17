@@ -68,9 +68,12 @@ pub async fn play_on_cinepol(
         launcher_name: crate::state::LAUNCHER_NAME,
         launcher_version: &state.launcher_version,
     };
+    // Claimed in `state.games` too, so kill_instance and the instances page
+    // see this session.
     let result = play(
         &config,
         &state.servers,
+        &state.games,
         &install,
         &launch,
         &ChannelReporter::new(on_progress),

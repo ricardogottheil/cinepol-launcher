@@ -19,7 +19,7 @@ pub use plan::{LibraryPlan, NativeJar, plan_libraries};
 pub use platform::{Arch, OsName, Platform};
 pub use ports::{
     ExtractError, GameExit, GameProcessError, GameProcessRunner, LogSink, LogStream,
-    NativesExtractor, ProcessSpec, VersionSource, VersionSourceError,
+    NativesExtractor, ProcessSpec, RunningGames, VersionSource, VersionSourceError,
 };
 pub use rules::{Features, OsCondition, Rule, RuleAction, rules_allow};
 pub use version::{

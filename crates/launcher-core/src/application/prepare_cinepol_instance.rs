@@ -2,7 +2,9 @@
 //! recommended version.
 
 use crate::application::create_instance::{CreateInstanceError, NewInstance, create_instance};
-use crate::domain::instance::{Instance, InstanceOrigin, InstanceRepository};
+use crate::domain::instance::{
+    Instance, InstanceOrigin, InstanceRepository, InstanceRepositoryError,
+};
 use crate::domain::loader::LoaderSpec;
 use crate::domain::server::ServerConfig;
 use crate::domain::server_list::{ServerEntry, ServerListStore};
@@ -10,6 +12,17 @@ use crate::domain::server_list::{ServerEntry, ServerListStore};
 /// The server entry new instances get first in their `servers.dat`.
 pub fn cinepol_server_entry(config: &ServerConfig) -> ServerEntry {
     ServerEntry::new(config.name.clone(), config.address.clone())
+}
+
+/// The managed CINEPOL instance, when it already exists.
+pub async fn find_cinepol_instance<R: InstanceRepository>(
+    instances: &R,
+) -> Result<Option<Instance>, InstanceRepositoryError> {
+    Ok(instances
+        .list()
+        .await?
+        .into_iter()
+        .find(|instance| instance.origin == InstanceOrigin::CinepolServer))
 }
 
 /// Reuses the instance whose origin is `CinepolServer` (moving it to the
@@ -21,11 +34,7 @@ pub async fn prepare_cinepol_instance<R: InstanceRepository, S: ServerListStore>
     servers: &S,
 ) -> Result<Instance, CreateInstanceError> {
     let recommended = config.versions.recommended();
-    let existing = instances
-        .list()
-        .await?
-        .into_iter()
-        .find(|instance| instance.origin == InstanceOrigin::CinepolServer);
+    let existing = find_cinepol_instance(instances).await?;
 
     match existing {
         Some(mut instance) => {

@@ -7,11 +7,12 @@ use std::sync::{Arc, Mutex};
 
 use tokio_util::sync::CancellationToken;
 
+use crate::domain::instance::InstanceId;
 use crate::domain::java::{JavaRequirement, JavaRuntime, JavaRuntimeError, JavaRuntimeProvider};
 use crate::domain::launch::{
     AssetIndex, AssetIndexRef, ExtractError, GameExit, GameProcessError, GameProcessRunner,
-    LogSink, LogStream, NativeJar, NativesExtractor, Platform, ProcessSpec, VersionManifest,
-    VersionSource, VersionSourceError, VersionSpec,
+    LogSink, LogStream, NativeJar, NativesExtractor, Platform, ProcessSpec, RunningGames,
+    VersionManifest, VersionSource, VersionSourceError, VersionSpec,
 };
 use crate::domain::ports::{FileSystem, FileSystemError, ProgressReporter, ProgressUpdate};
 
@@ -318,5 +319,32 @@ pub fn sample_asset_index() -> AssetIndex {
             object("icons/icon_16x16.png", 'e'),
             object("lang/es_es.json", 'f'),
         ],
+    }
+}
+
+/// Remembers which instances are busy and the stop signal each one claimed with.
+#[derive(Debug, Default)]
+pub struct InMemoryRunningGames {
+    busy: Mutex<HashMap<InstanceId, CancellationToken>>,
+}
+
+impl InMemoryRunningGames {
+    pub fn is_busy(&self, instance: &InstanceId) -> bool {
+        self.busy.lock().unwrap().contains_key(instance)
+    }
+}
+
+impl RunningGames for InMemoryRunningGames {
+    fn claim(&self, instance: &InstanceId, kill: &CancellationToken) -> bool {
+        let mut busy = self.busy.lock().unwrap();
+        if busy.contains_key(instance) {
+            return false;
+        }
+        busy.insert(instance.clone(), kill.clone());
+        true
+    }
+
+    fn release(&self, instance: &InstanceId) {
+        self.busy.lock().unwrap().remove(instance);
     }
 }

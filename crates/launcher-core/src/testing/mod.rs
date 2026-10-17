@@ -27,8 +27,8 @@ use tokio_util::sync::CancellationToken;
 mod launch;
 mod server;
 pub use launch::{
-    FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, RecordingLogSink,
-    RecordingNativesExtractor, sample_asset_index, sample_version_spec,
+    FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, InMemoryRunningGames,
+    RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,
 };
 pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySettingsRepository};
 

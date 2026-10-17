@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError, type LogLineDto, type ProgressEvent } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
-import { useActivityStore } from "./activityStore";
+import { CINEPOL_SESSION, useActivityStore } from "./activityStore";
 import { InstancesPage } from "./InstancesPage";
 
 const client = vi.hoisted(() => ({
@@ -133,5 +133,29 @@ describe("InstancesPage", () => {
     await waitFor(() => expect(client.launchInstance).toHaveBeenCalledTimes(2));
     expect(client.installInstance).toHaveBeenCalledOnce();
     expect(screen.queryByText(esCommon.errors.not_installed)).not.toBeInTheDocument();
+  });
+
+  it("shows a Play on CINEPOL session on the CINEPOL row and stops it from there", async () => {
+    client.listInstances.mockResolvedValue([
+      instance,
+      { ...instance, id: "cinepol", name: "CINEPOL", origin: "cinepolServer" },
+    ]);
+    client.killInstance.mockResolvedValue(true);
+    useActivityStore.setState({
+      byInstance: {
+        [CINEPOL_SESSION]: { activity: { kind: "running" }, logs: [], error: null, lastExit: null },
+      },
+    });
+    renderWithQuery(<InstancesPage />);
+
+    const row = (await screen.findByRole("heading", { name: "CINEPOL" })).closest("li");
+    if (!row) throw new Error("no CINEPOL row");
+    expect(within(row).queryByRole("button", { name: labels.play })).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: labels.stop }));
+    await waitFor(() => expect(client.killInstance).toHaveBeenCalledWith("cinepol"));
+
+    const other = screen.getByRole("heading", { name: "Survival" }).closest("li");
+    if (!other) throw new Error("no Survival row");
+    expect(within(other).getByRole("button", { name: labels.play })).toBeEnabled();
   });
 });

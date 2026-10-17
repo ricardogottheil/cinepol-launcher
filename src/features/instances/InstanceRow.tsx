@@ -3,13 +3,19 @@ import { Button } from "../../components/ui/Button";
 import { Meter } from "../../components/ui/Meter";
 import { Readout } from "../../components/ui/Readout";
 import type { InstanceDto } from "../../ipc/client";
-import { useActivityStore, useInstanceActivity } from "./activityStore";
+import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "./activityStore";
 import { splitPlaytime } from "./formatPlaytime";
 import { LogPanel } from "./LogPanel";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const { t } = useTranslation();
-  const { activity, logs, error, lastExit } = useInstanceActivity(instance.id);
+  const own = useInstanceActivity(instance.id);
+  const cinepolSession = useInstanceActivity(CINEPOL_SESSION);
+  // A Play on CINEPOL session started from Home runs this instance too.
+  const { activity, logs, error, lastExit } =
+    instance.origin === "cinepolServer" && cinepolSession.activity.kind !== "idle"
+      ? cinepolSession
+      : own;
   const { install, play, stop } = useActivityStore();
   const busy = activity.kind !== "idle";
   const loader = instance.loaderVersion

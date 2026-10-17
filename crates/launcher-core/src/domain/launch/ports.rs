@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
+use crate::domain::instance::InstanceId;
+
 use super::{AssetIndex, AssetIndexRef, LaunchCommand, NativeJar, VersionManifest, VersionSpec};
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -104,4 +106,14 @@ pub trait GameProcessRunner: Send + Sync {
         logs: S,
         kill: CancellationToken,
     ) -> impl Future<Output = Result<GameExit, GameProcessError>> + Send;
+}
+
+/// Instances with a game session in progress (installing or playing), so one
+/// instance never runs twice at the same time.
+pub trait RunningGames: Send + Sync {
+    /// Marks `instance` as busy, with `kill` as the signal that stops it.
+    /// Returns `false` when it is already busy.
+    fn claim(&self, instance: &InstanceId, kill: &CancellationToken) -> bool;
+    /// Marks `instance` as free again.
+    fn release(&self, instance: &InstanceId);
 }

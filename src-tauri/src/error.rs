@@ -195,6 +195,9 @@ impl From<launcher_core::application::play_on_cinepol::PlayOnCinepolError> for A
             PlayOnCinepolError::Prepare(prepare) => Self::from(prepare),
             PlayOnCinepolError::Install(install) => Self::from(install),
             PlayOnCinepolError::Launch(launch) => Self::from(launch),
+            PlayOnCinepolError::AlreadyRunning(_) => {
+                Self::new(ErrorCode::AlreadyRunning, error.to_string())
+            }
         }
     }
 }
