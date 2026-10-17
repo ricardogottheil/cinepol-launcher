@@ -13,3 +13,7 @@ pub use provider::ManagedJavaRuntimes;
 
 #[cfg(test)]
 mod tests;
+
+/// Adversarial regression probes from the independent security verification.
+#[cfg(test)]
+mod probes;

@@ -14,3 +14,7 @@ pub use natives::ZipNativesExtractor;
 
 #[cfg(test)]
 mod tests;
+
+/// Adversarial regression probes from the independent security verification.
+#[cfg(test)]
+mod probes;
