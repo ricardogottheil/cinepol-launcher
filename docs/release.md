@@ -39,5 +39,6 @@ It is public by design; the private key never leaves the secrets store.
   Gatekeeper blocks them. Developers testing a local unsigned build can clear it
   with `xattr -dr com.apple.quarantine "/Applications/Cinepol Launcher.app"`.
   Users must receive signed and notarized builds.
-- Java runtimes downloaded by the launcher also get the quarantine attribute when
-  extracted by some tools; the launcher extracts them itself, so they do not.
+- Files the launcher downloads through its own HTTP client (Java runtimes,
+  libraries) are not quarantined unless the app opts into `LSFileQuarantineEnabled`.
+  This is verified on real hardware in Milestone 5.
