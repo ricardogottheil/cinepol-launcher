@@ -118,6 +118,24 @@ pub fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<Vec<PathBuf>, Extra
     Ok(extracted)
 }
 
+/// Creates the symbolic link `relative` (an archive-style entry name) under
+/// `root` pointing at `target`, with the same containment rules as archive
+/// links: the link must resolve inside `root`. On Windows the target file is
+/// copied instead.
+pub(crate) fn create_link_inside(
+    root: &Path,
+    relative: &str,
+    target: &str,
+) -> Result<(), ExtractError> {
+    let root = Root::prepare(root)?;
+    let components = entry_components(relative)?;
+    if components.is_empty() {
+        return Err(ExtractError::UnsafeEntry(relative.to_owned()));
+    }
+    let path = root.join(&components);
+    root.create_symlink(&path, target, relative)
+}
+
 /// [`extract_zip`] on the blocking thread pool.
 pub async fn extract_zip_async(
     archive: PathBuf,

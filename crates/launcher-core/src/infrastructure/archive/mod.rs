@@ -8,6 +8,7 @@
 mod extract;
 mod natives;
 
+pub(crate) use extract::create_link_inside;
 pub use extract::{extract_tar_gz, extract_tar_gz_async, extract_zip, extract_zip_async};
 pub use natives::ZipNativesExtractor;
 
