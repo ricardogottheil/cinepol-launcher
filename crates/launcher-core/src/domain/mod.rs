@@ -3,4 +3,11 @@
 //! No I/O lives here. Nothing in this module may import `application` or
 //! `infrastructure` (enforced by `tests/architecture.rs`).
 
+pub mod account;
+pub mod instance;
+pub mod integrity;
+pub mod java;
+pub mod loader;
+pub mod modpack;
 pub mod ports;
+pub mod server_list;

@@ -15,9 +15,13 @@ name = "launcher_core"
 [features]
 # Integration tests that hit real external APIs. Never enabled by default.
 network-tests = []
+# In-memory fakes for every port, for tests in this and dependent crates.
+test-support = []
 
 [dependencies]
 thiserror.workspace = true
+uuid = { workspace = true, features = ["std", "v4"] }
+md-5.workspace = true
 tokio = { workspace = true, features = ["time"] }
 tokio-util.workspace = true
 
