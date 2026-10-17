@@ -52,10 +52,7 @@ where
         if waited.is_none() || cancel.is_cancelled() {
             return Err(ProgressDemoError::Cancelled);
         }
-        reporter.report(ProgressUpdate {
-            done,
-            total: Some(total),
-        });
+        reporter.report(ProgressUpdate::new(done, Some(total)));
     }
     Ok(())
 }
@@ -139,10 +136,7 @@ mod tests {
         assert_eq!(
             reporter.updates(),
             (1..=3)
-                .map(|done| ProgressUpdate {
-                    done,
-                    total: Some(3)
-                })
+                .map(|done| ProgressUpdate::new(done, Some(3)))
                 .collect::<Vec<_>>()
         );
     }

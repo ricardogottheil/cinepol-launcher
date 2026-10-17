@@ -4,10 +4,14 @@
 
 mod clock;
 mod delay;
+mod download;
+mod http;
 mod progress;
 mod secrets;
 
 pub use clock::{Clock, unix_seconds};
 pub use delay::Delay;
-pub use progress::{ProgressReporter, ProgressUpdate};
+pub use download::{DownloadError, DownloadRequest, DownloadSummary, Downloader};
+pub use http::{HttpClient, HttpError};
+pub use progress::{ProgressReporter, ProgressStage, ProgressUpdate, StagedReporter};
 pub use secrets::{Secret, SecretKey, SecretStore, SecretStoreError};

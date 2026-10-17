@@ -3,7 +3,7 @@
 mod ports;
 mod version;
 
-pub use ports::{JavaProbe, JavaProbeError};
+pub use ports::{JavaProbe, JavaProbeError, JavaRuntimeError, JavaRuntimeProvider};
 pub use version::{JavaVersion, JavaVersionError, parse_java_version_output};
 
 use std::path::PathBuf;
