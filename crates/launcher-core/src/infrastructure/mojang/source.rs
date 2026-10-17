@@ -95,7 +95,10 @@ impl<H: HttpClient> MojangVersionSource<H> {
     ) -> Result<VersionSpec, VersionSourceError> {
         GameVersion::parse(id)
             .map_err(|_| VersionSourceError::Invalid(format!("unsafe version id {id:?}")))?;
-        let cache = self.paths.version_json(id);
+        let cache = self
+            .paths
+            .version_json(id)
+            .ok_or_else(|| VersionSourceError::Invalid(format!("unsafe version id {id:?}")))?;
 
         let lookup = match manifest {
             Some(lookup) => lookup,
@@ -104,10 +107,16 @@ impl<H: HttpClient> MojangVersionSource<H> {
         let unavailable = match lookup {
             ManifestLookup::Entries(entries) => match entries.get(id) {
                 Some(entry) => {
+                    // A declared but malformed digest must fail: silently dropping it
+                    // would download and cache the file without any verification.
                     let checksum = entry
                         .sha1
                         .as_deref()
-                        .and_then(|raw| Checksum::parse(HashAlgorithm::Sha1, raw).ok());
+                        .map(|raw| Checksum::parse(HashAlgorithm::Sha1, raw))
+                        .transpose()
+                        .map_err(|error| {
+                            VersionSourceError::Invalid(format!("manifest sha1 for {id}: {error}"))
+                        })?;
                     let bytes = self
                         .fetch_verified(&cache, &entry.url, checksum.as_ref(), |error| {
                             version_http_error(id, error)
@@ -231,7 +240,7 @@ mod tests {
     }
 
     fn write_cached(root: &Path, id: &str, json: &str) {
-        let path = LauncherPaths::new(root).version_json(id);
+        let path = LauncherPaths::new(root).version_json(id).unwrap();
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, json).unwrap();
     }
@@ -266,7 +275,7 @@ mod tests {
         let spec = first.version("26.2").await.unwrap();
         assert_eq!(spec.libraries.len(), 131);
         assert_eq!(first.http.requests(), [VERSION_MANIFEST_URL, V26_2_URL]);
-        let cached = LauncherPaths::new(dir.path()).version_json("26.2");
+        let cached = LauncherPaths::new(dir.path()).version_json("26.2").unwrap();
         assert_eq!(std::fs::read(&cached).unwrap(), V26_2);
 
         let second = source(offline(), dir.path());
@@ -290,7 +299,7 @@ mod tests {
         let spec = online.version("26.2").await.unwrap();
         assert_eq!(spec.main_class, "net.minecraft.client.main.Main");
         assert_eq!(online.http.requests(), [VERSION_MANIFEST_URL, V26_2_URL]);
-        let cached = LauncherPaths::new(dir.path()).version_json("26.2");
+        let cached = LauncherPaths::new(dir.path()).version_json("26.2").unwrap();
         assert_eq!(std::fs::read(cached).unwrap(), V26_2);
     }
 
@@ -305,7 +314,12 @@ mod tests {
             source(http, dir.path()).version("26.2").await,
             Err(VersionSourceError::Invalid(_))
         ));
-        assert!(!LauncherPaths::new(dir.path()).version_json("26.2").exists());
+        assert!(
+            !LauncherPaths::new(dir.path())
+                .version_json("26.2")
+                .unwrap()
+                .exists()
+        );
     }
 
     #[tokio::test]
@@ -412,5 +426,30 @@ mod tests {
         ));
         let third = source(online(), dir.path());
         assert_eq!(third.asset_index(&asset_index_ref()).await.unwrap(), index);
+    }
+
+    #[tokio::test]
+    async fn a_malformed_manifest_sha1_fails_instead_of_skipping_verification() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = String::from_utf8(MANIFEST.to_vec()).unwrap().replace(
+            "91ef51b7d36ca092c5c02aba42f0f40c7cc1db84\",",
+            "not-a-sha1\",",
+        );
+        assert!(
+            manifest.contains("not-a-sha1"),
+            "the fixture entry for 26.2 was patched"
+        );
+        let http = FakeHttpClient::with([
+            (VERSION_MANIFEST_URL.to_owned(), manifest.into_bytes()),
+            (V26_2_URL.to_owned(), V26_2.to_vec()),
+        ]);
+        let source = source(http, dir.path());
+
+        assert!(matches!(
+            source.version("26.2").await,
+            Err(VersionSourceError::Invalid(_))
+        ));
+        let cached = LauncherPaths::new(dir.path()).version_json("26.2").unwrap();
+        assert!(!cached.exists(), "nothing unverified is cached");
     }
 }

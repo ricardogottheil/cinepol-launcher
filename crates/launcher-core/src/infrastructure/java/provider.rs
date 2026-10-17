@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use tokio_util::sync::CancellationToken;
 
-use super::marker::{RuntimeMarker, read_marker};
+use super::marker::{RuntimeMarker, read_marker, remove_marker};
 use crate::domain::java::{
     JavaProbe, JavaRequirement, JavaRuntime, JavaRuntimeError, JavaRuntimeProvider, JavaSource,
 };
@@ -49,6 +49,35 @@ impl<H: HttpClient, D: Downloader, P: JavaProbe> JavaRuntimeProvider
         if cancel.is_cancelled() {
             return Err(JavaRuntimeError::Cancelled);
         }
+        let executable = self
+            .install(requirement, platform, reporter, cancel)
+            .await?;
+        match self.check(executable, requirement).await {
+            Ok(runtime) => Ok(runtime),
+            Err(error) => {
+                // A runtime that no longer runs (damaged files, interrupted update)
+                // is installed again once: forgetting its marker makes the next
+                // install re-verify every file and replace the broken ones.
+                tracing::warn!(%error, "the managed Java runtime is broken; reinstalling it");
+                self.forget_installs(requirement, platform).await;
+                let executable = self
+                    .install(requirement, platform, reporter, cancel)
+                    .await?;
+                self.check(executable, requirement).await
+            }
+        }
+    }
+}
+
+impl<H: HttpClient, D: Downloader, P: JavaProbe> ManagedJavaRuntimes<H, D, P> {
+    /// Mojang first, Adoptium when Mojang has nothing for the platform.
+    async fn install<R: ProgressReporter>(
+        &self,
+        requirement: &JavaRequirement,
+        platform: &Platform,
+        reporter: &R,
+        cancel: &CancellationToken,
+    ) -> Result<PathBuf, JavaRuntimeError> {
         let mojang = match platform.mojang_runtime_platform() {
             Some(key) => {
                 self.ensure_mojang(requirement, platform, key, reporter, cancel)
@@ -56,14 +85,21 @@ impl<H: HttpClient, D: Downloader, P: JavaProbe> JavaRuntimeProvider
             }
             None => None,
         };
-        let executable = match mojang {
-            Some(executable) => executable,
+        match mojang {
+            Some(executable) => Ok(executable),
             None => {
                 self.ensure_adoptium(requirement, platform, reporter, cancel)
-                    .await?
+                    .await
             }
-        };
+        }
+    }
 
+    /// Runs the executable and checks it is the required major version.
+    async fn check(
+        &self,
+        executable: PathBuf,
+        requirement: &JavaRequirement,
+    ) -> Result<JavaRuntime, JavaRuntimeError> {
         let version = self
             .probe
             .probe(&executable)
@@ -82,6 +118,25 @@ impl<H: HttpClient, D: Downloader, P: JavaProbe> JavaRuntimeProvider
             version,
             source: JavaSource::Managed,
         })
+    }
+
+    /// Removes the markers of every install that could serve `requirement`.
+    async fn forget_installs(&self, requirement: &JavaRequirement, platform: &Platform) {
+        if let (Some(key), Ok(component)) = (
+            platform.mojang_runtime_platform(),
+            safe_segment(&requirement.component),
+        ) {
+            remove_marker(&self.runtimes_dir.join("mojang").join(component).join(key)).await;
+        }
+        let (os, arch) = platform.adoptium();
+        remove_marker(
+            &self
+                .runtimes_dir
+                .join("adoptium")
+                .join(requirement.major.to_string())
+                .join(format!("{os}-{arch}")),
+        )
+        .await;
     }
 }
 

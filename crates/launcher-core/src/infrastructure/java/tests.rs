@@ -497,3 +497,59 @@ async fn no_mojang_jre_and_no_adoptium_build_is_unavailable() {
     assert_eq!(provider.http.requests().len(), 3);
     assert!(provider.downloader.requests().is_empty());
 }
+
+/// Fails the first probe (a broken installed runtime), then works.
+struct FlakyProbe {
+    calls: std::sync::Mutex<u32>,
+}
+
+impl crate::domain::java::JavaProbe for FlakyProbe {
+    async fn probe(
+        &self,
+        _executable: &Path,
+    ) -> Result<JavaVersion, crate::domain::java::JavaProbeError> {
+        let mut calls = self.calls.lock().unwrap();
+        *calls += 1;
+        if *calls == 1 {
+            Err(crate::domain::java::JavaProbeError::Unreadable(
+                "corrupted runtime".into(),
+            ))
+        } else {
+            Ok(java(25))
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_broken_installed_runtime_is_reinstalled_once() {
+    let runtimes = tempfile::tempdir().unwrap();
+    let manifest = fixture("mojang/java-runtime-epsilon-mac-os-arm64-trimmed.json");
+    let healthy = ManagedJavaRuntimes::new(
+        mojang_http(&manifest),
+        FakeDownloader::with([]),
+        FakeJavaProbe::with([(epsilon_java(runtimes.path()), java(25))]),
+        runtimes.path().to_path_buf(),
+    );
+    ensure(&healthy, &epsilon(), &mac_arm64()).await.unwrap();
+
+    let flaky = ManagedJavaRuntimes::new(
+        mojang_http(&manifest),
+        FakeDownloader::with([]),
+        FlakyProbe {
+            calls: std::sync::Mutex::new(0),
+        },
+        runtimes.path().to_path_buf(),
+    );
+    let runtime = ensure(&flaky, &epsilon(), &mac_arm64()).await.unwrap();
+
+    assert_eq!(runtime.version, java(25));
+    assert_eq!(
+        *flaky.probe.calls.lock().unwrap(),
+        2,
+        "probed, reinstalled, probed again"
+    );
+    assert!(
+        !flaky.downloader.requests().is_empty(),
+        "the broken runtime was downloaded again"
+    );
+}

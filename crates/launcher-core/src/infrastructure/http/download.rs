@@ -101,6 +101,7 @@ impl DownloadManager {
                 .await
                 .map_err(|error| io_error(parent, &error.to_string()))?;
         }
+        remove_stale_parts(&request.destination).await;
 
         let mut backoff = self.config.initial_backoff;
         let mut attempt = 1;
@@ -128,7 +129,7 @@ impl DownloadManager {
             tracing::debug!(url = %request.url, attempt, error = %failure.error, "retrying download");
             tokio::select! {
                 () = cancel.cancelled() => return Err(DownloadError::Cancelled),
-                () = tokio::time::sleep(backoff) => {}
+                () = tokio::time::sleep(failure.retry_after.unwrap_or(backoff)) => {}
             }
             backoff = backoff.saturating_mul(2);
             attempt += 1;
@@ -150,6 +151,7 @@ impl DownloadManager {
                 reason,
             },
             retryable,
+            retry_after: None,
         };
         let sent = tokio::select! {
             () = cancel.cancelled() => return Err(Failure::fatal(DownloadError::Cancelled)),
@@ -159,7 +161,13 @@ impl DownloadManager {
         let status = response.status();
         if !status.is_success() {
             let retryable = status.is_server_error() || status.as_u16() == 429;
-            return Err(http(format!("HTTP {status}"), retryable));
+            let wait = (status.as_u16() == 429)
+                .then(|| retry_after(&response))
+                .flatten();
+            return Err(Failure {
+                retry_after: wait,
+                ..http(format!("HTTP {status}"), retryable)
+            });
         }
 
         let mut file = tokio::fs::File::create(temp)
@@ -207,6 +215,7 @@ impl DownloadManager {
                         actual,
                     },
                     retryable: true,
+                    retry_after: None,
                 });
             }
         }
@@ -276,6 +285,8 @@ enum Fetched {
 struct Failure {
     error: DownloadError,
     retryable: bool,
+    /// The server's `Retry-After` for a 429, which wins over the backoff.
+    retry_after: Option<Duration>,
 }
 
 impl Failure {
@@ -283,6 +294,55 @@ impl Failure {
         Self {
             error,
             retryable: false,
+            retry_after: None,
+        }
+    }
+}
+
+/// Age after which an orphaned `.part` file is considered abandoned.
+const STALE_PART_AGE: Duration = Duration::from_secs(5 * 60);
+
+/// Longest `Retry-After` the downloader honours.
+const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
+
+fn retry_after(response: &reqwest::Response) -> Option<Duration> {
+    let seconds = response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()?;
+    Some(Duration::from_secs(seconds).min(MAX_RETRY_AFTER))
+}
+
+/// Removes `<name>.<id>.part` files an interrupted run left next to `destination`.
+async fn remove_stale_parts(destination: &Path) {
+    // A `.part` untouched for STALE_PART_AGE belongs to an interrupted run, not to
+    // a download still in progress in another batch (which writes continuously).
+    let (Some(parent), Some(name)) = (destination.parent(), destination.file_name()) else {
+        return;
+    };
+    let prefix = format!("{}.", name.to_string_lossy());
+    let Ok(mut entries) = tokio::fs::read_dir(parent).await else {
+        return;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        let is_part = file_name
+            .strip_prefix(&prefix)
+            .and_then(|rest| rest.strip_suffix(".part"))
+            .is_some_and(|id| id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit()));
+        let stale = entry
+            .metadata()
+            .await
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age >= STALE_PART_AGE);
+        if is_part && stale {
+            let _ = tokio::fs::remove_file(entry.path()).await;
         }
     }
 }
@@ -818,5 +878,79 @@ mod tests {
         )
         .config();
         assert_eq!(config.max_concurrency, 1);
+    }
+
+    #[tokio::test]
+    async fn rate_limits_wait_for_retry_after_instead_of_the_backoff() {
+        let server = TestServer::start(vec![(
+            "/a.jar",
+            vec![
+                Reply::status(429).with_header("Retry-After", "1"),
+                Reply::ok("alpha"),
+            ],
+        )])
+        .await;
+        let dir = tempfile::tempdir().unwrap();
+        let started = std::time::Instant::now();
+        run(vec![request(
+            &server,
+            "/a.jar",
+            dir.path().join("a.jar"),
+            b"alpha",
+        )])
+        .await
+        .unwrap();
+        assert!(
+            started.elapsed() >= Duration::from_millis(900),
+            "waited {:?}",
+            started.elapsed()
+        );
+        assert_eq!(server.hits("/a.jar"), 2);
+    }
+
+    #[tokio::test]
+    async fn stale_part_files_from_an_interrupted_run_are_removed() {
+        let server = TestServer::start(vec![("/a.jar", vec![Reply::ok("alpha")])]).await;
+        let dir = tempfile::tempdir().unwrap();
+        let stale = dir
+            .path()
+            .join("a.jar.0123456789abcdef0123456789abcdef.part");
+        std::fs::write(&stale, b"half").unwrap();
+        let an_hour_ago = std::time::SystemTime::now() - Duration::from_secs(3600);
+        std::fs::File::options()
+            .write(true)
+            .open(&stale)
+            .unwrap()
+            .set_modified(an_hour_ago)
+            .unwrap();
+        std::fs::write(
+            dir.path()
+                .join("a.jar.fedcba9876543210fedcba9876543210.part"),
+            b"still being written by another download",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path()
+                .join("other.jar.0123456789abcdef0123456789abcdef.part"),
+            b"keep",
+        )
+        .unwrap();
+        run(vec![request(
+            &server,
+            "/a.jar",
+            dir.path().join("a.jar"),
+            b"alpha",
+        )])
+        .await
+        .unwrap();
+        assert_eq!(
+            files_in(dir.path()),
+            [
+                "a.jar",
+                "a.jar.fedcba9876543210fedcba9876543210.part",
+                "other.jar.0123456789abcdef0123456789abcdef.part"
+            ],
+            "only stale parts of this file go; a fresh one may belong to another download"
+        );
     }
 }

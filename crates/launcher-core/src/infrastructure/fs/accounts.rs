@@ -82,11 +82,34 @@ impl JsonAccountRepository {
 
     async fn load(&self) -> Result<AccountsFile, AccountRepositoryError> {
         match tokio::fs::read(&self.file).await {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map_err(|e| AccountRepositoryError::Storage(e.to_string())),
+            Ok(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(data) => Ok(data),
+                Err(error) => self.set_aside_corrupt_file(&error.to_string()).await,
+            },
             Err(e) if e.kind() == ErrorKind::NotFound => Ok(AccountsFile::default()),
             Err(e) => Err(AccountRepositoryError::Storage(e.to_string())),
         }
+    }
+
+    /// A corrupt file would block every account forever. Keep it next to the
+    /// original for recovery and start over with an empty list.
+    async fn set_aside_corrupt_file(
+        &self,
+        reason: &str,
+    ) -> Result<AccountsFile, AccountRepositoryError> {
+        let stamp = uuid::Uuid::new_v4().simple();
+        let backup = self.file.with_file_name(format!(
+            "{}.corrupt-{stamp}",
+            self.file
+                .file_name()
+                .map(|name| name.to_string_lossy())
+                .unwrap_or_default()
+        ));
+        tokio::fs::rename(&self.file, &backup).await.map_err(|e| {
+            AccountRepositoryError::Storage(format!("{reason}; could not set it aside: {e}"))
+        })?;
+        tracing::warn!(backup = %backup.display(), %reason, "accounts file was unreadable and was set aside");
+        Ok(AccountsFile::default())
     }
 
     async fn store(&self, mut data: AccountsFile) -> Result<(), AccountRepositoryError> {
@@ -198,5 +221,29 @@ mod tests {
                 "{forbidden} found in accounts.json"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn a_corrupt_file_is_set_aside_instead_of_blocking_every_account() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("accounts.json");
+        std::fs::write(&file, b"{ not json").unwrap();
+        let repo = JsonAccountRepository::new(&file);
+
+        assert_eq!(repo.list().await.unwrap(), vec![]);
+        let steve = Account::offline(AccountId::new_random(), Username::parse("Steve").unwrap());
+        repo.save(&steve).await.unwrap();
+        assert_eq!(repo.list().await.unwrap(), vec![steve]);
+
+        let backups: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+            .filter(|name| name.starts_with("accounts.json.corrupt-"))
+            .collect();
+        assert_eq!(backups.len(), 1, "the unreadable file is kept for recovery");
+        assert_eq!(
+            std::fs::read(dir.path().join(&backups[0])).unwrap(),
+            b"{ not json"
+        );
     }
 }
