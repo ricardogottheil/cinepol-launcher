@@ -2,7 +2,14 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!src/ipc/bindings.ts", "!src-tauri/gen", "!src-tauri/target", "!**/target"]
+    "includes": [
+      "**",
+      "!src/ipc/bindings.ts",
+      "!crates/**/tests/fixtures",
+      "!src-tauri/gen",
+      "!src-tauri/target",
+      "!**/target"
+    ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "javascript": { "formatter": { "quoteStyle": "double", "trailingCommas": "all" } },

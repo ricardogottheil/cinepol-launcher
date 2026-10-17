@@ -13,3 +13,13 @@ impl Delay for TokioDelay {
         tokio::time::sleep(duration).await;
     }
 }
+
+/// `Clock` backed by the system wall clock.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SystemClock;
+
+impl crate::domain::ports::Clock for SystemClock {
+    fn now(&self) -> std::time::SystemTime {
+        std::time::SystemTime::now()
+    }
+}

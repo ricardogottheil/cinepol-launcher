@@ -91,12 +91,68 @@
       "progressLabel": "Progreso del demo",
       "state": {
         "running": "En curso",
-        "done": "Completado",
-        "cancelled": "Cancelado",
-        "invalid_input": "Datos no válidos",
-        "internal": "Error inesperado",
-        "ipc_unavailable": "Solo disponible en la app de escritorio"
+        "done": "Completado"
       }
     }
+  },
+  "errors": {
+    "cancelled": "Cancelado",
+    "invalid_input": "Revisa el valor e inténtalo de nuevo",
+    "not_found": "Ya no existe",
+    "already_exists": "Eso ya existe",
+    "no_account": "Añade una cuenta para jugar",
+    "premium_required": "Hace falta una cuenta de Microsoft con Minecraft",
+    "not_installed": "Instala la instancia primero",
+    "network": "Sin conexión. Inténtalo de nuevo en un momento",
+    "java_unavailable": "Todavía no hay Java para este sistema",
+    "already_running": "Ya está en marcha",
+    "internal": "Algo ha fallado. Los detalles están en el registro",
+    "ipc_unavailable": "Solo disponible en la app de escritorio"
+  },
+  "stages": {
+    "metadata": "Leyendo la versión",
+    "libraries": "Descargando librerías",
+    "assets": "Descargando recursos",
+    "java": "Preparando Java",
+    "natives": "Preparando nativos",
+    "launching": "Iniciando el juego"
+  },
+  "accounts": {
+    "title": "Cuentas",
+    "active": "Activa",
+    "makeActive": "Usar esta cuenta",
+    "offline": "Sin premium",
+    "microsoft": "Microsoft",
+    "empty": "Todavía no hay cuentas.",
+    "offlineTitle": "Juega sin cuenta premium",
+    "offlineHint": "De 3 a 16 letras, números o guiones bajos. El servidor acepta jugadores sin cuenta premium.",
+    "usernameLabel": "Nombre de usuario",
+    "create": "Añadir cuenta",
+    "loading": "Cargando cuentas"
+  },
+  "instances": {
+    "title": "Instancias",
+    "empty": "Todavía no tienes instancias.",
+    "loading": "Cargando instancias",
+    "newTitle": "Nueva instancia",
+    "nameLabel": "Nombre",
+    "versionLabel": "Versión de Minecraft",
+    "showSnapshots": "Mostrar snapshots",
+    "create": "Crear instancia",
+    "install": "Instalar",
+    "play": "Jugar",
+    "stop": "Detener",
+    "cancel": "Cancelar",
+    "installed": "Instalada",
+    "playing": "Jugando",
+    "exited": "Cerrado con código {{code}}",
+    "spec": {
+      "version": "Versión",
+      "loader": "Loader",
+      "playtime": "Tiempo de juego"
+    },
+    "playtime": "{{hours}} h {{minutes}} min",
+    "logTitle": "Registro del juego",
+    "logEmpty": "Aquí aparece la salida del juego."
   }
 }

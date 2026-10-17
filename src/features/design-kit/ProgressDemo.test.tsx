@@ -36,7 +36,7 @@ describe("ProgressDemo", () => {
     fireEvent.click(screen.getByRole("button", { name: labels.start }));
     expect(screen.getByRole("status")).toHaveTextContent(labels.state.running);
 
-    act(() => options?.onProgress({ done: 5, total: 20 }));
+    act(() => options?.onProgress({ done: 5, total: 20, stage: null }));
     expect(screen.getByRole("progressbar", { name: labels.progressLabel })).toHaveAttribute(
       "aria-valuenow",
       "5",
@@ -61,6 +61,6 @@ describe("ProgressDemo", () => {
     });
 
     expect(cancel).toHaveBeenCalledOnce();
-    expect(screen.getByRole("status")).toHaveTextContent(labels.state.cancelled);
+    expect(screen.getByRole("status")).toHaveTextContent(esCommon.errors.cancelled);
   });
 });

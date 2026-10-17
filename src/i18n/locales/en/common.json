@@ -91,12 +91,68 @@
       "progressLabel": "Demo progress",
       "state": {
         "running": "Running",
-        "done": "Completed",
-        "cancelled": "Cancelled",
-        "invalid_input": "Invalid input",
-        "internal": "Unexpected error",
-        "ipc_unavailable": "Only available in the desktop app"
+        "done": "Completed"
       }
     }
+  },
+  "errors": {
+    "cancelled": "Cancelled",
+    "invalid_input": "Check the value and try again",
+    "not_found": "It no longer exists",
+    "already_exists": "That already exists",
+    "no_account": "Add an account to play",
+    "premium_required": "This needs a Microsoft account that owns Minecraft",
+    "not_installed": "Install the instance first",
+    "network": "No connection. Try again in a moment",
+    "java_unavailable": "There is no Java runtime for this system yet",
+    "already_running": "It is already running",
+    "internal": "Something went wrong. The details are in the log",
+    "ipc_unavailable": "Only available in the desktop app"
+  },
+  "stages": {
+    "metadata": "Reading the version",
+    "libraries": "Downloading libraries",
+    "assets": "Downloading assets",
+    "java": "Preparing Java",
+    "natives": "Preparing natives",
+    "launching": "Starting the game"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "active": "Active",
+    "makeActive": "Use this account",
+    "offline": "Offline",
+    "microsoft": "Microsoft",
+    "empty": "No accounts yet.",
+    "offlineTitle": "Play without a premium account",
+    "offlineHint": "3 to 16 letters, numbers or underscores. The server accepts players without a premium account.",
+    "usernameLabel": "Username",
+    "create": "Add account",
+    "loading": "Loading accounts"
+  },
+  "instances": {
+    "title": "Instances",
+    "empty": "You have no instances yet.",
+    "loading": "Loading instances",
+    "newTitle": "New instance",
+    "nameLabel": "Name",
+    "versionLabel": "Minecraft version",
+    "showSnapshots": "Show snapshots",
+    "create": "Create instance",
+    "install": "Install",
+    "play": "Play",
+    "stop": "Stop",
+    "cancel": "Cancel",
+    "installed": "Installed",
+    "playing": "Playing",
+    "exited": "Closed with code {{code}}",
+    "spec": {
+      "version": "Version",
+      "loader": "Loader",
+      "playtime": "Playtime"
+    },
+    "playtime": "{{hours}} h {{minutes}} min",
+    "logTitle": "Game log",
+    "logEmpty": "The game output appears here."
   }
 }

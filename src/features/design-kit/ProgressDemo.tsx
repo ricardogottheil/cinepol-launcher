@@ -47,7 +47,11 @@ export function ProgressDemo() {
           {t("designKit.ipc.cancel")}
         </Button>
         <span data-readout role="status" className="readout-sm text-engrave">
-          {state === "idle" ? "" : t(`designKit.ipc.state.${state}`)}
+          {state === "idle"
+            ? ""
+            : state === "running" || state === "done"
+              ? t(`designKit.ipc.state.${state}`)
+              : t(`errors.${state}`)}
         </span>
       </div>
     </div>

@@ -5,15 +5,61 @@ import type { Channel } from "@tauri-apps/api/core";
 
 export type AppInfo = { name: string, version: string, };
 
-export type ProgressEvent = { done: number, total: number | null, };
+export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "natives" | "launching";
 
-export type ErrorCode = "cancelled" | "invalid_input" | "internal";
+export type ProgressEvent = { done: number, total: number | null, stage: ProgressStageDto | null, };
+
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
+
+export type AccountKindDto = "microsoft" | "offline";
+
+export type AccountDto = { id: string, kind: AccountKindDto, username: string, profileUuid: string, };
+
+export type AccountsDto = { accounts: Array<AccountDto>, activeId: string | null, };
+
+export type GameVersionDto = { id: string, 
+/**
+ * `release`, `snapshot`, `old_beta` or `old_alpha`.
+ */
+kind: string, releaseTime: string, };
+
+export type GameVersionsDto = { latestRelease: string, versions: Array<GameVersionDto>, };
+
+export type InstanceOriginDto = "custom" | "cinepolServer" | "modpack";
+
+export type InstanceDto = { id: string, name: string, gameVersion: string, 
+/**
+ * `vanilla`, `fabric`, `quilt`, `forge` or `neoforge`.
+ */
+loader: string, loaderVersion: string | null, origin: InstanceOriginDto, playtimeSecs: number, };
+
+export type InstallSummaryDto = { downloadedFiles: number, reusedFiles: number, downloadedBytes: number, javaMajor: number | null, };
+
+export type LogStreamDto = "stdout" | "stderr";
+
+export type LogLineDto = { stream: LogStreamDto, line: string, };
+
+export type LaunchOutcomeDto = { instanceId: string, exitCode: number | null, killed: boolean, playedSecs: number, };
 
 /** Every backend command: its arguments and its success result. */
 export interface Commands {
   get_app_info: { args: Record<string, never>; result: AppInfo };
   run_progress_demo: { args: { operationId: string; steps: number; intervalMs: number; onProgress: Channel<ProgressEvent> }; result: null };
   cancel_operation: { args: { operationId: string }; result: boolean };
+  list_accounts: { args: Record<string, never>; result: AccountsDto };
+  create_offline_account: { args: { username: string }; result: AccountDto };
+  set_active_account: { args: { accountId: string }; result: null };
+  list_game_versions: { args: { includeSnapshots: boolean }; result: GameVersionsDto };
+  list_instances: { args: Record<string, never>; result: Array<InstanceDto> };
+  create_instance: { args: { name: string; gameVersion: string }; result: InstanceDto };
+  install_instance: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: InstallSummaryDto };
+  launch_instance: { args: { instanceId: string; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
+  kill_instance: { args: { instanceId: string }; result: boolean };
+}
+
+/** App-wide events and their payloads. */
+export interface Events {
+  "game-exited": LaunchOutcomeDto;
 }
