@@ -171,6 +171,7 @@ All live in `src/components/ui/` and are previewed on the dev-only route
 | `EquipmentPlate` | Equipment plate, D:195-201, D:669-680 | The cinema caption: subject + color temperature |
 | `WorldFrame` | Worlds gallery, WorldGallery.astro:46-89 | 16:9 capture with its plate |
 | `SpecSheet` | World readings ("label -> value") | Instance details: version, loader, Java, memory |
+| `Meter` | (launcher only) | Progress as a reading: hairline track, silk fill (never signal), tabular count |
 | `StepList` | How to join, HowToJoin.astro:43-58 | Numbered steps where order matters (Microsoft sign-in) |
 | `BrandGlyph` | src/icons/brandGlyphs.ts | Twitch and Discord only, simple-icons (CC0) |
 | `Wordmark` | `src/assets/brand/logo-wordmark.png` | The only logo rendered; never `logo.png` (it carries Mojang's badge, D:997) |

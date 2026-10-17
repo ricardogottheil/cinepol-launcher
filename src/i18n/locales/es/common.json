@@ -10,7 +10,8 @@
     "maximize": "Maximizar",
     "close": "Cerrar",
     "mainNavigation": "Navegación principal",
-    "community": "Comunidad"
+    "community": "Comunidad",
+    "version": "Versión"
   },
   "nav": {
     "home": "Inicio",
@@ -81,6 +82,21 @@
       "playtime": "Tiempo de juego",
       "secondary": "Acción secundaria",
       "disabled": "Acción desactivada"
+    },
+    "ipc": {
+      "title": "IPC",
+      "lead": "Una operación larga y cancelable que informa su progreso por un Channel de Tauri.",
+      "start": "Iniciar demo",
+      "cancel": "Cancelar",
+      "progressLabel": "Progreso del demo",
+      "state": {
+        "running": "En curso",
+        "done": "Completado",
+        "cancelled": "Cancelado",
+        "invalid_input": "Datos no válidos",
+        "internal": "Error inesperado",
+        "ipc_unavailable": "Solo disponible en la app de escritorio"
+      }
     }
   }
 }

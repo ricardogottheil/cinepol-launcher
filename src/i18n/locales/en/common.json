@@ -10,7 +10,8 @@
     "maximize": "Maximize",
     "close": "Close",
     "mainNavigation": "Main navigation",
-    "community": "Community"
+    "community": "Community",
+    "version": "Version"
   },
   "nav": {
     "home": "Home",
@@ -81,6 +82,21 @@
       "playtime": "Playtime",
       "secondary": "Secondary action",
       "disabled": "Disabled action"
+    },
+    "ipc": {
+      "title": "IPC",
+      "lead": "A cancellable long operation reporting progress through a Tauri Channel.",
+      "start": "Start demo",
+      "cancel": "Cancel",
+      "progressLabel": "Demo progress",
+      "state": {
+        "running": "Running",
+        "done": "Completed",
+        "cancelled": "Cancelled",
+        "invalid_input": "Invalid input",
+        "internal": "Unexpected error",
+        "ipc_unavailable": "Only available in the desktop app"
+      }
     }
   }
 }

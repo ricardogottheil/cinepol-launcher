@@ -10,6 +10,7 @@ import { SpecSheet } from "../../components/ui/SpecSheet";
 import { StatusLamp } from "../../components/ui/StatusLamp";
 import { StepList } from "../../components/ui/StepList";
 import { WorldFrame } from "../../components/ui/WorldFrame";
+import { ProgressDemo } from "./ProgressDemo";
 
 /** Development-only catalog of the base components (route `/design`). */
 export function DesignKitPage() {
@@ -93,6 +94,12 @@ export function DesignKitPage() {
             ]}
           />
         </div>
+      </section>
+
+      <section className="flex flex-col gap-6 border-t border-hairline pt-8">
+        <h2 className="display-md m-0">{t("designKit.ipc.title")}</h2>
+        <p className="measure m-0 text-silk-dim">{t("designKit.ipc.lead")}</p>
+        <ProgressDemo />
       </section>
 
       <section className="flex flex-col gap-6 border-t border-hairline pt-8">

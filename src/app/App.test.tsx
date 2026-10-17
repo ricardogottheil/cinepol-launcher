@@ -1,10 +1,19 @@
 import { createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import enCommon from "../i18n/locales/en/common.json";
 import esCommon from "../i18n/locales/es/common.json";
 import { App } from "./App";
 import { createAppRouter } from "./router";
+
+const getAppInfo = vi.hoisted(() =>
+  vi.fn(async () => ({ name: "Cinepol Launcher", version: "0.1.0" })),
+);
+
+vi.mock("../ipc/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../ipc/client")>()),
+  getAppInfo,
+}));
 
 function renderAt(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
@@ -38,5 +47,11 @@ describe("App shell", () => {
       "href",
       "https://discord.gg/cinepol",
     );
+  });
+
+  it("shows the app version from the backend", async () => {
+    getAppInfo.mockResolvedValue({ name: "Cinepol Launcher", version: "0.1.0" });
+    renderAt("/");
+    expect(await screen.findByText("0.1.0")).toBeInTheDocument();
   });
 });

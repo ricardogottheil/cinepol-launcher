@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { BrandGlyph } from "../../components/ui/BrandGlyph";
 import { bundledServerConfig } from "../../features/server/serverConfig";
+import { useAppInfo } from "../../features/system/useAppInfo";
 
 const NAV = [
   { to: "/", key: "nav.home" },
@@ -18,6 +19,7 @@ const itemClass =
 export function Sidebar() {
   const { t } = useTranslation();
   const { links } = bundledServerConfig;
+  const appInfo = useAppInfo();
 
   return (
     <aside
@@ -78,6 +80,14 @@ export function Sidebar() {
         <p className="mt-4 mb-0 text-[0.75rem] leading-[1.45] text-engrave">
           {t("legal.disclaimer")}
         </p>
+        {appInfo.data ? (
+          <p className="plate mt-3 mb-0 flex items-baseline gap-2 text-engrave">
+            {t("chrome.version")}
+            <span data-readout className="readout-sm normal-case tracking-normal">
+              {appInfo.data.version}
+            </span>
+          </p>
+        ) : null}
       </div>
     </aside>
   );
