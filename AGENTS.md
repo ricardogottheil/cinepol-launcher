@@ -105,7 +105,11 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
   (`launch_instance.rs`, `create_offline_profile.rs`).
 - Ports are traits with `async fn` (use `async-trait` only when a port must be
   used as `dyn`). Every port gets an in-memory fake for tests.
-- DTOs live only in `src-tauri/src/dto.rs`; domain types never derive `ts_rs::TS`.
+- DTOs live only in `src-tauri/src/dto.rs` and `AppError`/`ErrorCode` in
+  `src-tauri/src/error.rs`; domain types never derive `ts_rs::TS`.
+- Cancellable operations take an `operationId` from the frontend, register it in
+  `OperationRegistry` (`src-tauri/src/operations.rs`) and are cancelled with the
+  `cancel_operation` command.
 - Deserialize external APIs into strict serde types that tolerate unknown fields;
   never panic on missing optional data.
 - Validate every string that becomes a path or a JVM/game argument.

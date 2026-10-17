@@ -26,6 +26,8 @@ cinepol-launcher-core.workspace = true
 tauri = { version = "2.12.4", features = [] }
 serde.workspace = true
 serde_json.workspace = true
+tokio-util.workspace = true
+ts-rs.workspace = true
 
 [lints]
 workspace = true
