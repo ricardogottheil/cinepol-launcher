@@ -9,7 +9,12 @@ import { readFileSync } from "node:fs";
 const SUSPICIOUS =
   /[\u00bf\u00a1\u00f1\u00d1\u00e1\u00e9\u00ed\u00f3\u00fa\u00c1\u00c9\u00cd\u00d3\u00da\u00fc\u00dc]/u;
 const ALLOW_MARKER = "english-check: allow";
-const EXEMPT = [/^src\/i18n\/locales\/(?!en\/)[^/]+\//, /^pnpm-lock\.yaml$/];
+const EXEMPT = [
+  /^src\/i18n\/locales\/(?!en\/)[^/]+\//,
+  /^pnpm-lock\.yaml$/,
+  // Real-world data captured from external services (server MOTDs, APIs).
+  /^crates\/[^/]+\/tests\/fixtures\//,
+];
 const BINARY = /\.(png|jpe?g|webp|gif|ico|icns|woff2?|ttf|otf|zip|jar|dat|mrpack)$/i;
 
 const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {

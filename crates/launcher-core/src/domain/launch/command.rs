@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use super::{ArgumentToken, Features, OsName, Platform, VersionSpec, rules_allow};
 use crate::domain::instance::{JvmArgs, MemorySettings, WindowSize};
+use crate::domain::server_list::ServerAddress;
 
 /// Who the game runs as.
 #[derive(Clone)]
@@ -280,9 +281,19 @@ pub fn build_launch_command(spec: &VersionSpec, ctx: &LaunchContext) -> LaunchCo
                 .map(str::to_owned),
             );
         }
-        if ctx.quick_play_multiplayer.is_some() {
-            game_tokens.extend(legacy_server_args(ctx.quick_play_multiplayer.as_deref()));
-        }
+    }
+    // Quick Play arrived in 1.20; older versions (legacy or modern arguments)
+    // still join a server on start with --server/--port.
+    // Legacy arguments replace the modern ones entirely, so they never carry Quick Play.
+    let supports_quick_play = spec.legacy_game_arguments.is_none()
+        && spec.game_arguments.iter().any(|token| match token {
+            ArgumentToken::Plain(value) => value.contains("${quickPlayMultiplayer}"),
+            ArgumentToken::Conditional { values, .. } => values
+                .iter()
+                .any(|value| value.contains("${quickPlayMultiplayer}")),
+        });
+    if !supports_quick_play {
+        game_tokens.extend(legacy_server_args(ctx.quick_play_multiplayer.as_deref()));
     }
     let game_args = game_tokens
         .iter()
@@ -299,20 +310,15 @@ pub fn build_launch_command(spec: &VersionSpec, ctx: &LaunchContext) -> LaunchCo
 
 /// `--server host --port port` for versions without Quick Play.
 fn legacy_server_args(address: Option<&str>) -> Vec<String> {
-    let Some(address) = address else {
+    // An address that does not parse is not passed to the game at all.
+    let Some(address) = address.and_then(|raw| ServerAddress::parse(raw).ok()) else {
         return vec![];
-    };
-    let (host, port) = match address.rsplit_once(':') {
-        Some((host, port)) if !host.contains(':') || host.starts_with('[') => {
-            (host.trim_matches(['[', ']']), port)
-        }
-        _ => (address, "25565"),
     };
     vec![
         "--server".into(),
-        host.to_owned(),
+        address.host().to_owned(),
         "--port".into(),
-        port.to_owned(),
+        address.effective_port().to_string(),
     ]
 }
 
@@ -578,6 +584,33 @@ mod tests {
         assert_eq!(
             command.jvm_args.last().map(String::as_str),
             Some("-Dlog4j.configurationFile=/data/assets/log_configs/client-1.21.2.xml")
+        );
+    }
+
+    #[test]
+    fn versions_without_quick_play_join_with_server_and_port() {
+        // 1.13 to 1.20.1 have modern arguments but no Quick Play conditional.
+        let mut spec = spec_modern();
+        spec.game_arguments.retain(|token| !matches!(token, ArgumentToken::Conditional { values, .. } if values.iter().any(|v| v.contains("quickPlay"))));
+        let mut ctx = context(Platform::new(OsName::Linux, Arch::X86_64));
+        ctx.quick_play_multiplayer = Some("mc.policarpiers.com".into());
+        let args = build_launch_command(&spec, &ctx).game_args;
+        assert_eq!(
+            &args[args.len() - 4..],
+            ["--server", "mc.policarpiers.com", "--port", "25565"]
+        );
+        assert!(!args.iter().any(|arg| arg.contains("quickPlay")));
+    }
+
+    #[test]
+    fn server_flags_handle_ipv6_addresses() {
+        let mut spec = spec_modern();
+        spec.game_arguments.clear();
+        let mut ctx = context(Platform::new(OsName::Linux, Arch::X86_64));
+        ctx.quick_play_multiplayer = Some("[2001:db8::1]:25570".into());
+        assert_eq!(
+            build_launch_command(&spec, &ctx).game_args,
+            ["--server", "2001:db8::1", "--port", "25570"]
         );
     }
 }

@@ -25,10 +25,12 @@ use crate::domain::server_list::{ServerList, ServerListStore, ServerListStoreErr
 use tokio_util::sync::CancellationToken;
 
 mod launch;
+mod server;
 pub use launch::{
     FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, RecordingLogSink,
     RecordingNativesExtractor, sample_asset_index, sample_version_spec,
 };
+pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySettingsRepository};
 
 /// Records every progress update.
 #[derive(Debug, Default)]

@@ -1,0 +1,167 @@
+{
+ "version": {
+  "protocol": 777,
+  "name": "Velocity-CTD 1.21.11-26.3"
+ },
+ "players": {
+  "online": 11,
+  "max": 100,
+  "sample": [
+   {
+    "name": "§7Jugadores Conectados: §f11§7/§f100",
+    "id": "01a14c27-f4ca-795d-8aa6-88b0d5bdf366"
+   },
+   {
+    "name": "Player1",
+    "id": "00000000-0000-0000-0000-000000000001"
+   },
+   {
+    "name": "Player2",
+    "id": "00000000-0000-0000-0000-000000000002"
+   },
+   {
+    "name": "Player3",
+    "id": "00000000-0000-0000-0000-000000000003"
+   },
+   {
+    "name": "Player4",
+    "id": "00000000-0000-0000-0000-000000000004"
+   },
+   {
+    "name": "Player5",
+    "id": "00000000-0000-0000-0000-000000000005"
+   },
+   {
+    "name": "Player6",
+    "id": "00000000-0000-0000-0000-000000000006"
+   },
+   {
+    "name": "Player7",
+    "id": "00000000-0000-0000-0000-000000000007"
+   },
+   {
+    "name": "Player8",
+    "id": "00000000-0000-0000-0000-000000000008"
+   },
+   {
+    "name": "Player9",
+    "id": "00000000-0000-0000-0000-000000000009"
+   },
+   {
+    "name": "Player10",
+    "id": "00000000-0000-0000-0000-000000000010"
+   },
+   {
+    "name": "Player11",
+    "id": "00000000-0000-0000-0000-000000000011"
+   }
+  ]
+ },
+ "description": {
+  "extra": [
+   {
+    "bold": true,
+    "extra": [
+     {
+      "extra": [
+       {
+        "color": "#FF9A00",
+        "text": "『"
+       },
+       {
+        "color": "#FFA400",
+        "text": "★"
+       },
+       {
+        "color": "#FFAE00",
+        "text": "』"
+       },
+       {
+        "color": "#FFB800",
+        "text": " "
+       },
+       {
+        "color": "#FFC300",
+        "text": "ᴄ"
+       },
+       {
+        "color": "#FFCD00",
+        "text": "ɪ"
+       },
+       {
+        "color": "#FFD700",
+        "text": "ɴ"
+       },
+       {
+        "color": "#FFE100",
+        "text": "ᴇ"
+       },
+       {
+        "color": "#DBE024",
+        "text": "ᴘ"
+       },
+       {
+        "color": "#B6DE49",
+        "text": "ᴏ"
+       },
+       {
+        "color": "#92DD6D",
+        "text": "ʟ"
+       },
+       {
+        "color": "#6DDC92",
+        "text": " "
+       },
+       {
+        "color": "#49DBB6",
+        "text": "『"
+       },
+       {
+        "color": "#24D9DB",
+        "text": "★"
+       },
+       {
+        "color": "#00D8FF",
+        "text": "』"
+       }
+      ],
+      "text": ""
+     }
+    ],
+    "text": ""
+   },
+   "\n",
+   {
+    "color": "dark_gray",
+    "extra": [
+     {
+      "color": "aqua",
+      "extra": [
+       {
+        "color": "white",
+        "extra": [
+         {
+          "color": "dark_gray",
+          "extra": [
+           {
+            "color": "yellow",
+            "text": "¡sᴜᴍᴀᴛᴇ ᴀʜᴏʀᴀ!"
+           }
+          ],
+          "text": "• "
+         }
+        ],
+        "text": "ᴇɴ ʟɪɴᴇᴀ "
+       }
+      ],
+      "text": "11 "
+     }
+    ],
+    "text": "» "
+   }
+  ],
+  "text": ""
+ },
+ "favicon": "data:image/png;base64,iVBORw0KGgo=",
+ "preventsChatReports": false
+}

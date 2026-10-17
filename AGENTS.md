@@ -7,8 +7,10 @@
 Code, identifiers, comments, doc comments, commit messages, branch names, PR
 descriptions, docs, ADRs, log and error messages, test names and UI strings are
 English. UI strings go through i18n keys with `en` as the source locale.
-The only exception is translation files under `src/i18n/locales/<lang>/`
-(for example `es`). Reply to people in their chat language, but never let that
+The only exceptions are translation files under `src/i18n/locales/<lang>/`
+(for example `es`) and real-world data captured verbatim into
+`crates/*/tests/fixtures/` (server responses, API payloads), which is external
+input, not authored text. Reply to people in their chat language, but never let that
 language leak into the repository. Run `pnpm check:english` before every commit.
 
 ## 2. Project overview

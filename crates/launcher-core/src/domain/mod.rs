@@ -11,4 +11,6 @@ pub mod launch;
 pub mod loader;
 pub mod modpack;
 pub mod ports;
+pub mod server;
 pub mod server_list;
+pub mod settings;

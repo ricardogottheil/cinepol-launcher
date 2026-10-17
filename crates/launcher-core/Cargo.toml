@@ -35,6 +35,8 @@ flate2.workspace = true
 tar.workspace = true
 regex-lite.workspace = true
 tracing.workspace = true
+fastnbt.workspace = true
+hickory-resolver.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
