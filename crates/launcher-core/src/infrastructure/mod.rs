@@ -1,4 +1,9 @@
 //! Infrastructure layer: adapters implementing the domain ports
 //! (reqwest, keyring, file system, tokio processes, Mojang/loader APIs...).
 
+pub mod archive;
+pub mod http;
+pub mod java;
+pub mod mojang;
+pub mod process;
 pub mod time;

@@ -18,10 +18,11 @@ use crate::domain::modpack::{
     ModpackPage, ModpackQuery, ModpackSource, ModpackSourceError, ModpackSourceKind, ModpackVersion,
 };
 use crate::domain::ports::{
-    Clock, Delay, ProgressReporter, ProgressUpdate, Secret, SecretKey, SecretStore,
-    SecretStoreError,
+    Clock, Delay, DownloadError, DownloadRequest, DownloadSummary, Downloader, HttpClient,
+    HttpError, ProgressReporter, ProgressUpdate, Secret, SecretKey, SecretStore, SecretStoreError,
 };
 use crate::domain::server_list::{ServerList, ServerListStore, ServerListStoreError};
+use tokio_util::sync::CancellationToken;
 
 /// Records every progress update.
 #[derive(Debug, Default)]
@@ -343,6 +344,90 @@ impl ModpackSource for FakeModpackSource {
             .get(project)
             .cloned()
             .ok_or_else(|| ModpackSourceError::NotFound(project.to_owned()))
+    }
+}
+
+/// Serves fixed bodies by URL; unknown URLs are 404. Records every request.
+#[derive(Debug, Default)]
+pub struct FakeHttpClient {
+    bodies: HashMap<String, Vec<u8>>,
+    requests: Mutex<Vec<String>>,
+}
+
+impl FakeHttpClient {
+    pub fn with(bodies: impl IntoIterator<Item = (String, Vec<u8>)>) -> Self {
+        Self {
+            bodies: bodies.into_iter().collect(),
+            requests: Mutex::default(),
+        }
+    }
+
+    pub fn requests(&self) -> Vec<String> {
+        self.requests.lock().unwrap().clone()
+    }
+}
+
+impl HttpClient for FakeHttpClient {
+    async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, HttpError> {
+        self.requests.lock().unwrap().push(url.to_owned());
+        self.bodies
+            .get(url)
+            .cloned()
+            .ok_or_else(|| HttpError::NotFound(url.to_owned()))
+    }
+}
+
+/// Writes fixed bodies by URL to each destination (creating parent folders)
+/// without verifying checksums. Records every request it was given.
+#[derive(Debug, Default)]
+pub struct FakeDownloader {
+    bodies: HashMap<String, Vec<u8>>,
+    requests: Mutex<Vec<DownloadRequest>>,
+}
+
+impl FakeDownloader {
+    pub fn with(bodies: impl IntoIterator<Item = (String, Vec<u8>)>) -> Self {
+        Self {
+            bodies: bodies.into_iter().collect(),
+            requests: Mutex::default(),
+        }
+    }
+
+    pub fn requests(&self) -> Vec<DownloadRequest> {
+        self.requests.lock().unwrap().clone()
+    }
+}
+
+impl Downloader for FakeDownloader {
+    async fn download_all<R: ProgressReporter>(
+        &self,
+        requests: Vec<DownloadRequest>,
+        reporter: &R,
+        cancel: &CancellationToken,
+    ) -> Result<DownloadSummary, DownloadError> {
+        let mut summary = DownloadSummary::default();
+        let total = requests.len() as u64;
+        for (index, request) in requests.into_iter().enumerate() {
+            if cancel.is_cancelled() {
+                return Err(DownloadError::Cancelled);
+            }
+            let body = self.bodies.get(&request.url).cloned().unwrap_or_default();
+            if let Some(parent) = request.destination.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| DownloadError::Io {
+                    path: parent.display().to_string(),
+                    reason: e.to_string(),
+                })?;
+            }
+            std::fs::write(&request.destination, &body).map_err(|e| DownloadError::Io {
+                path: request.destination.display().to_string(),
+                reason: e.to_string(),
+            })?;
+            summary.downloaded += 1;
+            summary.bytes += body.len() as u64;
+            self.requests.lock().unwrap().push(request);
+            reporter.report(ProgressUpdate::new(index as u64 + 1, Some(total)));
+        }
+        Ok(summary)
     }
 }
 

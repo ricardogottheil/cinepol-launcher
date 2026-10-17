@@ -1,0 +1,38 @@
+[
+    {
+        "binary": {
+            "architecture": "aarch64",
+            "download_count": 16003,
+            "heap_size": "normal",
+            "image_type": "jre",
+            "jvm_impl": "hotspot",
+            "os": "linux",
+            "package": {
+                "checksum": "34828cbb93ed31c281c84ecb31ddab655d11a802f263c1fc019d42e9e0230fed",
+                "checksum_link": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_aarch64_linux_hotspot_25.0.4.1_1.tar.gz.sha256.txt",
+                "download_count": 16003,
+                "link": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_aarch64_linux_hotspot_25.0.4.1_1.tar.gz",
+                "metadata_link": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_aarch64_linux_hotspot_25.0.4.1_1.tar.gz.json",
+                "name": "OpenJDK25U-jre_aarch64_linux_hotspot_25.0.4.1_1.tar.gz",
+                "signature_link": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jre_aarch64_linux_hotspot_25.0.4.1_1.tar.gz.sig",
+                "size": 60479792
+            },
+            "project": "jdk",
+            "scm_ref": "jdk-25.0.4.1+1_adopt",
+            "updated_at": "2026-08-21T11:42:17Z"
+        },
+        "release_link": "https://github.com/adoptium/temurin25-binaries/releases/tag/jdk-25.0.4.1%2B1",
+        "release_name": "jdk-25.0.4.1+1",
+        "vendor": "eclipse",
+        "version": {
+            "build": 1,
+            "major": 25,
+            "minor": 0,
+            "openjdk_version": "25.0.4.1+1-LTS",
+            "optional": "LTS",
+            "patch": 1,
+            "security": 4,
+            "semver": "25.0.4+101.0.LTS"
+        }
+    }
+]

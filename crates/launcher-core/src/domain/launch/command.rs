@@ -79,6 +79,20 @@ pub struct LaunchCommand {
 }
 
 impl LaunchCommand {
+    /// A command with nothing to redact (tests and tools; launches use `build_launch_command`).
+    pub fn new(
+        jvm_args: Vec<String>,
+        main_class: impl Into<String>,
+        game_args: Vec<String>,
+    ) -> Self {
+        Self {
+            jvm_args,
+            main_class: main_class.into(),
+            game_args,
+            secret: String::new(),
+        }
+    }
+
     pub fn args(&self) -> Vec<String> {
         let mut args = self.jvm_args.clone();
         args.push(self.main_class.clone());
