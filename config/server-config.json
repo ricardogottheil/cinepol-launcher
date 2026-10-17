@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "server": {
+    "name": "CINEPOL",
+    "address": "mc.policarpiers.com",
+    "port": 25565
+  },
+  "versions": {
+    "min": "1.21.11",
+    "max": "26.2",
+    "recommended": "26.2"
+  },
+  "links": {
+    "website": "https://cinepol.policarpiers.com/",
+    "twitch": "https://twitch.tv/polispol1",
+    "discord": "https://discord.gg/cinepol"
+  }
+}

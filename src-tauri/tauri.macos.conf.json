@@ -1,0 +1,24 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cinepol Launcher",
+        "width": 1200,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true,
+        "decorations": true,
+        "backgroundColor": "#0e100e",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 18,
+          "y": 22
+        }
+      }
+    ]
+  }
+}

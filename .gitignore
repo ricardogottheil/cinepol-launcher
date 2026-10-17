@@ -20,3 +20,6 @@ odd/
 .DS_Store
 .idea/
 *.log
+
+# Browser automation artifacts
+.playwright-cli/

@@ -1,9 +1,80 @@
 {
   "app": {
-    "name": "Cinepol Launcher",
-    "scaffoldNotice": "El launcher del servidor de la comunidad CINEPOL. En construcción."
+    "name": "Cinepol Launcher"
   },
   "legal": {
     "disclaimer": "No es un producto oficial de Minecraft. No está aprobado por Mojang ni Microsoft, ni asociado con ellos."
+  },
+  "chrome": {
+    "minimize": "Minimizar",
+    "maximize": "Maximizar",
+    "close": "Cerrar",
+    "mainNavigation": "Navegación principal",
+    "community": "Comunidad"
+  },
+  "nav": {
+    "home": "Inicio",
+    "instances": "Instancias",
+    "modpacks": "Modpacks",
+    "accounts": "Cuentas",
+    "settings": "Ajustes",
+    "designKit": "Kit de diseño"
+  },
+  "links": {
+    "twitch": "Twitch de polispol1",
+    "discord": "Discord de la comunidad"
+  },
+  "home": {
+    "title": "Entras con o sin cuenta premium",
+    "lead": "El servidor de la comunidad de polispol1. El launcher instala la versión recomendada y te lleva directo al servidor.",
+    "play": "Jugar en CINEPOL",
+    "copyAddress": "Copiar IP",
+    "copied": "Copiada",
+    "copiedAnnouncement": "Dirección copiada al portapapeles",
+    "readouts": {
+      "online": "Conectados",
+      "versions": "Versiones",
+      "recommended": "Recomendada"
+    },
+    "status": {
+      "checking": "Comprobando",
+      "offline": "Servidor sin respuesta",
+      "unavailable": "Estado no disponible"
+    },
+    "worldCaption": "Mundo de recursos",
+    "instances": {
+      "title": "Instancias",
+      "empty": "Todavía no hay instancias. Jugar en CINEPOL crea la primera."
+    }
+  },
+  "placeholder": {
+    "notAvailable": "Esta sección todavía no está disponible."
+  },
+  "designKit": {
+    "title": "Kit de diseño",
+    "lead": "Todos los componentes base con el aspecto de CINEPOL y textos reales.",
+    "worlds": "Mundos",
+    "controls": "Controles",
+    "readouts": "Lecturas",
+    "steps": "Pasos",
+    "specSheet": "Ficha técnica",
+    "sampleSteps": {
+      "open": "Abre la página de inicio de sesión",
+      "openBody": "El launcher la abre en tu navegador.",
+      "code": "Introduce el código",
+      "codeBody": "El código aparece aquí y se copia solo.",
+      "done": "Vuelve aquí",
+      "doneBody": "El launcher termina por su cuenta."
+    },
+    "sample": {
+      "version": "Versión",
+      "loader": "Loader",
+      "mods": "Mods",
+      "java": "Java",
+      "memory": "Memoria",
+      "playtime": "Tiempo de juego",
+      "secondary": "Acción secundaria",
+      "disabled": "Acción desactivada"
+    }
   }
 }

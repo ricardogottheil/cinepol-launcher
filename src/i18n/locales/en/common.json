@@ -1,9 +1,80 @@
 {
   "app": {
-    "name": "Cinepol Launcher",
-    "scaffoldNotice": "The launcher of the CINEPOL community server. Under construction."
+    "name": "Cinepol Launcher"
   },
   "legal": {
     "disclaimer": "Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft."
+  },
+  "chrome": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "close": "Close",
+    "mainNavigation": "Main navigation",
+    "community": "Community"
+  },
+  "nav": {
+    "home": "Home",
+    "instances": "Instances",
+    "modpacks": "Modpacks",
+    "accounts": "Accounts",
+    "settings": "Settings",
+    "designKit": "Design kit"
+  },
+  "links": {
+    "twitch": "polispol1 on Twitch",
+    "discord": "Community Discord"
+  },
+  "home": {
+    "title": "Play with or without a premium account",
+    "lead": "The polispol1 community server. The launcher installs the recommended version and takes you straight into the server.",
+    "play": "Play on CINEPOL",
+    "copyAddress": "Copy IP",
+    "copied": "Copied",
+    "copiedAnnouncement": "Address copied to the clipboard",
+    "readouts": {
+      "online": "Online",
+      "versions": "Versions",
+      "recommended": "Recommended"
+    },
+    "status": {
+      "checking": "Checking",
+      "offline": "Server not responding",
+      "unavailable": "Status unavailable"
+    },
+    "worldCaption": "Resource world",
+    "instances": {
+      "title": "Instances",
+      "empty": "No instances yet. Play on CINEPOL creates the first one."
+    }
+  },
+  "placeholder": {
+    "notAvailable": "This section is not available yet."
+  },
+  "designKit": {
+    "title": "Design kit",
+    "lead": "Every base component in the CINEPOL look, rendered with real copy.",
+    "worlds": "Worlds",
+    "controls": "Controls",
+    "readouts": "Readouts",
+    "steps": "Steps",
+    "specSheet": "Spec sheet",
+    "sampleSteps": {
+      "open": "Open the sign-in page",
+      "openBody": "The launcher opens it in your browser.",
+      "code": "Enter the code",
+      "codeBody": "The code is shown here and copied for you.",
+      "done": "Come back here",
+      "doneBody": "The launcher finishes on its own."
+    },
+    "sample": {
+      "version": "Version",
+      "loader": "Loader",
+      "mods": "Mods",
+      "java": "Java",
+      "memory": "Memory",
+      "playtime": "Playtime",
+      "secondary": "Secondary action",
+      "disabled": "Disabled action"
+    }
   }
 }
