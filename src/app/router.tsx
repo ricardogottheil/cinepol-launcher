@@ -5,8 +5,10 @@ import {
   createRouter,
   type RouterHistory,
 } from "@tanstack/react-router";
+import { AccountsPage } from "../features/accounts/AccountsPage";
 import { DesignKitPage } from "../features/design-kit/DesignKitPage";
 import { HomePage } from "../features/home/HomePage";
+import { InstancesPage } from "../features/instances/InstancesPage";
 import { PlaceholderPage, type PlaceholderSection } from "../features/placeholder/PlaceholderPage";
 import { AppShell } from "./shell/AppShell";
 
@@ -34,9 +36,9 @@ const designRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
-  placeholderRoute("instances"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/instances", component: InstancesPage }),
   placeholderRoute("modpacks"),
-  placeholderRoute("accounts"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/accounts", component: AccountsPage }),
   placeholderRoute("settings"),
   ...(import.meta.env.DEV ? [designRoute] : []),
 ]);

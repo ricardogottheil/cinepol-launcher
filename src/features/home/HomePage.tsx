@@ -6,6 +6,9 @@ import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
 import { type ServerStatus, StatusLamp } from "../../components/ui/StatusLamp";
 import { WorldFrame } from "../../components/ui/WorldFrame";
+import { useAccounts } from "../accounts/useAccounts";
+import { splitPlaytime } from "../instances/formatPlaytime";
+import { useInstances } from "../instances/useInstances";
 import { bundledServerConfig, displayAddress } from "../server/serverConfig";
 
 const plateLink =
@@ -15,17 +18,45 @@ export interface HomePageProps {
   /** Live status of the server. The Server List Ping arrives in Milestone 6. */
   status?: ServerStatus;
   onlinePlayers?: number | null;
-  /** Display name of the active account, if any (Milestone 7). */
-  accountName?: string | null;
+}
+
+/** The player's instances, or an empty state. */
+function HomeInstances() {
+  const { t } = useTranslation();
+  const instances = useInstances();
+  if (!instances.data || instances.data.length === 0) {
+    return (
+      <p className="mt-6 mb-0 border-t border-hairline pt-6 text-silk-dim">
+        {t("home.instances.empty")}
+      </p>
+    );
+  }
+  return (
+    <ul className="mt-6 mb-0 list-none border-t border-hairline p-0">
+      {instances.data.map((instance) => (
+        <li
+          key={instance.id}
+          className="flex flex-wrap items-baseline justify-between gap-4 border-b border-hairline py-4"
+        >
+          <Link to="/instances" className="display-md text-silk no-underline hover:text-silk-dim">
+            {instance.name}
+          </Link>
+          <span data-readout className="readout-sm text-engrave">
+            {instance.gameVersion} · {t("instances.playtime", splitPlaytime(instance.playtimeSecs))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** Launcher home: quick play on CINEPOL, then the player's instances. */
-export function HomePage({
-  status = "unavailable",
-  onlinePlayers = null,
-  accountName = null,
-}: HomePageProps) {
+export function HomePage({ status = "unavailable", onlinePlayers = null }: HomePageProps) {
   const { t } = useTranslation();
+  const accounts = useAccounts();
+  const accountName =
+    accounts.data?.accounts.find((account) => account.id === accounts.data?.activeId)?.username ??
+    null;
   const config = bundledServerConfig;
   const { recommended } = config.versions;
 
@@ -118,9 +149,7 @@ export function HomePage({
             </Link>
           </div>
         </div>
-        <p className="mt-6 mb-0 border-t border-hairline pt-6 text-silk-dim">
-          {t("home.instances.empty")}
-        </p>
+        <HomeInstances />
       </section>
     </div>
   );

@@ -6,6 +6,8 @@ import esCommon from "../i18n/locales/es/common.json";
 import { App } from "./App";
 import { createAppRouter } from "./router";
 
+const listAccounts = vi.hoisted(() => vi.fn(async () => ({ accounts: [], activeId: null })));
+const listInstances = vi.hoisted(() => vi.fn(async () => []));
 const getAppInfo = vi.hoisted(() =>
   vi.fn(async () => ({ name: "Cinepol Launcher", version: "0.1.0" })),
 );
@@ -13,6 +15,8 @@ const getAppInfo = vi.hoisted(() =>
 vi.mock("../ipc/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../ipc/client")>()),
   getAppInfo,
+  listAccounts,
+  listInstances,
 }));
 
 function renderAt(path: string) {
