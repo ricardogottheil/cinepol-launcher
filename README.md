@@ -37,4 +37,13 @@ All checks, conventions and recipes are in [`AGENTS.md`](AGENTS.md).
 
 ## License
 
-To be decided.
+The source code is licensed under the [GNU General Public License v3.0 only](LICENSE)
+(`GPL-3.0-only`).
+
+The CINEPOL name, wordmark, logo and the imagery under `src/assets/brand/` are
+**not** covered by the GPL. They identify the official launcher of the CINEPOL
+community and may not be used to distribute modified versions. Forks must remove
+them and ship under a different name.
+
+Third-party fonts keep their own licenses (SIL Open Font License 1.1), listed in
+`src/assets/brand/fonts/`.

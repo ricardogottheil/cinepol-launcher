@@ -31,6 +31,8 @@
     "active": true,
     "targets": ["nsis", "msi", "dmg", "app", "appimage", "deb"],
     "category": "Game",
+    "license": "GPL-3.0-only",
+    "licenseFile": "../LICENSE",
     "shortDescription": "The launcher of the CINEPOL community Minecraft server.",
     "longDescription": "Cinepol Launcher is the official launcher of the CINEPOL community Minecraft server. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.",
     "copyright": "Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.",
