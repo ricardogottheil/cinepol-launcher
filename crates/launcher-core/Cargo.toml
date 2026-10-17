@@ -20,7 +20,7 @@ test-support = []
 
 [dependencies]
 thiserror.workspace = true
-uuid = { workspace = true, features = ["std", "v4"] }
+uuid = { workspace = true, features = ["std", "v4", "serde"] }
 md-5.workspace = true
 tokio = { workspace = true, features = ["time", "fs", "process", "io-util", "rt", "sync", "macros"] }
 serde.workspace = true
