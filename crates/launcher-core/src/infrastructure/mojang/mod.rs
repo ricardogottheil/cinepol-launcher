@@ -1,1 +1,14 @@
 //! Mojang version manifest, version JSONs and asset indexes.
+//!
+//! [`MojangVersionSource`] implements the `VersionSource` port: it reads
+//! Mojang's metadata over HTTP, verifies every SHA-1 it declares and caches the
+//! version JSONs and asset indexes on disk so installed versions keep launching
+//! offline.
+
+mod cache;
+mod json;
+mod source;
+
+pub use source::{
+    ASSET_OBJECTS_BASE_URL, LIBRARIES_BASE_URL, MojangVersionSource, VERSION_MANIFEST_URL,
+};
