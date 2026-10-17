@@ -1,0 +1,21 @@
+[package]
+name = "cinepol-launcher-core"
+description = "Framework-free core of Cinepol Launcher: domain, use cases and adapters."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "launcher_core"
+
+[features]
+# Integration tests that hit real external APIs. Never enabled by default.
+network-tests = []
+
+[dependencies]
+
+[lints]
+workspace = true

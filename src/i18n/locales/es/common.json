@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "Cinepol Launcher",
+    "scaffoldNotice": "El launcher del servidor de la comunidad CINEPOL. En construcción."
+  },
+  "legal": {
+    "disclaimer": "No es un producto oficial de Minecraft. No está aprobado por Mojang ni Microsoft, ni asociado con ellos."
+  }
+}

@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+src-tauri/gen/schemas/
+
+# Local tracking (ODD feature documents, may contain chat-language notes)
+odd/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Editors and OS
+.DS_Store
+.idea/
+*.log

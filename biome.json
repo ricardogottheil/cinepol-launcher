@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": ["**", "!src/ipc/bindings.ts", "!src-tauri/gen", "!src-tauri/target", "!**/target"]
+  },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "javascript": { "formatter": { "quoteStyle": "double", "trailingCommas": "all" } },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "suspicious": { "noExplicitAny": "error" },
+      "style": {
+        "noDefaultExport": "error",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "@tauri-apps/api/core": "Call the backend through src/ipc/client.ts, never invoke directly."
+            },
+            "patterns": [
+              {
+                "group": ["**/ipc/bindings", "**/ipc/bindings.ts"],
+                "message": "Only src/ipc/ may import the generated bindings. Use src/ipc/client.ts."
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/ipc/**"],
+      "linter": { "rules": { "style": { "noRestrictedImports": "off" } } }
+    },
+    {
+      "includes": ["vite.config.ts", "*.config.ts"],
+      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+    }
+  ]
+}

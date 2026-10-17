@@ -1,0 +1,50 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Cinepol Launcher",
+  "version": "0.1.0",
+  "identifier": "com.policarpiers.cinepol-launcher",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cinepol Launcher",
+        "width": 1200,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: asset: http://asset.localhost; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 ws://localhost:1421; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi", "dmg", "app", "appimage", "deb"],
+    "category": "Game",
+    "shortDescription": "The launcher of the CINEPOL community Minecraft server.",
+    "longDescription": "Cinepol Launcher is the official launcher of the CINEPOL community Minecraft server. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.",
+    "copyright": "Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.",
+    "createUpdaterArtifacts": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+[workspace]
+resolver = "3"
+members = ["crates/launcher-core", "src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+authors = ["Ricardo Gottheil"]
+repository = "https://github.com/ricardogottheil/cinepol-launcher"
+
+[workspace.dependencies]
+cinepol-launcher-core = { path = "crates/launcher-core" }
+thiserror = "2.0.21"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

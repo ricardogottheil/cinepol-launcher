@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-surface-base);
+  color: var(--color-ink-primary);
+}

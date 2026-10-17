@@ -1,0 +1,11 @@
+/*
+ * CINEPOL design tokens (Tailwind v4 @theme), the single source of truth for
+ * colors, fonts and spacing. Milestone 2 ports the full token set from the
+ * website (see docs/design/design-system.md). Bootstrap values only:
+ * - surface-base: the website's theme-color (#0e100e).
+ */
+@theme {
+  --color-surface-base: #0e100e;
+  --color-ink-primary: #f2f4ef;
+  --color-ink-muted: #9aa197;
+}
