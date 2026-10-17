@@ -8,8 +8,12 @@ import {
   type LogLineDto,
   launchInstance,
   type ProgressStageDto,
+  playOnCinepol,
   toIpcError,
 } from "../../ipc/client";
+
+/** Store key of the "Play on CINEPOL" session (instance ids never contain a colon). */
+export const CINEPOL_SESSION = "cinepol:session";
 
 /** Lines kept per instance; older output is dropped. */
 export const MAX_LOG_LINES = 2000;
@@ -23,7 +27,11 @@ export type Activity =
       total: number | null;
       cancel: () => Promise<boolean>;
     }
-  | { kind: "running" };
+  | {
+      kind: "running";
+      /** Stops a game started by an operation (Play on CINEPOL); per-instance games use `stop`. */
+      cancel?: () => Promise<boolean>;
+    };
 
 export interface InstanceActivity {
   activity: Activity;
@@ -37,6 +45,7 @@ interface ActivityState {
   install: (instanceId: string) => Promise<InstallSummaryDto | null>;
   play: (instanceId: string) => Promise<LaunchOutcomeDto | null>;
   stop: (instanceId: string) => Promise<void>;
+  playCinepol: () => Promise<LaunchOutcomeDto | null>;
 }
 
 const IDLE: InstanceActivity = {
@@ -105,7 +114,9 @@ export const useActivityStore = create<ActivityState>((set) => {
       return outcome;
     } catch (error) {
       const code = toIpcError(error).code;
-      if (code === "not_installed" && (await install(instanceId))) {
+      if (code === "not_installed") {
+        // A failed install already recorded its own, more precise error.
+        if (!(await install(instanceId))) return null;
         try {
           const outcome = await launch();
           update(instanceId, { activity: { kind: "idle" }, lastExit: outcome });
@@ -124,7 +135,56 @@ export const useActivityStore = create<ActivityState>((set) => {
     await killInstance(instanceId).catch(() => false);
   };
 
-  return { byInstance: {}, install, play, stop };
+  const playCinepol = async (): Promise<LaunchOutcomeDto | null> => {
+    const key = CINEPOL_SESSION;
+    const operation = playOnCinepol({
+      onProgress: (event) =>
+        update(key, {
+          activity:
+            event.stage === "launching"
+              ? { kind: "running", cancel: operation.cancel }
+              : {
+                  kind: "installing",
+                  stage: event.stage,
+                  done: event.done,
+                  total: event.total,
+                  cancel: operation.cancel,
+                },
+        }),
+      onLog: (line) =>
+        set((state) => {
+          const current = state.byInstance[key] ?? IDLE;
+          return {
+            byInstance: {
+              ...state.byInstance,
+              [key]: { ...current, logs: [...current.logs, line].slice(-MAX_LOG_LINES) },
+            },
+          };
+        }),
+    });
+    update(key, {
+      activity: {
+        kind: "installing",
+        stage: "metadata",
+        done: 0,
+        total: null,
+        cancel: operation.cancel,
+      },
+      logs: [],
+      error: null,
+      lastExit: null,
+    });
+    try {
+      const outcome = await operation.done;
+      update(key, { activity: { kind: "idle" }, lastExit: outcome });
+      return outcome;
+    } catch (error) {
+      update(key, { activity: { kind: "idle" }, error: toIpcError(error).code });
+      return null;
+    }
+  };
+
+  return { byInstance: {}, install, play, stop, playCinepol };
 });
 
 export function useInstanceActivity(instanceId: string): InstanceActivity {

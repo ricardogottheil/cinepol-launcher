@@ -26,7 +26,7 @@
     "discord": "Discord de la comunidad"
   },
   "home": {
-    "title": "Jugar en CINEPOL",
+    "title": "Jugar en {{server}}",
     "play": "Jugar",
     "gameVersion": "Minecraft {{version}}",
     "spec": {
@@ -39,7 +39,8 @@
     "addAccount": "Añadir cuenta",
     "readouts": {
       "online": "Conectados",
-      "versions": "Versiones compatibles"
+      "versions": "Versiones compatibles",
+      "latency": "Latencia"
     },
     "status": {
       "checking": "Comprobando",
@@ -52,6 +53,9 @@
       "empty": "Todavía no tienes instancias.",
       "create": "Nueva instancia",
       "import": "Importar modpack"
+    },
+    "session": {
+      "playing": "En el servidor"
     }
   },
   "placeholder": {
@@ -107,7 +111,8 @@
     "java_unavailable": "Todavía no hay Java para este sistema",
     "already_running": "Ya está en marcha",
     "internal": "Algo ha fallado. Los detalles están en el registro",
-    "ipc_unavailable": "Solo disponible en la app de escritorio"
+    "ipc_unavailable": "Solo disponible en la app de escritorio",
+    "server_unreachable": "El servidor no responde"
   },
   "stages": {
     "metadata": "Leyendo la versión",
@@ -154,5 +159,18 @@
     "playtime": "{{hours}} h {{minutes}} min",
     "logTitle": "Registro del juego",
     "logEmpty": "Aquí aparece la salida del juego."
+  },
+  "settings": {
+    "title": "Ajustes",
+    "serverConfigTitle": "Configuración del servidor",
+    "serverConfigHint": "Dirección https del archivo server-config.json. Si no se puede leer, el launcher usa la copia incluida.",
+    "urlLabel": "URL de la configuración",
+    "save": "Guardar",
+    "reset": "Restablecer",
+    "origin": {
+      "remote": "En uso: la configuración remota",
+      "bundled": "En uso: la copia incluida en el launcher"
+    },
+    "saved": "Guardado"
   }
 }

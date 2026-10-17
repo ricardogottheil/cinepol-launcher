@@ -1,5 +1,6 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   AccountDto,
   AccountsDto,
@@ -15,6 +16,9 @@ import type {
   LogLineDto,
   ProgressEvent,
   ProgressStageDto,
+  ServerConfigDto,
+  ServerStatusDto,
+  SettingsDto,
 } from "./bindings";
 
 /**
@@ -34,6 +38,9 @@ export type {
   LogLineDto,
   ProgressEvent,
   ProgressStageDto,
+  ServerConfigDto,
+  ServerStatusDto,
+  SettingsDto,
 };
 
 /** Backend error codes plus the one the client raises on its own. */
@@ -50,6 +57,7 @@ const BACKEND_CODES = {
   network: true,
   java_unavailable: true,
   already_running: true,
+  server_unreachable: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -207,4 +215,53 @@ export async function onEvent<E extends keyof Events>(
 ): Promise<UnlistenFn> {
   if (!isTauri()) return () => {};
   return listen<Events[E]>(event, ({ payload }) => handler(payload));
+}
+
+export function getServerConfig(): Promise<ServerConfigDto> {
+  return call("get_server_config");
+}
+
+export function getServerStatus(): Promise<ServerStatusDto> {
+  return call("get_server_status");
+}
+
+export interface PlayOnCinepolOptions {
+  onProgress: (event: ProgressEvent) => void;
+  onLog: (line: LogLineDto) => void;
+}
+
+/** Prepares, installs and launches the CINEPOL instance; `cancel` stops either phase. */
+export function playOnCinepol({
+  onProgress,
+  onLog,
+}: PlayOnCinepolOptions): RunningOperation<LaunchOutcomeDto> {
+  return startOperation("play_on_cinepol", (operationId) =>
+    call("play_on_cinepol", {
+      operationId,
+      onProgress: channel(onProgress),
+      onLog: channel(onLog),
+    }),
+  );
+}
+
+export function getSettings(): Promise<SettingsDto> {
+  return call("get_settings");
+}
+
+/** `null` restores the default URL. */
+export function setServerConfigUrl(url: string | null): Promise<SettingsDto> {
+  return call("set_server_config_url", { url });
+}
+
+/** Opens a community link in the system browser (the capability limits the domains). */
+export async function openExternal(url: string): Promise<void> {
+  if (!isTauri()) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  try {
+    await openUrl(url);
+  } catch (error) {
+    throw toIpcError(error);
+  }
 }

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-export type PlaceholderSection = "modpacks" | "settings";
+export type PlaceholderSection = "modpacks";
 
 /** A section whose feature lands in a later milestone. */
 export function PlaceholderPage({ section }: { section: PlaceholderSection }) {

@@ -10,6 +10,7 @@ import { DesignKitPage } from "../features/design-kit/DesignKitPage";
 import { HomePage } from "../features/home/HomePage";
 import { InstancesPage } from "../features/instances/InstancesPage";
 import { PlaceholderPage, type PlaceholderSection } from "../features/placeholder/PlaceholderPage";
+import { SettingsPage } from "../features/settings/SettingsPage";
 import { AppShell } from "./shell/AppShell";
 
 const rootRoute = createRootRoute({ component: AppShell });
@@ -39,7 +40,7 @@ const routeTree = rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: "/instances", component: InstancesPage }),
   placeholderRoute("modpacks"),
   createRoute({ getParentRoute: () => rootRoute, path: "/accounts", component: AccountsPage }),
-  placeholderRoute("settings"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage }),
   ...(import.meta.env.DEV ? [designRoute] : []),
 ]);
 

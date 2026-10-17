@@ -1,24 +1,23 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import serverBanner from "../../assets/worlds/cinepol-recursos.webp";
+import { Button } from "../../components/ui/Button";
+import { Meter } from "../../components/ui/Meter";
 import { Readout } from "../../components/ui/Readout";
 import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
 import { type ServerStatus, StatusLamp } from "../../components/ui/StatusLamp";
 import { WorldFrame } from "../../components/ui/WorldFrame";
+import { toIpcError } from "../../ipc/client";
 import { useAccounts } from "../accounts/useAccounts";
+import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../instances/activityStore";
 import { splitPlaytime } from "../instances/formatPlaytime";
+import { LogPanel } from "../instances/LogPanel";
 import { useInstances } from "../instances/useInstances";
-import { bundledServerConfig, displayAddress } from "../server/serverConfig";
+import { bundledConfigDto, useServerConfig, useServerStatus } from "../server/useServer";
 
 const plateLink =
   "plate-lg inline-flex h-11 items-center rounded-plate border border-hairline-lit px-4 text-silk-dim no-underline transition-colors duration-[160ms] ease-settle hover:border-engrave hover:text-silk";
-
-export interface HomePageProps {
-  /** Live status of the server. The Server List Ping arrives in Milestone 6. */
-  status?: ServerStatus;
-  onlinePlayers?: number | null;
-}
 
 /** The player's instances, or an empty state. */
 function HomeInstances() {
@@ -50,15 +49,68 @@ function HomeInstances() {
   );
 }
 
-/** Launcher home: quick play on CINEPOL, then the player's instances. */
-export function HomePage({ status = "unavailable", onlinePlayers = null }: HomePageProps) {
+/** The signal control and what follows a press: install progress, the running game, errors. */
+function QuickPlay({ recommended }: { recommended: string }) {
+  const { t } = useTranslation();
+  const { activity, logs, error, lastExit } = useInstanceActivity(CINEPOL_SESSION);
+  const playCinepol = useActivityStore((state) => state.playCinepol);
+
+  return (
+    <div data-enter-control className="mt-8 flex flex-col gap-4">
+      {activity.kind === "idle" ? (
+        <SignalControl
+          label={t("home.play")}
+          detail={t("home.gameVersion", { version: recommended })}
+          onPress={() => void playCinepol()}
+        />
+      ) : (
+        <div className="flex flex-col gap-3 rounded-control border border-hairline-lit p-4">
+          <div className="flex items-center justify-between gap-4">
+            <span className="plate text-silk">
+              {activity.kind === "running"
+                ? t("home.session.playing")
+                : t(`stages.${activity.stage ?? "metadata"}`)}
+            </span>
+            <Button onClick={() => void activity.cancel?.()} disabled={!activity.cancel}>
+              {activity.kind === "running" ? t("instances.stop") : t("instances.cancel")}
+            </Button>
+          </div>
+          {activity.kind === "installing" ? (
+            <Meter label={t("home.play")} value={activity.done} max={activity.total} />
+          ) : null}
+        </div>
+      )}
+      <p role="status" className="m-0 text-[0.875rem]">
+        {error ? (
+          <span className="text-stale">{t(`errors.${error}`)}</span>
+        ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
+          <span className="text-stale">
+            {t("instances.exited", { code: lastExit.exitCode ?? "-" })}
+          </span>
+        ) : null}
+      </p>
+      {activity.kind === "running" || logs.length > 0 ? <LogPanel lines={logs} /> : null}
+    </div>
+  );
+}
+
+/** Launcher home: quick play on CINEPOL with its live status, then the player's instances. */
+export function HomePage() {
   const { t } = useTranslation();
   const accounts = useAccounts();
   const accountName =
     accounts.data?.accounts.find((account) => account.id === accounts.data?.activeId)?.username ??
     null;
-  const config = bundledServerConfig;
-  const { recommended } = config.versions;
+  const config = useServerConfig().data ?? bundledConfigDto();
+  const statusQuery = useServerStatus();
+  const status: ServerStatus = statusQuery.isPending
+    ? "checking"
+    : statusQuery.isError
+      ? toIpcError(statusQuery.error).code === "server_unreachable"
+        ? "offline"
+        : "unavailable"
+      : "online";
+  const live = statusQuery.data;
 
   return (
     <div className="@container mx-auto flex max-w-[1120px] flex-col px-gutter-lg">
@@ -68,46 +120,37 @@ export function HomePage({ status = "unavailable", onlinePlayers = null }: HomeP
       >
         <div className="col-span-12 flex flex-col @3xl:col-span-7">
           <h1 id="quick-play-title" className="display-lg m-0 text-silk">
-            {t("home.title")}
+            {t("home.title", { server: config.name })}
           </h1>
 
           <div className="mt-8 flex flex-wrap items-start gap-x-12 gap-y-6">
             <SpecSheet
               rows={[
-                { label: t("home.spec.server"), value: displayAddress(config) },
+                { label: t("home.spec.server"), value: config.address },
                 {
                   label: t("home.spec.version"),
-                  value: t("home.recommended", { version: recommended }),
+                  value: t("home.recommended", { version: config.recommendedVersion }),
                 },
               ]}
             />
-            <div className="flex flex-col gap-3">
-              <SpecSheet
-                rows={[
-                  { label: t("home.spec.account"), value: accountName ?? t("home.noAccount") },
-                ]}
-              />
-            </div>
+            <SpecSheet
+              rows={[{ label: t("home.spec.account"), value: accountName ?? t("home.noAccount") }]}
+            />
           </div>
 
-          <div data-enter-control className="mt-8 flex flex-col gap-3">
-            <SignalControl
-              label={t("home.play")}
-              detail={t("home.gameVersion", { version: recommended })}
-            />
-            {accountName ? null : (
-              <Link to="/accounts" className={`${plateLink} self-start`}>
-                {t("home.addAccount")}
-              </Link>
-            )}
-          </div>
+          <QuickPlay recommended={config.recommendedVersion} />
+          {accountName ? null : (
+            <Link to="/accounts" className={`${plateLink} mt-3 self-start`}>
+              {t("home.addAccount")}
+            </Link>
+          )}
         </div>
 
         <div className="col-span-12 flex flex-col gap-6 @3xl:col-span-5">
           <WorldFrame
             world="overworld"
             src={serverBanner}
-            caption={t("home.bannerCaption")}
+            caption={config.name}
             className="hidden @3xl:block"
           />
           <div
@@ -117,17 +160,22 @@ export function HomePage({ status = "unavailable", onlinePlayers = null }: HomeP
           >
             <Readout
               unit={t("home.readouts.online")}
-              value={onlinePlayers === null ? null : String(onlinePlayers)}
+              value={live ? `${live.onlinePlayers} / ${live.maxPlayers}` : null}
               size="md"
               lead={<StatusLamp status={status} />}
             />
             <Readout
               unit={t("home.readouts.versions")}
-              value={`${config.versions.min} – ${config.versions.max}`}
+              value={`${config.minVersion} – ${config.maxVersion}`}
               size="md"
             />
+            {live?.latencyMs != null ? (
+              <Readout unit={t("home.readouts.latency")} value={`${live.latencyMs} ms`} size="md" />
+            ) : null}
           </div>
-          {status === "online" ? null : (
+          {live ? (
+            <p className="m-0 whitespace-pre-line text-[0.875rem] text-silk-dim">{live.motd}</p>
+          ) : (
             <span data-readout className="readout-sm -mt-2 text-engrave">
               {t(`home.status.${status}` as "home.status.unavailable")}
             </span>

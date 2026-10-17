@@ -26,7 +26,8 @@
           "level": "error",
           "options": {
             "paths": {
-              "@tauri-apps/api/core": "Call the backend through src/ipc/client.ts, never invoke directly."
+              "@tauri-apps/api/core": "Call the backend through src/ipc/client.ts, never invoke directly.",
+              "@tauri-apps/plugin-opener": "Open links through openExternal in src/ipc/client.ts."
             },
             "patterns": [
               {

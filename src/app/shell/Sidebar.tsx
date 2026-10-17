@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { BrandGlyph } from "../../components/ui/BrandGlyph";
-import { bundledServerConfig } from "../../features/server/serverConfig";
+import { BrandGlyph, type BrandGlyphName } from "../../components/ui/BrandGlyph";
+import { bundledConfigDto, useServerConfig } from "../../features/server/useServer";
 import { useAppInfo } from "../../features/system/useAppInfo";
+import { openExternal } from "../../ipc/client";
 
 const NAV = [
   { to: "/", key: "nav.home" },
@@ -18,7 +19,7 @@ const itemClass =
 /** Section rail. Text only, like the website's section strip: no icons as decoration. */
 export function Sidebar() {
   const { t } = useTranslation();
-  const { links } = bundledServerConfig;
+  const { links } = useServerConfig().data ?? bundledConfigDto();
   const appInfo = useAppInfo();
 
   return (
@@ -59,24 +60,8 @@ export function Sidebar() {
 
       <div className="mt-auto flex flex-col gap-1 border-t border-hairline px-gutter py-5">
         <p className="plate m-0 mb-2 text-engrave">{t("chrome.community")}</p>
-        <a
-          href={links.twitch}
-          target="_blank"
-          rel="noreferrer"
-          className="flex h-9 items-center gap-3 text-[0.875rem] text-silk-dim no-underline transition-colors duration-[160ms] ease-settle hover:text-silk"
-        >
-          <BrandGlyph name="twitch" />
-          {t("links.twitch")}
-        </a>
-        <a
-          href={links.discord}
-          target="_blank"
-          rel="noreferrer"
-          className="flex h-9 items-center gap-3 text-[0.875rem] text-silk-dim no-underline transition-colors duration-[160ms] ease-settle hover:text-silk"
-        >
-          <BrandGlyph name="discord" />
-          {t("links.discord")}
-        </a>
+        <CommunityLink href={links.twitch} glyph="twitch" label={t("links.twitch")} />
+        <CommunityLink href={links.discord} glyph="discord" label={t("links.discord")} />
         <p className="mt-4 mb-0 text-[0.75rem] leading-[1.45] text-engrave">
           {t("legal.disclaimer")}
         </p>
@@ -90,5 +75,30 @@ export function Sidebar() {
         ) : null}
       </div>
     </aside>
+  );
+}
+
+/** Opens in the system browser, not inside the launcher window. */
+function CommunityLink({
+  href,
+  glyph,
+  label,
+}: {
+  href: string;
+  glyph: BrandGlyphName;
+  label: string;
+}) {
+  return (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        void openExternal(href);
+      }}
+      className="flex h-9 items-center gap-3 text-[0.875rem] text-silk-dim no-underline transition-colors duration-[160ms] ease-settle hover:text-silk"
+    >
+      <BrandGlyph name={glyph} />
+      {label}
+    </a>
   );
 }

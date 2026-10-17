@@ -8,10 +8,16 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import serverConfig from "../../../config/server-config.json";
 import esCommon from "../../i18n/locales/es/common.json";
+import { IpcError } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
-import { HomePage, type HomePageProps } from "./HomePage";
+import { HomePage } from "./HomePage";
 
-const client = vi.hoisted(() => ({ listAccounts: vi.fn(), listInstances: vi.fn() }));
+const client = vi.hoisted(() => ({
+  listAccounts: vi.fn(),
+  listInstances: vi.fn(),
+  getServerConfig: vi.fn(),
+  getServerStatus: vi.fn(),
+}));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../ipc/client")>()),
@@ -21,10 +27,12 @@ vi.mock("../../ipc/client", async (importOriginal) => ({
 beforeEach(() => {
   client.listAccounts.mockResolvedValue({ accounts: [], activeId: null });
   client.listInstances.mockResolvedValue([]);
+  client.getServerConfig.mockRejectedValue(new IpcError("internal", "no backend"));
+  client.getServerStatus.mockRejectedValue(new IpcError("internal", "no backend"));
 });
 
-function renderHome(props: HomePageProps = {}) {
-  const rootRoute = createRootRoute({ component: () => <HomePage {...props} /> });
+function renderHome() {
+  const rootRoute = createRootRoute({ component: HomePage });
   const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory() });
   return renderWithQuery(<RouterProvider router={router} />);
 }
@@ -83,14 +91,45 @@ describe("HomePage", () => {
   });
 
   it("shows the status note and no lamp when the status is unknown", async () => {
-    const { container } = renderHome({ status: "unavailable" });
+    const { container } = renderHome();
     expect(await screen.findByText(esCommon.home.status.unavailable)).toBeInTheDocument();
     expect(container.querySelector("[data-status-dot]")).toBeNull();
   });
 
-  it("lights the lamp and shows the count when the server answers", async () => {
-    const { container } = renderHome({ status: "online", onlinePlayers: 8 });
-    expect(await screen.findByText("8")).toBeInTheDocument();
+  it("says the server does not answer when the ping is unreachable", async () => {
+    client.getServerStatus.mockRejectedValue(new IpcError("server_unreachable", "timed out"));
+    const { container } = renderHome();
+    expect(await screen.findByText(esCommon.home.status.offline)).toBeInTheDocument();
+    expect(container.querySelector("[data-status-dot]")).toBeNull();
+  });
+
+  it("lights the lamp and shows the live readings when the server answers", async () => {
+    client.getServerStatus.mockResolvedValue({
+      onlinePlayers: 8,
+      maxPlayers: 100,
+      versionName: "Velocity",
+      protocol: 777,
+      motd: "Welcome to CINEPOL",
+      latencyMs: 42,
+    });
+    const { container } = renderHome();
+    expect(await screen.findByText("8 / 100")).toBeInTheDocument();
+    expect(screen.getByText("42 ms")).toBeInTheDocument();
+    expect(screen.getByText("Welcome to CINEPOL")).toBeInTheDocument();
     expect(container.querySelector("[data-status-dot]")).not.toBeNull();
+  });
+
+  it("uses the remote config when the backend provides one", async () => {
+    client.getServerConfig.mockResolvedValue({
+      name: "CINEPOL",
+      address: "play.example.test",
+      minVersion: "1.21.11",
+      maxVersion: "26.2",
+      recommendedVersion: "26.2",
+      links: serverConfig.links,
+      origin: "remote",
+    });
+    renderHome();
+    expect(await screen.findByText("play.example.test")).toBeInTheDocument();
   });
 });

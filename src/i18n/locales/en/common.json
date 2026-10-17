@@ -26,7 +26,7 @@
     "discord": "Community Discord"
   },
   "home": {
-    "title": "Play on CINEPOL",
+    "title": "Play on {{server}}",
     "play": "Play",
     "gameVersion": "Minecraft {{version}}",
     "spec": {
@@ -39,7 +39,8 @@
     "addAccount": "Add account",
     "readouts": {
       "online": "Online",
-      "versions": "Supported versions"
+      "versions": "Supported versions",
+      "latency": "Latency"
     },
     "status": {
       "checking": "Checking",
@@ -52,6 +53,9 @@
       "empty": "You have no instances yet.",
       "create": "New instance",
       "import": "Import modpack"
+    },
+    "session": {
+      "playing": "On the server"
     }
   },
   "placeholder": {
@@ -107,7 +111,8 @@
     "java_unavailable": "There is no Java runtime for this system yet",
     "already_running": "It is already running",
     "internal": "Something went wrong. The details are in the log",
-    "ipc_unavailable": "Only available in the desktop app"
+    "ipc_unavailable": "Only available in the desktop app",
+    "server_unreachable": "The server is not answering"
   },
   "stages": {
     "metadata": "Reading the version",
@@ -154,5 +159,18 @@
     "playtime": "{{hours}} h {{minutes}} min",
     "logTitle": "Game log",
     "logEmpty": "The game output appears here."
+  },
+  "settings": {
+    "title": "Settings",
+    "serverConfigTitle": "Server configuration",
+    "serverConfigHint": "The https address of server-config.json. When it cannot be read, the launcher uses its bundled copy.",
+    "urlLabel": "Configuration URL",
+    "save": "Save",
+    "reset": "Reset",
+    "origin": {
+      "remote": "In use: the remote configuration",
+      "bundled": "In use: the copy bundled with the launcher"
+    },
+    "saved": "Saved"
   }
 }
