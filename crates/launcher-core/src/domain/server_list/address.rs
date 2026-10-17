@@ -39,7 +39,8 @@ impl ServerAddress {
             let (host, after) = rest
                 .split_once(']')
                 .ok_or_else(|| ServerAddressError::InvalidHost(raw.to_owned()))?;
-            if host.is_empty()
+            // Brackets are only for IPv6 literals, which always contain a colon.
+            if !host.contains(':')
                 || !host
                     .chars()
                     .all(|c| c.is_ascii_hexdigit() || c == ':' || c == '.')
@@ -144,7 +145,15 @@ mod tests {
     #[test]
     fn rejects_malformed_addresses() {
         assert_eq!(ServerAddress::parse(" "), Err(ServerAddressError::Empty));
-        for raw in ["host:0", "host:65536", "host:abc", "[::1]x", "[::1"] {
+        for raw in [
+            "host:0",
+            "host:65536",
+            "host:abc",
+            "[::1]x",
+            "[::1",
+            "[ab.cd]",
+            "[1234]:25565",
+        ] {
             assert!(ServerAddress::parse(raw).is_err(), "{raw}");
         }
         for raw in ["bad host", "-leading.dash", "../x", "a/b"] {

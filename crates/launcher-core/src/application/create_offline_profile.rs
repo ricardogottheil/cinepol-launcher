@@ -21,7 +21,8 @@ pub enum CreateOfflineProfileError {
 
 /// Validates the name, applies `OfflinePolicy`, refuses a duplicate offline
 /// name (case-insensitive, like Minecraft names), saves the account and makes
-/// it active when no account is active yet.
+/// it active when no account is active yet. A failed activation rolls the
+/// save back, so the profile is either fully created or not at all.
 pub async fn create_offline_profile<R: AccountRepository>(
     raw_username: &str,
     policy: OfflinePolicy,
@@ -46,8 +47,14 @@ pub async fn create_offline_profile<R: AccountRepository>(
 
     let account = Account::offline(AccountId::new_random(), username);
     accounts.save(&account).await?;
-    if accounts.active().await?.is_none() {
-        accounts.set_active(Some(account.id)).await?;
+    if accounts.active().await?.is_none()
+        && let Err(error) = accounts.set_active(Some(account.id)).await
+    {
+        // Undo the save so a retry does not hit AlreadyExists for a profile
+        // the caller was told was not created. Best effort: the activation
+        // error is the one worth reporting.
+        let _ = accounts.remove(account.id).await;
+        return Err(error.into());
     }
     Ok(account)
 }
@@ -110,6 +117,20 @@ mod tests {
             ))
         );
         assert_eq!(repo.list().await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn rolls_back_the_saved_profile_when_activation_fails() {
+        let repo = InMemoryAccountRepository::default();
+        repo.fail_activation();
+        assert!(matches!(
+            create_offline_profile("Steve", OfflinePolicy::default(), &repo).await,
+            Err(CreateOfflineProfileError::Storage(_))
+        ));
+        assert!(
+            repo.list().await.unwrap().is_empty(),
+            "a failed create must not leave a profile behind"
+        );
     }
 
     #[tokio::test]

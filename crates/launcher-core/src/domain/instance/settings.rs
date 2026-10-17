@@ -21,6 +21,7 @@ impl GameVersion {
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+' | ' '))
             && !raw.starts_with(['.', ' '])
+            && !raw.ends_with(['.', ' '])
             && !raw.contains("..");
         if valid {
             Ok(Self(raw.to_owned()))
@@ -210,7 +211,9 @@ mod tests {
         ] {
             assert!(GameVersion::parse(raw).is_ok(), "{raw}");
         }
-        for raw in ["", "../1.21", "1.21/x", "1.21;rm", ".hidden"] {
+        for raw in [
+            "", "../1.21", "1.21/x", "1.21;rm", ".hidden", "1.21.", "1.21 ",
+        ] {
             assert!(GameVersion::parse(raw).is_err(), "{raw}");
         }
     }

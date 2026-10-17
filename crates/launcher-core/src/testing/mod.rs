@@ -114,6 +114,7 @@ pub struct InMemoryAccountRepository {
     accounts: Mutex<Vec<Account>>,
     active: Mutex<Option<AccountId>>,
     fail_writes: AtomicBool,
+    fail_activation: AtomicBool,
 }
 
 impl InMemoryAccountRepository {
@@ -126,6 +127,11 @@ impl InMemoryAccountRepository {
 
     pub fn fail_writes(&self) {
         self.fail_writes.store(true, Ordering::SeqCst);
+    }
+
+    /// Only `set_active` fails; saves and removals still work.
+    pub fn fail_activation(&self) {
+        self.fail_activation.store(true, Ordering::SeqCst);
     }
 
     fn check_write(&self) -> Result<(), AccountRepositoryError> {
@@ -169,6 +175,9 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn set_active(&self, id: Option<AccountId>) -> Result<(), AccountRepositoryError> {
         self.check_write()?;
+        if self.fail_activation.load(Ordering::SeqCst) {
+            return Err(AccountRepositoryError::Storage("activation failed".into()));
+        }
         *self.active.lock().unwrap() = id;
         Ok(())
     }
