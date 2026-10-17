@@ -1,12 +1,15 @@
 @import "tailwindcss";
+
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/martian-mono";
+@import "@fontsource-variable/schibsted-grotesk";
+
 @import "./tokens.css";
+@import "./motion.css";
 
-:root {
-  color-scheme: dark;
-}
-
-body {
-  margin: 0;
-  background-color: var(--color-surface-base);
-  color: var(--color-ink-primary);
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
 }

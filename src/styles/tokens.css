@@ -1,11 +1,278 @@
-/*
- * CINEPOL design tokens (Tailwind v4 @theme), the single source of truth for
- * colors, fonts and spacing. Milestone 2 ports the full token set from the
- * website (see docs/design/design-system.md). Bootstrap values only:
- * - surface-base: the website's theme-color (#0e100e).
- */
+/* ---------------------------------------------------------------------------
+   CINEPOL design tokens: the single source of truth for the launcher.
+
+   Ported from the website's "light meter" design system. Every value below is
+   copied from cinepol-web/src/styles/global.css (GC) and keeps the website's
+   token names so both products can share a tokens package later. Rationale,
+   contrast ratios and usage rules live in docs/design/design-system.md.
+
+   Launcher-only tokens are grouped at the end of @theme and marked LAUNCHER.
+   --------------------------------------------------------------------------- */
+
 @theme {
-  --color-surface-base: #0e100e;
-  --color-ink-primary: #f2f4ef;
-  --color-ink-muted: #9aa197;
+  /* chassis: the instrument body, constant across all three readings (GC:15-23) */
+  --color-chassis: #0e100e;
+  --color-panel: #1a1d19;
+  --color-panel-deep: #080a08;
+  --color-silk: #e8e6df;
+  --color-silk-dim: #b4b2ab;
+  --color-engrave: #8a8f86;
+  --color-hairline: #2a2e29;
+  --color-hairline-lit: #454a44;
+
+  /* signal: legislated to the primary signal control and the live dot only (GC:25-28) */
+  --color-signal: #2cb302;
+  --color-signal-lit: #68ca4a;
+  --color-on-signal: #0e100e; /* 6.87:1. White would be 2.78:1 and fail. */
+
+  /* Ratios are measured against each reading's OWN ground (GC:30-34). */
+
+  /* reading 01 - Overworld - 5600 K (GC:36-44) */
+  --color-ow-ground: #1f262c; /* hue 208: readings separate by hue, not luminance */
+  --color-ow-sky: #b7cbdd; /* 9.18:1 text-safe */
+  --color-ow-cloud: #c6cbd5; /* 9.41:1 text-safe */
+  --color-ow-foliage: #72915b; /* 4.31:1 large text and field (see design-system.md) */
+  --color-ow-oak: #8e6f50; /* 3.31:1 large text and field */
+  --color-ow-roof: #9b5252; /* 2.71:1 FIELD ONLY (see design-system.md) */
+  --color-ow-blossom: #b88898; /* 5.11:1 text-safe */
+  --color-ow-spruce: #394030; /* 1.42:1 FIELD ONLY */
+
+  /* reading 02 - Nether - 2000 K (GC:46-51) */
+  --color-nt-ground: #2e130d;
+  --color-nt-lava: #de9133; /* 6.75:1 text-safe */
+  --color-nt-beacon: #8fe3e3; /* 11.74:1 text-safe */
+  --color-nt-crimson: #942a12; /* 2.14:1 FIELD ONLY */
+  --color-nt-basalt: #5a2416; /* 1.40:1 FIELD ONLY */
+
+  /* reading 03 - End - 7500 K (GC:53-59) */
+  --color-end-ground: #281e2c;
+  --color-end-glow: #e4d8e4; /* 11.61:1 text-safe */
+  --color-end-stone: #be9f9f; /* 6.59:1 text-safe */
+  --color-end-plum: #6c5059; /* 2.23:1 FIELD ONLY */
+  --color-end-violet: #6d4a86; /* 2.27:1 FIELD ONLY */
+  --color-end-deep: #4f3759; /* 1.54:1 FIELD ONLY */
+
+  /* ores, measured against chassis (GC:61-70) */
+  --color-ore-coal: #a3a6ab;
+  --color-ore-emerald: #25e169;
+  --color-ore-gold: #eb9d0e;
+  --color-ore-lapis: #5b8af0;
+  --color-ore-diamond: #19afb4;
+  --color-ore-amethyst: #a678f1;
+
+  /* semantic: there is no error red (GC:72-74) */
+  --color-live: #2cb302;
+  --color-stale: #de9133;
+
+  /* families (GC:76-79) */
+  --font-display: "Archivo Variable", system-ui, sans-serif;
+  --font-readout: "Martian Mono Variable", ui-monospace, monospace;
+  --font-body: "Schibsted Grotesk Variable", system-ui, sans-serif;
+
+  /* radii: nothing is a pill (GC:81-83) */
+  --radius-plate: 2px;
+  --radius-control: 3px;
+
+  /* band rhythm and gutters (GC:85-95) */
+  --spacing-band: 72px;
+  --spacing-band-lg: 112px;
+  --spacing-gutter: 24px;
+  --spacing-gutter-lg: 32px;
+
+  /* motion curves (GC:346-351) */
+  --ease-shutter: cubic-bezier(0.85, 0, 0.15, 1); /* moving parts */
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1); /* things that settle into place */
+
+  /* LAUNCHER: window chrome. The title bar matches the site's 44px section
+     strip; the sidebar holds the 40px wordmark plus its gutter. */
+  --spacing-titlebar: 44px;
+  --spacing-sidebar: 248px;
+  --spacing-control: 44px; /* minimum target size (DESIGN.md:1007-1015) */
+}
+
+/* ---------------------------------------------------------------------------
+   Base and browser surfaces (GC:107-198)
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    background-color: var(--color-chassis);
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-chassis);
+    color: var(--color-silk);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-hairline-lit);
+    color: var(--color-silk);
+  }
+
+  :root {
+    caret-color: var(--color-signal);
+    scrollbar-color: var(--color-hairline-lit) var(--color-chassis);
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: var(--color-chassis);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-hairline-lit);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-engrave);
+  }
+
+  ::marker {
+    color: var(--color-engrave);
+  }
+
+  :focus-visible {
+    outline: 2px solid;
+    outline-color: var(--color-silk);
+    outline-offset: 2px;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  /* Tabular by default: a changing number must never shift the layout. */
+  [data-readout] {
+    font-family: var(--font-readout);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* A desktop app does not select its own chrome on drag. */
+  [data-tauri-drag-region],
+  [data-chrome] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Type utilities: the instrument's vocabulary (GC:204-324)
+   --------------------------------------------------------------------------- */
+
+@utility display-xl {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 125;
+  font-weight: 700;
+  font-size: clamp(2.75rem, 5.2vw, 4.75rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+@utility display-lg {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 125;
+  font-weight: 700;
+  font-size: clamp(2rem, 3.6vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+@utility display-md {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 112;
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+/* Labels something measurable. Never above a heading (that is a kicker). */
+@utility plate {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@utility plate-lg {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@utility readout-xl {
+  font-family: var(--font-readout);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+@utility readout-md {
+  font-family: var(--font-readout);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+@utility readout-sm {
+  font-family: var(--font-readout);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+@utility control-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@utility nav-label {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* A milled groove: the only inset device. No shadows anywhere. */
+@utility groove {
+  border-top: 1px solid var(--color-panel-deep);
+  box-shadow: inset 0 1px 0 0 var(--color-hairline-lit);
+}
+
+@utility measure {
+  max-width: 68ch;
 }

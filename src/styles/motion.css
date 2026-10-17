@@ -1,0 +1,131 @@
+/* ---------------------------------------------------------------------------
+   Motion, ported from cinepol-web/src/styles/global.css:344-553.
+   Every animation has a reduced-motion alternative that lands the final state.
+   Nothing animates off screen and nothing listens to scroll.
+   --------------------------------------------------------------------------- */
+
+@layer components {
+  /* The home headline wipes in behind a hard edge, once (GC:356-370). */
+  [data-enter] {
+    animation: enter-wipe 620ms var(--ease-settle) backwards;
+    animation-delay: calc((var(--enter-index, 0) - 1) * 90ms);
+  }
+
+  @keyframes enter-wipe {
+    from {
+      clip-path: inset(0 100% 0 0);
+      transform: translateX(-8px);
+    }
+    to {
+      clip-path: inset(0 -2% 0 0);
+      transform: none;
+    }
+  }
+
+  /* The engraved rule draws itself (GC:373-386). */
+  [data-enter-rule] {
+    animation: enter-rule 720ms var(--ease-settle) backwards;
+    animation-delay: 270ms;
+    transform-origin: left center;
+  }
+
+  @keyframes enter-rule {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  /* The primary control arrives last, and solidly (GC:389-403). */
+  [data-enter-control] {
+    animation: enter-control 520ms var(--ease-settle) backwards;
+    animation-delay: 520ms;
+  }
+
+  @keyframes enter-control {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The live lamp breathes only while the server actually answered (GC:408-422). */
+  [data-live-status][data-status="online"] [data-status-dot] {
+    animation: lamp 2600ms ease-in-out infinite;
+  }
+
+  @keyframes lamp {
+    0%,
+    100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-live) 55%, transparent);
+    }
+    50% {
+      opacity: 0.72;
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-live) 0%, transparent);
+    }
+  }
+
+  /* Links underline from the left (GC:448-471). */
+  [data-underline] {
+    position: relative;
+    text-decoration: none;
+  }
+
+  [data-underline]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: calc(50% + 0.58em);
+    height: 1px;
+    background-color: currentColor;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 260ms var(--ease-settle);
+  }
+
+  [data-underline]:hover::after,
+  [data-underline]:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  /* A pressed signal control acknowledges the press (GC:474-488). */
+  [data-signal-control][data-state="pressed"] {
+    animation: control-flash 420ms var(--ease-shutter);
+  }
+
+  @keyframes control-flash {
+    0% {
+      transform: scale(0.97);
+    }
+    45% {
+      transform: scale(1.015);
+    }
+    100% {
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-enter],
+    [data-enter-rule],
+    [data-enter-control],
+    [data-signal-control][data-state="pressed"],
+    [data-live-status][data-status="online"] [data-status-dot] {
+      animation: none;
+      clip-path: none;
+      opacity: 1;
+      transform: none;
+    }
+
+    [data-underline]::after {
+      transition: none;
+    }
+  }
+}
