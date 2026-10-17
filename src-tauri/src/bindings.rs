@@ -9,9 +9,10 @@
 use ts_rs::{Config, TS};
 
 use crate::dto::{
-    AccountDto, AccountKindDto, AccountsDto, AppInfo, GameVersionDto, GameVersionsDto,
-    InstallSummaryDto, InstanceDto, InstanceOriginDto, LaunchOutcomeDto, LogLineDto, LogStreamDto,
-    ProgressEvent, ProgressStageDto,
+    AccountDto, AccountKindDto, AccountsDto, AppInfo, CommunityLinksDto, ConfigOriginDto,
+    GameVersionDto, GameVersionsDto, InstallSummaryDto, InstanceDto, InstanceOriginDto,
+    LaunchOutcomeDto, LogLineDto, LogStreamDto, ProgressEvent, ProgressStageDto, ServerConfigDto,
+    ServerStatusDto, SettingsDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -48,6 +49,11 @@ fn declarations(cfg: &Config) -> Vec<String> {
         LogStreamDto::decl(cfg),
         LogLineDto::decl(cfg),
         LaunchOutcomeDto::decl(cfg),
+        CommunityLinksDto::decl(cfg),
+        ConfigOriginDto::decl(cfg),
+        ServerConfigDto::decl(cfg),
+        ServerStatusDto::decl(cfg),
+        SettingsDto::decl(cfg),
     ]
 }
 
@@ -128,6 +134,26 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             vec![("instanceId", string())],
             bool::name(cfg),
         ),
+        command("get_server_config", vec![], ServerConfigDto::name(cfg)),
+        command("get_server_status", vec![], ServerStatusDto::name(cfg)),
+        command(
+            "play_on_cinepol",
+            vec![
+                ("operationId", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+                ("onLog", format!("Channel<{}>", LogLineDto::name(cfg))),
+            ],
+            LaunchOutcomeDto::name(cfg),
+        ),
+        command("get_settings", vec![], SettingsDto::name(cfg)),
+        command(
+            "set_server_config_url",
+            vec![("url", "string | null".to_owned())],
+            SettingsDto::name(cfg),
+        ),
     ]
 }
 
@@ -206,6 +232,11 @@ mod tests {
             "install_instance",
             "launch_instance",
             "kill_instance",
+            "get_server_config",
+            "get_server_status",
+            "play_on_cinepol",
+            "get_settings",
+            "set_server_config_url",
         ] {
             assert!(
                 rendered.contains(&format!("  {name}: {{ args:")),

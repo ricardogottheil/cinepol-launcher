@@ -4,6 +4,7 @@ use launcher_core::application::launch_instance::{
     LaunchDeps, LaunchRequest, launch_instance as launch,
 };
 use launcher_core::application::list_instances::list_instances as list;
+use launcher_core::application::prepare_cinepol_instance::cinepol_server_entry;
 use launcher_core::domain::instance::InstanceOrigin;
 use launcher_core::domain::loader::LoaderSpec;
 use tauri::ipc::Channel;
@@ -26,7 +27,8 @@ pub async fn list_instances(state: State<'_, AppState>) -> Result<Vec<InstanceDt
         .collect())
 }
 
-/// Creates a vanilla instance; loaders arrive in Milestones 8 and 9.
+/// Creates a vanilla instance with CINEPOL first in its server list;
+/// loaders arrive in Milestones 8 and 9.
 #[tauri::command]
 pub async fn create_instance(
     state: State<'_, AppState>,
@@ -38,8 +40,11 @@ pub async fn create_instance(
         game_version: &game_version,
         loader: LoaderSpec::vanilla(),
         origin: InstanceOrigin::Custom,
+        seed_server: Some(cinepol_server_entry(&state.current_config())),
     };
-    Ok(InstanceDto::from(&create(request, &state.instances).await?))
+    Ok(InstanceDto::from(
+        &create(request, &state.instances, &state.servers).await?,
+    ))
 }
 
 /// Downloads everything the instance needs; cancellable with `cancel_operation`.
@@ -91,7 +96,7 @@ pub async fn launch_instance(
         fs: &state.fs,
         paths: &state.paths,
         platform: &state.platform,
-        launcher_name: "cinepol-launcher",
+        launcher_name: crate::state::LAUNCHER_NAME,
         launcher_version: &state.launcher_version,
     };
     let request = LaunchRequest {

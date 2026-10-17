@@ -29,6 +29,7 @@ pub fn run() -> Result<(), tauri::Error> {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_dir = app.path().data_dir()?.join(DATA_DIR_NAME);
             let version = app.package_info().version.to_string();
@@ -49,6 +50,11 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::instances::install_instance,
             commands::instances::launch_instance,
             commands::instances::kill_instance,
+            commands::server::get_server_config,
+            commands::server::get_server_status,
+            commands::server::play_on_cinepol,
+            commands::server::get_settings,
+            commands::server::set_server_config_url,
         ])
         .run(tauri::generate_context!())
 }

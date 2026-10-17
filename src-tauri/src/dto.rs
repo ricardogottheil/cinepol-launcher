@@ -234,3 +234,97 @@ impl LaunchOutcomeDto {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CommunityLinksDto {
+    pub website: String,
+    pub twitch: String,
+    pub discord: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ConfigOriginDto {
+    Remote,
+    Bundled,
+}
+
+/// The CINEPOL server configuration the UI shows and acts on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConfigDto {
+    pub name: String,
+    /// `host[:port]` as players type it.
+    pub address: String,
+    pub min_version: String,
+    pub max_version: String,
+    pub recommended_version: String,
+    pub links: CommunityLinksDto,
+    pub origin: ConfigOriginDto,
+}
+
+impl ServerConfigDto {
+    pub fn new(
+        loaded: &launcher_core::application::load_server_config::LoadedServerConfig,
+    ) -> Self {
+        use launcher_core::application::load_server_config::ConfigOrigin;
+        let config = &loaded.config;
+        Self {
+            name: config.name.clone(),
+            address: config.address.to_string(),
+            min_version: config.versions.min().as_str().to_owned(),
+            max_version: config.versions.max().as_str().to_owned(),
+            recommended_version: config.versions.recommended().as_str().to_owned(),
+            links: CommunityLinksDto {
+                website: config.links.website.to_string(),
+                twitch: config.links.twitch.to_string(),
+                discord: config.links.discord.to_string(),
+            },
+            origin: match loaded.origin {
+                ConfigOrigin::Remote => ConfigOriginDto::Remote,
+                ConfigOrigin::Bundled { .. } => ConfigOriginDto::Bundled,
+            },
+        }
+    }
+}
+
+/// The live answer of the server to a status ping.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerStatusDto {
+    pub online_players: u32,
+    pub max_players: u32,
+    pub version_name: String,
+    pub motd: String,
+    pub latency_ms: Option<u32>,
+}
+
+impl From<&launcher_core::domain::server::ServerStatus> for ServerStatusDto {
+    fn from(status: &launcher_core::domain::server::ServerStatus) -> Self {
+        Self {
+            online_players: status.online_players,
+            max_players: status.max_players,
+            version_name: status.version_name.clone(),
+            motd: status.motd.clone(),
+            latency_ms: status.latency_ms,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsDto {
+    pub server_config_url: String,
+    pub default_server_config_url: String,
+}
+
+impl From<&launcher_core::domain::settings::AppSettings> for SettingsDto {
+    fn from(settings: &launcher_core::domain::settings::AppSettings) -> Self {
+        Self {
+            server_config_url: settings.server_config_url.to_string(),
+            default_server_config_url: launcher_core::domain::settings::DEFAULT_SERVER_CONFIG_URL
+                .to_owned(),
+        }
+    }
+}

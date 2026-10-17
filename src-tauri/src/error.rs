@@ -27,6 +27,7 @@ pub enum ErrorCode {
     Network,
     JavaUnavailable,
     AlreadyRunning,
+    ServerUnreachable,
     Internal,
 }
 
@@ -161,6 +162,40 @@ impl From<LaunchError> for AppError {
             _ => ErrorCode::Internal,
         };
         Self::new(code, error.to_string())
+    }
+}
+
+impl From<launcher_core::domain::server::ServerStatusError> for AppError {
+    fn from(error: launcher_core::domain::server::ServerStatusError) -> Self {
+        Self::new(ErrorCode::ServerUnreachable, error.to_string())
+    }
+}
+
+impl From<launcher_core::application::update_settings::UpdateSettingsError> for AppError {
+    fn from(error: launcher_core::application::update_settings::UpdateSettingsError) -> Self {
+        use launcher_core::application::update_settings::UpdateSettingsError;
+        let code = match &error {
+            UpdateSettingsError::InvalidUrl(_) => ErrorCode::InvalidInput,
+            UpdateSettingsError::Storage(_) => ErrorCode::Internal,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<launcher_core::domain::settings::SettingsError> for AppError {
+    fn from(error: launcher_core::domain::settings::SettingsError) -> Self {
+        Self::new(ErrorCode::Internal, error.to_string())
+    }
+}
+
+impl From<launcher_core::application::play_on_cinepol::PlayOnCinepolError> for AppError {
+    fn from(error: launcher_core::application::play_on_cinepol::PlayOnCinepolError) -> Self {
+        use launcher_core::application::play_on_cinepol::PlayOnCinepolError;
+        match error {
+            PlayOnCinepolError::Prepare(prepare) => Self::from(prepare),
+            PlayOnCinepolError::Install(install) => Self::from(install),
+            PlayOnCinepolError::Launch(launch) => Self::from(launch),
+        }
     }
 }
 

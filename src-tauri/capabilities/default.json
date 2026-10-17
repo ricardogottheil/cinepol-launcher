@@ -1,13 +1,33 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Least-privilege permissions for the main window. Add permissions per feature, never blanket fs/shell access.",
+  "description": "Least-privilege permissions for the main window. Add permissions per feature, never blanket fs/shell access. Links open only on the community domains.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://twitch.tv/*"
+        },
+        {
+          "url": "https://www.twitch.tv/*"
+        },
+        {
+          "url": "https://discord.gg/*"
+        },
+        {
+          "url": "https://discord.com/*"
+        },
+        {
+          "url": "https://cinepol.policarpiers.com/*"
+        }
+      ]
+    }
   ]
 }

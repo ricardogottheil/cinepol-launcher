@@ -33,6 +33,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "ansi"] }
 tempfile = "3.27.0"
 fastnbt = "2.6.3"
+tauri-plugin-opener = "2.7.2"
 hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "system-config"] }
 
 [workspace.lints.clippy]

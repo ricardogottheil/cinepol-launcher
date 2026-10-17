@@ -9,7 +9,7 @@ export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "n
 
 export type ProgressEvent = { done: number, total: number | null, stage: ProgressStageDto | null, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -43,6 +43,20 @@ export type LogLineDto = { stream: LogStreamDto, line: string, };
 
 export type LaunchOutcomeDto = { instanceId: string, exitCode: number | null, killed: boolean, playedSecs: number, };
 
+export type CommunityLinksDto = { website: string, twitch: string, discord: string, };
+
+export type ConfigOriginDto = "remote" | "bundled";
+
+export type ServerConfigDto = { name: string, 
+/**
+ * `host[:port]` as players type it.
+ */
+address: string, minVersion: string, maxVersion: string, recommendedVersion: string, links: CommunityLinksDto, origin: ConfigOriginDto, };
+
+export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versionName: string, motd: string, latencyMs: number | null, };
+
+export type SettingsDto = { serverConfigUrl: string, defaultServerConfigUrl: string, };
+
 /** Every backend command: its arguments and its success result. */
 export interface Commands {
   get_app_info: { args: Record<string, never>; result: AppInfo };
@@ -57,6 +71,11 @@ export interface Commands {
   install_instance: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: InstallSummaryDto };
   launch_instance: { args: { instanceId: string; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
   kill_instance: { args: { instanceId: string }; result: boolean };
+  get_server_config: { args: Record<string, never>; result: ServerConfigDto };
+  get_server_status: { args: Record<string, never>; result: ServerStatusDto };
+  play_on_cinepol: { args: { operationId: string; onProgress: Channel<ProgressEvent>; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
+  get_settings: { args: Record<string, never>; result: SettingsDto };
+  set_server_config_url: { args: { url: string | null }; result: SettingsDto };
 }
 
 /** App-wide events and their payloads. */
