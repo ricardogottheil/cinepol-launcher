@@ -24,6 +24,12 @@ use crate::domain::ports::{
 use crate::domain::server_list::{ServerList, ServerListStore, ServerListStoreError};
 use tokio_util::sync::CancellationToken;
 
+mod launch;
+pub use launch::{
+    FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, RecordingLogSink,
+    RecordingNativesExtractor, sample_asset_index, sample_version_spec,
+};
+
 /// Records every progress update.
 #[derive(Debug, Default)]
 pub struct RecordingReporter {

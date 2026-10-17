@@ -24,7 +24,7 @@ pub trait JavaProbe: Send + Sync {
     ) -> impl Future<Output = Result<JavaVersion, JavaProbeError>> + Send;
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum JavaRuntimeError {
     #[error("no Java {major} runtime is available for {platform}")]
     Unavailable { major: u32, platform: String },
