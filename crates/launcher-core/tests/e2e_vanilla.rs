@@ -37,6 +37,29 @@ const PLAYER: &str = "polispol1";
 /// Generous: the first start after an install compiles shaders and loads resources.
 const START_TIMEOUT: Duration = Duration::from_secs(240);
 
+/// The E2E instance is not seeded, so its server list is never touched.
+struct NoServerList;
+
+impl launcher_core::domain::server_list::ServerListStore for NoServerList {
+    async fn load(
+        &self,
+        _instance: &launcher_core::domain::instance::InstanceId,
+    ) -> Result<
+        launcher_core::domain::server_list::ServerList,
+        launcher_core::domain::server_list::ServerListStoreError,
+    > {
+        Ok(Default::default())
+    }
+
+    async fn save(
+        &self,
+        _instance: &launcher_core::domain::instance::InstanceId,
+        _list: &launcher_core::domain::server_list::ServerList,
+    ) -> Result<(), launcher_core::domain::server_list::ServerListStoreError> {
+        Ok(())
+    }
+}
+
 struct PrintProgress;
 
 impl ProgressReporter for PrintProgress {
@@ -125,8 +148,10 @@ async fn installs_and_launches_vanilla_offline() {
                 game_version: &version,
                 loader: LoaderSpec::vanilla(),
                 origin: InstanceOrigin::Custom,
+                seed_server: None,
             },
             &instances,
+            &NoServerList,
         )
         .await
         .expect("instance"),

@@ -82,6 +82,11 @@ impl LauncherPaths {
         self.instance_dir(id).join("natives")
     }
 
+    /// Launcher settings the player can change.
+    pub fn settings_file(&self) -> PathBuf {
+        self.root.join("settings.json")
+    }
+
     /// Account metadata (never tokens).
     pub fn accounts_file(&self) -> PathBuf {
         self.root.join("accounts.json")
