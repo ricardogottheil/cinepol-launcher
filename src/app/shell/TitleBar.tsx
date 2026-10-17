@@ -18,7 +18,7 @@ export function TitleBar({ platform }: { platform: DesktopPlatform }) {
         data-tauri-drag-region
         className={cx(
           "flex h-full flex-1 items-center",
-          platform === "macos" ? "pl-[84px]" : "pl-4",
+          platform === "macos" ? "pl-[100px]" : "pl-4",
         )}
       >
         <Wordmark className="pointer-events-none h-7" />
