@@ -184,9 +184,11 @@ App shell (`src/app/shell/`):
 - **Sidebar**: text-only section rail, like the website's section strip (no
   decorative icons, D:239-268). Current item: `silk` on `panel`. Community links
   (Twitch, Discord) and the legal disclaimer sit at the bottom.
-- **Home**: the website's hero, translated: headline, lead, engraved rule,
-  readouts (online, versions, recommended), the signal control, and a world
-  capture with its equipment plate. Below it, the instances band.
+- **Home**: a launcher view in the website's style, not the website's content.
+  Quick play on CINEPOL (server, recommended version, active account as a spec
+  sheet; the signal control "Play"), the CINEPOL banner with its equipment plate
+  and the live readouts, then the instances band with its actions. Marketing
+  copy from the website (headlines, pitch, "Copy IP") does not belong here.
 
 ## 7. Iconography and imagery
 

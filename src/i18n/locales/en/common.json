@@ -25,26 +25,32 @@
     "discord": "Community Discord"
   },
   "home": {
-    "title": "Play with or without a premium account",
-    "lead": "The polispol1 community server. The launcher installs the recommended version and takes you straight into the server.",
-    "play": "Play on CINEPOL",
-    "copyAddress": "Copy IP",
-    "copied": "Copied",
-    "copiedAnnouncement": "Address copied to the clipboard",
+    "title": "Play on CINEPOL",
+    "play": "Play",
+    "gameVersion": "Minecraft {{version}}",
+    "spec": {
+      "server": "Server",
+      "version": "Version",
+      "account": "Account"
+    },
+    "recommended": "{{version}} (recommended)",
+    "noAccount": "No account yet",
+    "addAccount": "Add account",
     "readouts": {
       "online": "Online",
-      "versions": "Versions",
-      "recommended": "Recommended"
+      "versions": "Supported versions"
     },
     "status": {
       "checking": "Checking",
       "offline": "Server not responding",
       "unavailable": "Status unavailable"
     },
-    "worldCaption": "Resource world",
+    "bannerCaption": "CINEPOL",
     "instances": {
       "title": "Instances",
-      "empty": "No instances yet. Play on CINEPOL creates the first one."
+      "empty": "You have no instances yet.",
+      "create": "New instance",
+      "import": "Import modpack"
     }
   },
   "placeholder": {

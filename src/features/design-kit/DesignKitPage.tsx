@@ -52,10 +52,10 @@ export function DesignKitPage() {
       <section className="flex flex-col gap-6 border-t border-hairline pt-8">
         <h2 className="display-md m-0">{t("designKit.controls")}</h2>
         <div className="max-w-[520px]">
-          <SignalControl label={t("home.play")} detail="mc.policarpiers.com" />
+          <SignalControl label={t("home.play")} detail="Minecraft 26.2" />
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <SignalControl label={t("home.copyAddress")} size="compact" />
+          <SignalControl label={t("home.play")} size="compact" />
           <Button>{s("secondary")}</Button>
           <Button disabled>{s("disabled")}</Button>
           <IconButton label={t("chrome.close")}>
@@ -77,7 +77,7 @@ export function DesignKitPage() {
               lead={<StatusLamp status="online" />}
             />
             <Readout unit={t("home.readouts.versions")} value={"1.21.11 – 26.2"} />
-            <Readout unit={t("home.readouts.recommended")} value={null} />
+            <Readout unit={s("playtime")} value={null} />
           </div>
         </div>
         <div className="flex flex-col gap-6">
