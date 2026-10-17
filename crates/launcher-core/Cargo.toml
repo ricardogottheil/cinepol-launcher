@@ -22,7 +22,7 @@ test-support = []
 thiserror.workspace = true
 uuid = { workspace = true, features = ["std", "v4", "serde"] }
 md-5.workspace = true
-tokio = { workspace = true, features = ["time", "fs", "process", "io-util", "rt", "sync", "macros"] }
+tokio = { workspace = true, features = ["time", "fs", "process", "io-util", "net", "rt", "sync", "macros"] }
 serde.workspace = true
 serde_json.workspace = true
 reqwest.workspace = true
