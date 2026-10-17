@@ -17,6 +17,12 @@ name = "launcher_core"
 network-tests = []
 
 [dependencies]
+thiserror.workspace = true
+tokio = { workspace = true, features = ["time"] }
+tokio-util.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "time", "test-util"] }
 
 [lints]
 workspace = true
