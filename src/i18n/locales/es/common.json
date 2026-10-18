@@ -122,7 +122,9 @@
     "keychain_unavailable": "El llavero del sistema no está disponible para guardar la sesión",
     "microsoft_not_configured": "Esta versión del launcher no incluye inicio de sesión con Microsoft",
     "loader_unavailable": "Ese loader no está disponible para esta versión de Minecraft",
-    "unverified_file": "Un archivo no tiene suma de verificación, así que el launcher no lo usará"
+    "unverified_file": "Un archivo no tiene suma de verificación, así que el launcher no lo usará",
+    "rate_limited": "Modrinth pidió ir más despacio. Inténtalo de nuevo en un momento",
+    "invalid_modpack": "Este modpack está dañado, no es seguro o no es compatible"
   },
   "stages": {
     "metadata": "Leyendo la versión",

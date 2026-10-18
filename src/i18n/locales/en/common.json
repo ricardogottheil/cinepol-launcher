@@ -122,7 +122,9 @@
     "keychain_unavailable": "The system keychain is not available to store the session",
     "microsoft_not_configured": "This build of the launcher has no Microsoft sign-in",
     "loader_unavailable": "That loader is not available for this Minecraft version",
-    "unverified_file": "A file has no checksum, so the launcher will not use it"
+    "unverified_file": "A file has no checksum, so the launcher will not use it",
+    "rate_limited": "Modrinth asked us to slow down. Try again in a moment",
+    "invalid_modpack": "This modpack is damaged, unsafe or not supported"
   },
   "stages": {
     "metadata": "Reading the version",

@@ -17,6 +17,14 @@ import type {
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLineDto,
+  ModpackDetailsDto,
+  ModpackExportDto,
+  ModpackInstallDto,
+  ModpackPageDto,
+  ModpackSummaryDto,
+  ModpackUpdateDto,
+  ModpackVersionDto,
+  PackFilesDto,
   PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
@@ -45,6 +53,14 @@ export type {
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLineDto,
+  ModpackDetailsDto,
+  ModpackExportDto,
+  ModpackInstallDto,
+  ModpackPageDto,
+  ModpackSummaryDto,
+  ModpackUpdateDto,
+  ModpackVersionDto,
+  PackFilesDto,
   PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
@@ -78,6 +94,8 @@ const BACKEND_CODES = {
   microsoft_not_configured: true,
   loader_unavailable: true,
   unverified_file: true,
+  rate_limited: true,
+  invalid_modpack: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -277,6 +295,60 @@ export function launchInstance(
 
 export function killInstance(instanceId: string): Promise<boolean> {
   return call("kill_instance", { instanceId });
+}
+
+export interface ModpackSearch {
+  query: string;
+  gameVersion: string | null;
+  loader: Exclude<InstanceLoader, "vanilla"> | null;
+  /** Zero-based. */
+  page: number;
+  pageSize: number;
+}
+
+/** One page of Modrinth modpacks. */
+export function searchModpacks(search: ModpackSearch): Promise<ModpackPageDto> {
+  return call("search_modpacks", { ...search });
+}
+
+/** A modpack and its versions, newest first. */
+export function getModpack(project: string): Promise<ModpackDetailsDto> {
+  return call("get_modpack", { project });
+}
+
+/** Installs a Modrinth modpack version into a new instance, game and loader included. */
+export function installModpack(
+  project: string,
+  version: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<ModpackInstallDto> {
+  return startOperation("install_modpack", (operationId) =>
+    call("install_modpack", { operationId, project, version, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Asks for a `.mrpack` file and installs it; resolves `null` when the picker is closed. */
+export function importMrpack(
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<ModpackInstallDto | null> {
+  return startOperation("import_mrpack", (operationId) =>
+    call("import_mrpack", { operationId, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Updates a modpack instance to its newest version, keeping the player's changes. */
+export function updateModpack(
+  instanceId: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<ModpackUpdateDto> {
+  return startOperation("update_modpack", (operationId) =>
+    call("update_modpack", { operationId, instanceId, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Asks where to save and exports the instance; resolves `null` when the picker is closed. */
+export function exportMrpack(instanceId: string): Promise<ModpackExportDto | null> {
+  return call("export_mrpack", { instanceId });
 }
 
 /** Subscribes to an app-wide event; resolves to the unsubscribe function. */

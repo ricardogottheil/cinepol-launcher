@@ -8,6 +8,7 @@ pub mod accounts;
 pub mod app;
 pub mod demo;
 pub mod instances;
+pub mod modpacks;
 pub mod server;
 pub mod versions;
 

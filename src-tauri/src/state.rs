@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 use std::sync::{PoisonError, RwLock};
 
+use launcher_core::application::install_instance::InstallDeps;
+use launcher_core::application::modpack_files::PackSyncDeps;
 use launcher_core::application::refresh_session::{
     MicrosoftSessions, PremiumSessions, SessionError,
 };
@@ -10,10 +12,11 @@ use launcher_core::domain::account::{Account, OfflinePolicy};
 use launcher_core::domain::launch::{LauncherPaths, Platform};
 use launcher_core::domain::ports::Secret;
 use launcher_core::domain::server::ServerConfig;
-use launcher_core::infrastructure::archive::ZipNativesExtractor;
+use launcher_core::infrastructure::archive::{ZipMrpackArchive, ZipNativesExtractor};
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
 use launcher_core::infrastructure::fs::{
-    JsonAccountRepository, JsonInstanceRepository, JsonSettingsRepository, TokioFileSystem,
+    JsonAccountRepository, JsonInstanceRepository, JsonPackManifestStore, JsonSettingsRepository,
+    StdPackFiles, TokioFileSystem,
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
@@ -21,6 +24,7 @@ use launcher_core::infrastructure::keychain::KeyringSecretStore;
 use launcher_core::infrastructure::loaders::{
     ForgeLoaderMetadata, LoaderInstallers, MetaLoaderMetadata,
 };
+use launcher_core::infrastructure::modrinth::ModrinthSource;
 use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
 use launcher_core::infrastructure::msa::MsaClient;
 use launcher_core::infrastructure::nbt::NbtServerListStore;
@@ -60,6 +64,18 @@ const BUNDLED_SERVER_CONFIG: &[u8] = include_bytes!("../../config/server-config.
 /// Contact in the User-Agent, as API providers ask (`<user>/<repo>/<version> (<contact>)`).
 const USER_AGENT_CONTACT: &str = "https://cinepol.policarpiers.com";
 
+/// The game installer's dependencies, as wired in this app.
+pub type AppInstallDeps<'a> = InstallDeps<
+    'a,
+    JsonInstanceRepository,
+    MojangVersionSource<ReqwestHttpClient>,
+    DownloadManager,
+    AppJavaRuntimes,
+    LoaderInstallers<ReqwestHttpClient>,
+>;
+
+type AppJavaRuntimes = ManagedJavaRuntimes<ReqwestHttpClient, DownloadManager, ProcessJavaProbe>;
+
 /// Application state shared with every command through `tauri::State`.
 pub struct AppState {
     pub operations: OperationRegistry,
@@ -76,7 +92,7 @@ pub struct AppState {
     pub accounts: JsonAccountRepository,
     pub versions: MojangVersionSource<ReqwestHttpClient>,
     pub downloader: DownloadManager,
-    pub java: ManagedJavaRuntimes<ReqwestHttpClient, DownloadManager, ProcessJavaProbe>,
+    pub java: AppJavaRuntimes,
     pub natives: ZipNativesExtractor,
     pub runner: TokioGameProcessRunner,
     pub clock: SystemClock,
@@ -95,6 +111,12 @@ pub struct AppState {
     pub forge_releases: ForgeLoaderMetadata<ReqwestHttpClient>,
     pub neoforge_releases: ForgeLoaderMetadata<ReqwestHttpClient>,
     pub config_source: HttpServerConfigSource<ReqwestHttpClient>,
+    /// The Modrinth catalog (modpack search, versions, file lookups).
+    pub modrinth: ModrinthSource<ReqwestHttpClient>,
+    pub mrpack: ZipMrpackArchive,
+    pub pack_files: StdPackFiles,
+    /// Which files each modpack instance got from its pack.
+    pub pack_manifests: JsonPackManifestStore,
     pub settings: JsonSettingsRepository,
     pub bundled_config: ServerConfig,
     /// The last config loaded (remote or bundled), used to seed new instances.
@@ -112,6 +134,40 @@ impl AppState {
             .read()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// What installing an instance (game, loader, Java) needs.
+    pub fn install_deps(&self) -> AppInstallDeps<'_> {
+        InstallDeps {
+            instances: &self.instances,
+            versions: &self.versions,
+            downloader: &self.downloader,
+            java: &self.java,
+            paths: &self.paths,
+            platform: &self.platform,
+            loaders: &self.loaders,
+        }
+    }
+
+    /// What syncing a pack into an instance's game folder needs.
+    pub fn pack_sync(
+        &self,
+    ) -> PackSyncDeps<
+        '_,
+        ZipMrpackArchive,
+        DownloadManager,
+        TokioFileSystem,
+        StdPackFiles,
+        JsonPackManifestStore,
+    > {
+        PackSyncDeps {
+            archive: &self.mrpack,
+            downloader: &self.downloader,
+            fs: &self.fs,
+            files: &self.pack_files,
+            manifests: &self.pack_manifests,
+            paths: &self.paths,
+        }
     }
 
     pub fn remember_config(&self, config: ServerConfig) {
@@ -146,6 +202,10 @@ impl AppState {
             accounts: JsonAccountRepository::new(paths.accounts_file()),
             versions: MojangVersionSource::new(http.clone(), paths.clone()),
             config_source: HttpServerConfigSource::new(http.clone()),
+            modrinth: ModrinthSource::new(http.clone()),
+            mrpack: ZipMrpackArchive::new(),
+            pack_files: StdPackFiles,
+            pack_manifests: JsonPackManifestStore::new(paths.clone()),
             settings: JsonSettingsRepository::new(paths.settings_file()),
             servers: NbtServerListStore::new(paths.clone()),
             pinger: MinecraftServerPinger::new(),

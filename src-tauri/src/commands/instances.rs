@@ -1,5 +1,5 @@
 use launcher_core::application::create_instance::{NewInstance, create_instance as create};
-use launcher_core::application::install_instance::{InstallDeps, install_instance as install};
+use launcher_core::application::install_instance::install_instance as install;
 use launcher_core::application::launch_instance::{
     LaunchDeps, LaunchRequest, launch_instance as launch,
 };
@@ -70,16 +70,13 @@ pub async fn install_instance(
             format!("{id} is already running"),
         ));
     };
-    let deps = InstallDeps {
-        instances: &state.instances,
-        versions: &state.versions,
-        downloader: &state.downloader,
-        java: &state.java,
-        paths: &state.paths,
-        platform: &state.platform,
-        loaders: &state.loaders,
-    };
-    let result = install(&id, &deps, &ChannelReporter::new(on_progress), &token).await;
+    let result = install(
+        &id,
+        &state.install_deps(),
+        &ChannelReporter::new(on_progress),
+        &token,
+    )
+    .await;
     state.operations.finish(&operation_id);
     Ok(InstallSummaryDto::from(&result?))
 }

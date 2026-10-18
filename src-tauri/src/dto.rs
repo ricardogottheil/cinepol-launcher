@@ -4,13 +4,16 @@
 
 use launcher_core::application::account_skin::SkinTexture;
 use launcher_core::application::check_premium_name::PremiumNameCheck;
+use launcher_core::application::export_mrpack::ExportSummary;
 use launcher_core::application::install_instance::InstallSummary;
 use launcher_core::application::launch_instance::LaunchOutcome;
+use launcher_core::application::modpack_files::SyncSummary;
 use launcher_core::domain::account::{Account, AccountKind};
 use launcher_core::domain::account::{DeviceCode, SkinVariant};
 use launcher_core::domain::instance::{Instance, InstanceOrigin};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
 use launcher_core::domain::loader::LoaderRelease;
+use launcher_core::domain::modpack::{ModpackPage, ModpackSummary, ModpackVersion};
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
 use serde::Serialize;
 use ts_rs::TS;
@@ -242,6 +245,89 @@ impl From<&LoaderRelease> for LoaderReleaseDto {
     }
 }
 
+/// A modpack in a catalog listing or details view.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackSummaryDto {
+    pub project: String,
+    pub title: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    #[ts(type = "number | null")]
+    pub downloads: Option<u64>,
+}
+
+impl From<&ModpackSummary> for ModpackSummaryDto {
+    fn from(summary: &ModpackSummary) -> Self {
+        Self {
+            project: summary.project.clone(),
+            title: summary.title.clone(),
+            description: summary.description.clone(),
+            icon_url: summary.icon_url.clone(),
+            downloads: summary.downloads,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackPageDto {
+    pub items: Vec<ModpackSummaryDto>,
+    #[ts(type = "number | null")]
+    pub total: Option<u64>,
+}
+
+impl From<&ModpackPage> for ModpackPageDto {
+    fn from(page: &ModpackPage) -> Self {
+        Self {
+            items: page.items.iter().map(ModpackSummaryDto::from).collect(),
+            total: page.total,
+        }
+    }
+}
+
+/// One release of a modpack; `installable` is false when it has no `.mrpack`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackVersionDto {
+    pub id: String,
+    pub name: String,
+    pub version_number: String,
+    pub game_versions: Vec<String>,
+    /// Loader ids (`fabric`, `quilt`, `forge`, `neoforge`).
+    pub loaders: Vec<String>,
+    pub published: Option<String>,
+    pub installable: bool,
+    #[ts(type = "number | null")]
+    pub size: Option<u64>,
+}
+
+impl From<&ModpackVersion> for ModpackVersionDto {
+    fn from(version: &ModpackVersion) -> Self {
+        Self {
+            id: version.id.clone(),
+            name: version.name.clone(),
+            version_number: version.version_number.clone(),
+            game_versions: version
+                .game_versions
+                .iter()
+                .map(|v| v.as_str().to_owned())
+                .collect(),
+            loaders: version.loaders.iter().map(|l| l.id().to_owned()).collect(),
+            published: version.published.clone(),
+            installable: version.pack_file.is_some(),
+            size: version.pack_file.as_ref().map(|file| file.size),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackDetailsDto {
+    pub summary: ModpackSummaryDto,
+    pub versions: Vec<ModpackVersionDto>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum InstanceOriginDto {
@@ -440,6 +526,68 @@ impl From<&launcher_core::domain::settings::AppSettings> for SettingsDto {
             server_config_url: settings.server_config_url.to_string(),
             default_server_config_url: launcher_core::domain::settings::DEFAULT_SERVER_CONFIG_URL
                 .to_owned(),
+        }
+    }
+}
+
+/// What a pack sync did to the game folder; `kept` counts the player's changes left alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PackFilesDto {
+    pub written: u32,
+    pub unchanged: u32,
+    pub kept: u32,
+    pub removed: u32,
+}
+
+impl From<&SyncSummary> for PackFilesDto {
+    fn from(summary: &SyncSummary) -> Self {
+        let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        Self {
+            written: count(summary.written),
+            unchanged: count(summary.unchanged),
+            kept: count(summary.kept),
+            removed: count(summary.removed),
+        }
+    }
+}
+
+/// A modpack installed into a new instance, with the game and loader ready.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackInstallDto {
+    pub instance: InstanceDto,
+    pub files: PackFilesDto,
+    pub install: InstallSummaryDto,
+}
+
+/// `instance` and `files` are absent when the instance was already up to date.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackUpdateDto {
+    pub up_to_date: bool,
+    pub instance: Option<InstanceDto>,
+    pub files: Option<PackFilesDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackExportDto {
+    /// Where the `.mrpack` was written.
+    pub path: String,
+    /// Files listed for download from Modrinth.
+    pub indexed: u32,
+    /// Files copied into the pack.
+    pub overrides: u32,
+}
+
+impl ModpackExportDto {
+    pub fn new(path: &std::path::Path, summary: &ExportSummary) -> Self {
+        let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        Self {
+            path: path.display().to_string(),
+            indexed: count(summary.indexed),
+            overrides: count(summary.overrides),
         }
     }
 }

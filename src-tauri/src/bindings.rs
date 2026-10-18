@@ -12,8 +12,9 @@ use crate::dto::{
     AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, CommunityLinksDto,
     ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto, InstallSummaryDto,
     InstanceDto, InstanceOriginDto, LaunchOutcomeDto, LoaderReleaseDto, LogLineDto, LogStreamDto,
-    PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto, ServerConfigDto,
-    ServerStatusDto, SettingsDto, SkinDto,
+    ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto,
+    ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PremiumNameDto, ProgressEvent,
+    ProgressStageDto, ProgressUnitDto, ServerConfigDto, ServerStatusDto, SettingsDto, SkinDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -61,6 +62,14 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ServerConfigDto::decl(cfg),
         ServerStatusDto::decl(cfg),
         SettingsDto::decl(cfg),
+        ModpackSummaryDto::decl(cfg),
+        ModpackPageDto::decl(cfg),
+        ModpackVersionDto::decl(cfg),
+        ModpackDetailsDto::decl(cfg),
+        PackFilesDto::decl(cfg),
+        ModpackInstallDto::decl(cfg),
+        ModpackUpdateDto::decl(cfg),
+        ModpackExportDto::decl(cfg),
     ]
 }
 
@@ -189,6 +198,63 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             ],
             LaunchOutcomeDto::name(cfg),
         ),
+        command(
+            "search_modpacks",
+            vec![
+                ("query", string()),
+                ("gameVersion", "string | null".to_owned()),
+                ("loader", "string | null".to_owned()),
+                ("page", u32::name(cfg)),
+                ("pageSize", u32::name(cfg)),
+            ],
+            ModpackPageDto::name(cfg),
+        ),
+        command(
+            "get_modpack",
+            vec![("project", string())],
+            ModpackDetailsDto::name(cfg),
+        ),
+        command(
+            "install_modpack",
+            vec![
+                ("operationId", string()),
+                ("project", string()),
+                ("version", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            ModpackInstallDto::name(cfg),
+        ),
+        command(
+            "import_mrpack",
+            vec![
+                ("operationId", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            format!("{} | null", ModpackInstallDto::name(cfg)),
+        ),
+        command(
+            "update_modpack",
+            vec![
+                ("operationId", string()),
+                ("instanceId", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            ModpackUpdateDto::name(cfg),
+        ),
+        command(
+            "export_mrpack",
+            vec![("instanceId", string())],
+            format!("{} | null", ModpackExportDto::name(cfg)),
+        ),
         command("get_settings", vec![], SettingsDto::name(cfg)),
         command(
             "set_server_config_url",
@@ -279,6 +345,12 @@ mod tests {
             "install_instance",
             "launch_instance",
             "kill_instance",
+            "search_modpacks",
+            "get_modpack",
+            "install_modpack",
+            "import_mrpack",
+            "update_modpack",
+            "export_mrpack",
             "get_server_config",
             "get_server_status",
             "play_on_cinepol",

@@ -4,19 +4,25 @@
 use launcher_core::application::account_skin::AccountSkinError;
 use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
+use launcher_core::application::export_mrpack::ExportMrpackError;
 use launcher_core::application::install_instance::InstallError;
+use launcher_core::application::install_modpack::InstallModpackError;
 use launcher_core::application::launch_instance::LaunchError;
 use launcher_core::application::list_loader_versions::ListLoaderVersionsError;
 use launcher_core::application::login_microsoft::LoginError;
+use launcher_core::application::modpack_files::PackSyncError;
 use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
+use launcher_core::application::update_modpack::UpdateModpackError;
 use launcher_core::domain::account::AccountRepositoryError;
 use launcher_core::domain::account::AuthError;
 use launcher_core::domain::instance::InstanceRepositoryError;
 use launcher_core::domain::java::JavaRuntimeError;
 use launcher_core::domain::launch::VersionSourceError;
 use launcher_core::domain::loader::{LoaderInstallError, LoaderMetadataError};
+use launcher_core::domain::modpack::mrpack::MrpackError;
+use launcher_core::domain::modpack::{ModpackSourceError, PackFileError};
 use launcher_core::domain::ports::DownloadError;
 use serde::Serialize;
 use ts_rs::TS;
@@ -52,6 +58,10 @@ pub enum ErrorCode {
     LoaderUnavailable,
     /// A file declares no checksum, so it is never downloaded or launched.
     UnverifiedFile,
+    /// A catalog asked the launcher to slow down; try again in a moment.
+    RateLimited,
+    /// A modpack archive or index is broken, unsafe or unsupported.
+    InvalidModpack,
     Internal,
 }
 
@@ -325,9 +335,123 @@ impl From<AccountSkinError> for AppError {
     }
 }
 
+/// The code a modpack catalog failure is reported with.
+fn source_code(error: &ModpackSourceError) -> ErrorCode {
+    match error {
+        ModpackSourceError::NotFound(_) => ErrorCode::NotFound,
+        ModpackSourceError::RateLimited { .. } => ErrorCode::RateLimited,
+        ModpackSourceError::Network(_) => ErrorCode::Network,
+        ModpackSourceError::NotConfigured(_) | ModpackSourceError::InvalidResponse(_) => {
+            ErrorCode::Internal
+        }
+    }
+}
+
+/// The code a modpack file failure is reported with.
+fn pack_file_code(error: &PackFileError) -> ErrorCode {
+    match error {
+        PackFileError::Io { .. } => ErrorCode::Internal,
+        PackFileError::Index(MrpackError::UnverifiedFile(_)) => ErrorCode::UnverifiedFile,
+        PackFileError::InvalidArchive(_)
+        | PackFileError::UnsafeEntry(_)
+        | PackFileError::Index(_) => ErrorCode::InvalidModpack,
+    }
+}
+
+fn pack_sync_code(error: &PackSyncError) -> ErrorCode {
+    match error {
+        PackSyncError::Files(files) => pack_file_code(files),
+        PackSyncError::Download(DownloadError::Io { .. }) | PackSyncError::Scratch(_) => {
+            ErrorCode::Internal
+        }
+        PackSyncError::Download(_) => ErrorCode::Network,
+        PackSyncError::Cancelled => ErrorCode::Cancelled,
+    }
+}
+
+impl From<ModpackSourceError> for AppError {
+    fn from(error: ModpackSourceError) -> Self {
+        Self::new(source_code(&error), error.to_string())
+    }
+}
+
+impl From<InstallModpackError> for AppError {
+    fn from(error: InstallModpackError) -> Self {
+        let code = match &error {
+            InstallModpackError::Source(source) => source_code(source),
+            InstallModpackError::UnsupportedSource(_) => ErrorCode::InvalidInput,
+            InstallModpackError::VersionNotFound(_) => ErrorCode::NotFound,
+            InstallModpackError::NoPackFile(_) => ErrorCode::InvalidModpack,
+            InstallModpackError::Create(CreateInstanceError::Storage(_)) => ErrorCode::Internal,
+            InstallModpackError::Create(_) => ErrorCode::InvalidModpack,
+            InstallModpackError::Pack(pack) => pack_sync_code(pack),
+            InstallModpackError::Cancelled => ErrorCode::Cancelled,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<UpdateModpackError> for AppError {
+    fn from(error: UpdateModpackError) -> Self {
+        let code = match &error {
+            UpdateModpackError::Instance(InstanceRepositoryError::NotFound(_)) => {
+                ErrorCode::NotFound
+            }
+            UpdateModpackError::Instance(_) => ErrorCode::Internal,
+            UpdateModpackError::NotFromCatalog(_) | UpdateModpackError::UnsupportedSource(_) => {
+                ErrorCode::InvalidInput
+            }
+            UpdateModpackError::Source(source) => source_code(source),
+            UpdateModpackError::VersionNotFound(_)
+            | UpdateModpackError::NoInstallableVersion(_) => ErrorCode::NotFound,
+            UpdateModpackError::NoPackFile(_) => ErrorCode::InvalidModpack,
+            UpdateModpackError::Pack(pack) => pack_sync_code(pack),
+            UpdateModpackError::Cancelled => ErrorCode::Cancelled,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<ExportMrpackError> for AppError {
+    fn from(error: ExportMrpackError) -> Self {
+        let code = match &error {
+            ExportMrpackError::NotMrpack(_) => ErrorCode::InvalidInput,
+            ExportMrpackError::Instance(InstanceRepositoryError::NotFound(_)) => {
+                ErrorCode::NotFound
+            }
+            ExportMrpackError::Instance(_) => ErrorCode::Internal,
+            ExportMrpackError::Catalog(source) => source_code(source),
+            ExportMrpackError::Files(files) => pack_file_code(files),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maps_modpack_errors_to_actionable_codes() {
+        let rate_limited = ModpackSourceError::RateLimited {
+            retry_after_secs: 30,
+        };
+        assert_eq!(AppError::from(rate_limited).code, ErrorCode::RateLimited);
+        let unsafe_entry = PackSyncError::Files(PackFileError::UnsafeEntry("../x".into()));
+        assert_eq!(
+            AppError::from(InstallModpackError::Pack(unsafe_entry)).code,
+            ErrorCode::InvalidModpack
+        );
+        let unverified = PackFileError::Index(MrpackError::UnverifiedFile("mods/a.jar".into()));
+        assert_eq!(
+            AppError::from(ExportMrpackError::Files(unverified)).code,
+            ErrorCode::UnverifiedFile
+        );
+        assert_eq!(
+            AppError::from(UpdateModpackError::Cancelled).code,
+            ErrorCode::Cancelled
+        );
+    }
 
     #[test]
     fn maps_demo_errors_to_codes() {

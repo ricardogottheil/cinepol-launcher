@@ -15,7 +15,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -81,6 +81,38 @@ export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versi
 
 export type SettingsDto = { serverConfigUrl: string, defaultServerConfigUrl: string, };
 
+export type ModpackSummaryDto = { project: string, title: string, description: string, iconUrl: string | null, downloads: number | null, };
+
+export type ModpackPageDto = { items: Array<ModpackSummaryDto>, total: number | null, };
+
+export type ModpackVersionDto = { id: string, name: string, versionNumber: string, gameVersions: Array<string>, 
+/**
+ * Loader ids (`fabric`, `quilt`, `forge`, `neoforge`).
+ */
+loaders: Array<string>, published: string | null, installable: boolean, size: number | null, };
+
+export type ModpackDetailsDto = { summary: ModpackSummaryDto, versions: Array<ModpackVersionDto>, };
+
+export type PackFilesDto = { written: number, unchanged: number, kept: number, removed: number, };
+
+export type ModpackInstallDto = { instance: InstanceDto, files: PackFilesDto, install: InstallSummaryDto, };
+
+export type ModpackUpdateDto = { upToDate: boolean, instance: InstanceDto | null, files: PackFilesDto | null, };
+
+export type ModpackExportDto = { 
+/**
+ * Where the `.mrpack` was written.
+ */
+path: string, 
+/**
+ * Files listed for download from Modrinth.
+ */
+indexed: number, 
+/**
+ * Files copied into the pack.
+ */
+overrides: number, };
+
 /** Every backend command: its arguments and its success result. */
 export interface Commands {
   get_app_info: { args: Record<string, never>; result: AppInfo };
@@ -104,6 +136,12 @@ export interface Commands {
   get_server_config: { args: Record<string, never>; result: ServerConfigDto };
   get_server_status: { args: Record<string, never>; result: ServerStatusDto };
   play_on_cinepol: { args: { operationId: string; onProgress: Channel<ProgressEvent>; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
+  search_modpacks: { args: { query: string; gameVersion: string | null; loader: string | null; page: number; pageSize: number }; result: ModpackPageDto };
+  get_modpack: { args: { project: string }; result: ModpackDetailsDto };
+  install_modpack: { args: { operationId: string; project: string; version: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto };
+  import_mrpack: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto | null };
+  update_modpack: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: ModpackUpdateDto };
+  export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };
   get_settings: { args: Record<string, never>; result: SettingsDto };
   set_server_config_url: { args: { url: string | null }; result: SettingsDto };
 }
