@@ -150,6 +150,8 @@ fn decode_entry(mut fields: HashMap<String, Value>) -> Result<ServerEntry, HashM
         tracing::warn!("keeping a server entry with an unusable address or field as raw data");
         return Err(fields);
     };
+    // Kept whole in case the leftover tags cannot be preserved below.
+    let original = fields.clone();
     fields.remove(IP);
 
     let name = match fields.remove(NAME) {
@@ -171,12 +173,12 @@ fn decode_entry(mut fields: HashMap<String, Value>) -> Result<ServerEntry, HashM
     entry.icon = icon;
     entry.accept_textures = accept_textures;
     entry.hidden = hidden;
-    match preserve(fields.clone()) {
+    match preserve(fields) {
         Ok(preserved) => {
             entry.preserved = preserved;
             Ok(entry)
         }
-        Err(_) => Err(fields),
+        Err(_) => Err(original),
     }
 }
 

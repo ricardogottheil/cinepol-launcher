@@ -59,13 +59,13 @@ pub async fn install_instance(
     let token = state.operations.start(&operation_id)?;
     // Claimed as a running game too: no install over a running game, no
     // launch over an install, and kill_instance stops the install.
-    if state.games.adopt(id.as_str(), token.clone()).is_err() {
+    let Ok(_claim) = state.games.hold(id.as_str(), token.clone()) else {
         state.operations.finish(&operation_id);
         return Err(AppError::new(
             ErrorCode::AlreadyRunning,
             format!("{id} is already running"),
         ));
-    }
+    };
     let deps = InstallDeps {
         instances: &state.instances,
         versions: &state.versions,
@@ -75,7 +75,6 @@ pub async fn install_instance(
         platform: &state.platform,
     };
     let result = install(&id, &deps, &ChannelReporter::new(on_progress), &token).await;
-    state.games.finish(id.as_str());
     state.operations.finish(&operation_id);
     Ok(InstallSummaryDto::from(&result?))
 }

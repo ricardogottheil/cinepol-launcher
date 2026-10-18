@@ -39,6 +39,16 @@ impl OperationRegistry {
         Ok(())
     }
 
+    /// Registers `id` with `token` until the returned hold is dropped, so the
+    /// registration ends on every path, early returns and panics included.
+    pub fn hold(&self, id: &str, token: CancellationToken) -> Result<Hold<'_>, AppError> {
+        self.adopt(id, token)?;
+        Ok(Hold {
+            registry: self,
+            id: id.to_owned(),
+        })
+    }
+
     /// Forgets a finished operation.
     pub fn finish(&self, id: &str) {
         self.running
@@ -51,6 +61,18 @@ impl OperationRegistry {
     pub fn cancel(&self, id: &str) -> bool {
         let running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
         running.get(id).map(CancellationToken::cancel).is_some()
+    }
+}
+
+/// Keeps an id registered until dropped.
+pub struct Hold<'a> {
+    registry: &'a OperationRegistry,
+    id: String,
+}
+
+impl Drop for Hold<'_> {
+    fn drop(&mut self) {
+        self.registry.finish(&self.id);
     }
 }
 
@@ -169,5 +191,20 @@ mod tests {
         );
         drop(first);
         assert!(gate.try_enter().is_some(), "free again once the first ends");
+    }
+
+    #[test]
+    fn a_held_id_is_released_when_the_hold_is_dropped() {
+        let games = OperationRegistry::default();
+        let token = CancellationToken::new();
+        let hold = games.hold("survival", token.clone()).unwrap();
+        assert!(games.start("survival").is_err(), "busy while held");
+        assert!(games.cancel("survival"));
+        assert!(token.is_cancelled(), "kill_instance reaches the holder");
+        drop(hold);
+        assert!(
+            games.start("survival").is_ok(),
+            "free once the hold is gone"
+        );
     }
 }
