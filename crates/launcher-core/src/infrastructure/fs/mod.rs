@@ -5,10 +5,14 @@ mod accounts;
 mod atomic;
 mod filesystem;
 mod instances;
+mod pack_files;
+mod pack_manifest;
 mod settings;
 
 pub use accounts::JsonAccountRepository;
 pub use atomic::write_atomic;
 pub use filesystem::TokioFileSystem;
 pub use instances::JsonInstanceRepository;
+pub use pack_files::StdPackFiles;
+pub use pack_manifest::JsonPackManifestStore;
 pub use settings::JsonSettingsRepository;
