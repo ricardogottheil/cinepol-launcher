@@ -231,7 +231,15 @@ where
     for path in &plan.remove {
         deps.files.remove_file(&path.under(&game_dir)).await?;
     }
-    deps.manifests.save(instance, &plan.manifest).await?;
+    // Record what was actually written: downloads are verified against sha512
+    // only, and a wrong declared sha1 would make an intact file look changed.
+    let mut manifest = plan.manifest;
+    for path in &plan.write {
+        if let Some(sha1) = deps.files.sha1(&path.under(&game_dir)).await? {
+            manifest.files.insert(path.clone(), sha1);
+        }
+    }
+    deps.manifests.save(instance, &manifest).await?;
     Ok(SyncSummary {
         written: plan.write.len(),
         unchanged: plan.unchanged.len(),

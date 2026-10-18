@@ -289,6 +289,13 @@ impl InstanceRepository for JsonInstanceRepository {
             .map_err(|e| InstanceRepositoryError::Storage(e.to_string()))
     }
 
+    async fn id_taken(&self, id: &InstanceId) -> Result<bool, InstanceRepositoryError> {
+        // Any entry counts, readable or not, so a new instance never takes over a folder.
+        tokio::fs::try_exists(self.paths.instance_dir(id))
+            .await
+            .map_err(|e| InstanceRepositoryError::Storage(e.to_string()))
+    }
+
     async fn delete(&self, id: &InstanceId) -> Result<(), InstanceRepositoryError> {
         match tokio::fs::remove_dir_all(self.paths.instance_dir(id)).await {
             Ok(()) => Ok(()),
@@ -356,6 +363,30 @@ mod tests {
             repo.delete(&instance.id).await,
             Err(InstanceRepositoryError::NotFound(instance.id.clone()))
         );
+    }
+
+    #[tokio::test]
+    async fn unreadable_instance_folders_still_take_their_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = JsonInstanceRepository::new(LauncherPaths::new(dir.path()));
+        let broken = dir.path().join("instances").join("broken");
+        std::fs::create_dir_all(&broken).unwrap();
+        std::fs::write(broken.join(FILE_NAME), b"{not json").unwrap();
+
+        assert!(repo.list().await.unwrap().is_empty());
+        assert!(
+            repo.id_taken(&InstanceId::parse("broken").unwrap())
+                .await
+                .unwrap()
+        );
+        assert!(
+            !repo
+                .id_taken(&InstanceId::parse("free").unwrap())
+                .await
+                .unwrap()
+        );
+        repo.save(&sample()).await.unwrap();
+        assert!(repo.id_taken(&sample().id).await.unwrap());
     }
 
     #[tokio::test]

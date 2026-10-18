@@ -498,4 +498,57 @@ mod tests {
         assert!(world.instances.list().await.unwrap().is_empty());
         assert!(world.fs.removed().contains(&world.paths.instance_dir(&id)));
     }
+
+    #[tokio::test]
+    async fn never_installs_into_a_folder_that_already_exists() {
+        // An instance folder whose instance.json cannot be read is not listed,
+        // but its worlds still belong to the player.
+        let world = World::new(vec![v1_pack(LOCAL)]);
+        world.instances.occupy(InstanceId::parse(ID).unwrap());
+        world.write_game_file(ID, "saves/My World/level.dat", b"years of building");
+
+        let failed = install_modpack(
+            local(None),
+            &deps(&world, &FailingDownloader),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert!(failed.is_err());
+        let installed = install(&world, local(None)).await.unwrap();
+
+        assert_ne!(installed.instance.id.as_str(), ID);
+        assert_eq!(
+            world
+                .read_game_file(ID, "saves/My World/level.dat")
+                .as_deref(),
+            Some(b"years of building".as_slice())
+        );
+        assert!(
+            !world
+                .fs
+                .removed()
+                .contains(&world.paths.instance_dir(&InstanceId::parse(ID).unwrap()))
+        );
+    }
+
+    #[tokio::test]
+    async fn records_the_sha1_of_the_written_file_not_the_declared_one() {
+        let mut wrong = entry("v1", "mods/sodium.jar", "required");
+        wrong.hashes.insert("sha1".into(), "0".repeat(40));
+        let pack = (
+            LOCAL.into(),
+            index("v1", "26.2", "0.19.5", vec![wrong]),
+            vec![],
+        );
+        let world = World::new(vec![pack]);
+        let installed = install(&world, local(None)).await.unwrap();
+
+        let manifests = world.manifests.manifests.lock().unwrap();
+        let manifest = &manifests[&installed.instance.id];
+        let written = world
+            .read_game_file(installed.instance.id.as_str(), "mods/sodium.jar")
+            .unwrap();
+        assert_eq!(manifest.files[&rel("mods/sodium.jar")], sha1_hex(&written));
+    }
 }

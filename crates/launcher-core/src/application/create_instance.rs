@@ -39,15 +39,21 @@ pub async fn create_instance<R: InstanceRepository, S: ServerListStore>(
 ) -> Result<Instance, CreateInstanceError> {
     let name = InstanceName::parse(request.name)?;
     let game_version = GameVersion::parse(request.game_version.trim())?;
-    let existing: Vec<InstanceId> = instances
+    let mut taken: Vec<InstanceId> = instances
         .list()
         .await?
         .into_iter()
         .map(|instance| instance.id)
         .collect();
-    let id = InstanceId::unique(&InstanceId::slug_from(&name), |candidate| {
-        existing.contains(candidate)
-    });
+    let base = InstanceId::slug_from(&name);
+    // `list` skips folders it cannot read; those ids are taken too.
+    let id = loop {
+        let candidate = InstanceId::unique(&base, |candidate| taken.contains(candidate));
+        if !instances.id_taken(&candidate).await? {
+            break candidate;
+        }
+        taken.push(candidate);
+    };
     let instance = Instance::new(id, name, game_version, request.loader, request.origin);
     instances.save(&instance).await?;
 

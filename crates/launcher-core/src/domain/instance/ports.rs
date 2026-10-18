@@ -27,4 +27,10 @@ pub trait InstanceRepository: Send + Sync {
         &self,
         id: &InstanceId,
     ) -> impl Future<Output = Result<(), InstanceRepositoryError>> + Send;
+    /// Whether `id` is in use, including by a folder whose metadata `list`
+    /// cannot read (it may still hold the player's worlds).
+    fn id_taken(
+        &self,
+        id: &InstanceId,
+    ) -> impl Future<Output = Result<bool, InstanceRepositoryError>> + Send;
 }

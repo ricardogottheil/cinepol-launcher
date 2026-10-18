@@ -240,6 +240,15 @@ impl AccountRepository for InMemoryAccountRepository {
 #[derive(Debug, Default)]
 pub struct InMemoryInstanceRepository {
     instances: Mutex<Vec<Instance>>,
+    /// Ids whose folder exists without readable metadata.
+    occupied: Mutex<Vec<InstanceId>>,
+}
+
+impl InMemoryInstanceRepository {
+    /// Marks `id` as taken by a folder `list` cannot read.
+    pub fn occupy(&self, id: InstanceId) {
+        self.occupied.lock().unwrap().push(id);
+    }
 }
 
 impl InstanceRepository for InMemoryInstanceRepository {
@@ -267,6 +276,11 @@ impl InstanceRepository for InMemoryInstanceRepository {
             None => instances.push(instance.clone()),
         }
         Ok(())
+    }
+
+    async fn id_taken(&self, id: &InstanceId) -> Result<bool, InstanceRepositoryError> {
+        let listed = self.instances.lock().unwrap().iter().any(|i| &i.id == id);
+        Ok(listed || self.occupied.lock().unwrap().contains(id))
     }
 
     async fn delete(&self, id: &InstanceId) -> Result<(), InstanceRepositoryError> {

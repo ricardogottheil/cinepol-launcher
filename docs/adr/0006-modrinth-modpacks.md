@@ -51,6 +51,12 @@ their own, and an update must not throw that work away.
 - A pack imported from a local file is an instance with the `custom` origin; it
   is not updated from the catalog.
 - A file the player changed stays at the player's version after an update, even
-  when the pack ships a fix for it.
+  when the pack ships a fix for it. A pack file the player deleted comes back on
+  the next update (only changed or added files are the player's).
+- The manifest records the sha1 of the file actually written, not the one the
+  index declares, so a wrong declared sha1 cannot make an intact file look
+  changed.
+- A new instance never reuses an existing folder, even one whose metadata
+  cannot be read, so cleaning up a failed install cannot delete worlds.
 - Installing and updating chain the regular instance install (game, loader,
   Java) in the same cancellable operation.
