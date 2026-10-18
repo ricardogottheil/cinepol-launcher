@@ -11,10 +11,11 @@ use ts_rs::{Config, TS};
 use crate::dto::{
     AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, CommunityLinksDto,
     ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto, InstallSummaryDto,
-    InstanceDto, InstanceOriginDto, LaunchOutcomeDto, LoaderReleaseDto, LogLineDto, LogStreamDto,
-    ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto,
-    ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PremiumNameDto, ProgressEvent,
-    ProgressStageDto, ProgressUnitDto, ServerConfigDto, ServerStatusDto, SettingsDto, SkinDto,
+    InstanceDto, InstanceOriginDto, InstanceSettingsDto, JavaChoiceDto, JavaKindDto,
+    LaunchOutcomeDto, LoaderReleaseDto, LogLineDto, LogStreamDto, ModpackDetailsDto,
+    ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto,
+    ModpackVersionDto, PackFilesDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
+    ProgressUnitDto, ServerConfigDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -70,6 +71,10 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ModpackInstallDto::decl(cfg),
         ModpackUpdateDto::decl(cfg),
         ModpackExportDto::decl(cfg),
+        JavaKindDto::decl(cfg),
+        JavaChoiceDto::decl(cfg),
+        WindowSizeDto::decl(cfg),
+        InstanceSettingsDto::decl(cfg),
     ]
 }
 
@@ -198,6 +203,30 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             ],
             LaunchOutcomeDto::name(cfg),
         ),
+        command(
+            "delete_instance",
+            vec![("instanceId", string())],
+            "null".to_owned(),
+        ),
+        command(
+            "duplicate_instance",
+            vec![("instanceId", string()), ("name", string())],
+            InstanceDto::name(cfg),
+        ),
+        command(
+            "get_instance_settings",
+            vec![("instanceId", string())],
+            InstanceSettingsDto::name(cfg),
+        ),
+        command(
+            "update_instance_settings",
+            vec![
+                ("instanceId", string()),
+                ("settings", InstanceSettingsDto::name(cfg)),
+            ],
+            InstanceSettingsDto::name(cfg),
+        ),
+        command("pick_java_executable", vec![], "string | null".to_owned()),
         command(
             "search_modpacks",
             vec![
@@ -345,6 +374,11 @@ mod tests {
             "install_instance",
             "launch_instance",
             "kill_instance",
+            "delete_instance",
+            "duplicate_instance",
+            "get_instance_settings",
+            "update_instance_settings",
+            "pick_java_executable",
             "search_modpacks",
             "get_modpack",
             "install_modpack",

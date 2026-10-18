@@ -1,7 +1,8 @@
 //! Composition root: wires infrastructure adapters into use cases.
 
-use std::path::PathBuf;
-use std::sync::{PoisonError, RwLock};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError, RwLock};
 
 use launcher_core::application::install_instance::InstallDeps;
 use launcher_core::application::modpack_files::PackSyncDeps;
@@ -118,6 +119,10 @@ pub struct AppState {
     /// Which files each modpack instance got from its pack.
     pub pack_manifests: JsonPackManifestStore,
     pub settings: JsonSettingsRepository,
+    /// Checks custom Java executables (`java -version`).
+    pub java_probe: ProcessJavaProbe,
+    /// Java executables the player picked with the native picker this session.
+    picked_java: Mutex<HashSet<PathBuf>>,
     pub bundled_config: ServerConfig,
     /// The last config loaded (remote or bundled), used to seed new instances.
     current_config: RwLock<ServerConfig>,
@@ -170,6 +175,20 @@ impl AppState {
         }
     }
 
+    pub fn remember_picked_java(&self, path: PathBuf) {
+        self.picked_java
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(path);
+    }
+
+    pub fn was_picked_java(&self, path: &Path) -> bool {
+        self.picked_java
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(path)
+    }
+
     pub fn remember_config(&self, config: ServerConfig) {
         *self
             .current_config
@@ -207,6 +226,8 @@ impl AppState {
             pack_files: StdPackFiles,
             pack_manifests: JsonPackManifestStore::new(paths.clone()),
             settings: JsonSettingsRepository::new(paths.settings_file()),
+            java_probe: ProcessJavaProbe::new(),
+            picked_java: Mutex::default(),
             servers: NbtServerListStore::new(paths.clone()),
             pinger: MinecraftServerPinger::new(),
             premium_names: MojangPremiumNames::new(http.clone()),

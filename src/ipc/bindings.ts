@@ -113,6 +113,18 @@ indexed: number,
  */
 overrides: number, };
 
+export type JavaKindDto = "managed" | "custom";
+
+export type JavaChoiceDto = { kind: JavaKindDto, path: string | null, };
+
+export type WindowSizeDto = { width: number, height: number, };
+
+export type InstanceSettingsDto = { name: string, defaultAccountId: string | null, java: JavaChoiceDto, minMemoryMb: number, maxMemoryMb: number, jvmArgs: Array<string>, 
+/**
+ * `null` keeps the game's own window size.
+ */
+window: WindowSizeDto | null, env: { [key in string]: string }, };
+
 /** Every backend command: its arguments and its success result. */
 export interface Commands {
   get_app_info: { args: Record<string, never>; result: AppInfo };
@@ -136,6 +148,11 @@ export interface Commands {
   get_server_config: { args: Record<string, never>; result: ServerConfigDto };
   get_server_status: { args: Record<string, never>; result: ServerStatusDto };
   play_on_cinepol: { args: { operationId: string; onProgress: Channel<ProgressEvent>; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
+  delete_instance: { args: { instanceId: string }; result: null };
+  duplicate_instance: { args: { instanceId: string; name: string }; result: InstanceDto };
+  get_instance_settings: { args: { instanceId: string }; result: InstanceSettingsDto };
+  update_instance_settings: { args: { instanceId: string; settings: InstanceSettingsDto }; result: InstanceSettingsDto };
+  pick_java_executable: { args: Record<string, never>; result: string | null };
   search_modpacks: { args: { query: string; gameVersion: string | null; loader: string | null; page: number; pageSize: number }; result: ModpackPageDto };
   get_modpack: { args: { project: string }; result: ModpackDetailsDto };
   install_modpack: { args: { operationId: string; project: string; version: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto };

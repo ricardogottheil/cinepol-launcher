@@ -10,12 +10,12 @@ use launcher_core::application::launch_instance::LaunchOutcome;
 use launcher_core::application::modpack_files::SyncSummary;
 use launcher_core::domain::account::{Account, AccountKind};
 use launcher_core::domain::account::{DeviceCode, SkinVariant};
-use launcher_core::domain::instance::{Instance, InstanceOrigin};
+use launcher_core::domain::instance::{Instance, InstanceOrigin, JavaSelection};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
 use launcher_core::domain::loader::LoaderRelease;
 use launcher_core::domain::modpack::{ModpackPage, ModpackSummary, ModpackVersion};
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// Application metadata shown in the UI (About, footer).
@@ -588,6 +588,76 @@ impl ModpackExportDto {
             path: path.display().to_string(),
             indexed: count(summary.indexed),
             overrides: count(summary.overrides),
+        }
+    }
+}
+
+/// `managed`: the launcher downloads the runtime the version needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum JavaKindDto {
+    Managed,
+    Custom,
+}
+
+/// Which Java an instance runs with. `path` is set only for `custom`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct JavaChoiceDto {
+    pub kind: JavaKindDto,
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowSizeDto {
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Everything the player can edit on an instance; sent back whole on save.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct InstanceSettingsDto {
+    pub name: String,
+    pub default_account_id: Option<String>,
+    pub java: JavaChoiceDto,
+    pub min_memory_mb: u32,
+    pub max_memory_mb: u32,
+    pub jvm_args: Vec<String>,
+    /// `null` keeps the game's own window size.
+    pub window: Option<WindowSizeDto>,
+    pub env: std::collections::BTreeMap<String, String>,
+}
+
+impl From<&Instance> for InstanceSettingsDto {
+    fn from(instance: &Instance) -> Self {
+        let settings = &instance.settings;
+        Self {
+            name: instance.name.to_string(),
+            default_account_id: instance.default_account.map(|id| id.as_uuid().to_string()),
+            java: match &settings.java {
+                JavaSelection::Managed => JavaChoiceDto {
+                    kind: JavaKindDto::Managed,
+                    path: None,
+                },
+                JavaSelection::Custom(path) => JavaChoiceDto {
+                    kind: JavaKindDto::Custom,
+                    path: Some(path.display().to_string()),
+                },
+            },
+            min_memory_mb: settings.memory.min_mb(),
+            max_memory_mb: settings.memory.max_mb(),
+            jvm_args: settings.jvm_args.as_slice().to_vec(),
+            window: settings.window.map(|window| WindowSizeDto {
+                width: window.width(),
+                height: window.height(),
+            }),
+            env: settings
+                .env
+                .iter()
+                .map(|(name, value)| (name.to_owned(), value.to_owned()))
+                .collect(),
         }
     }
 }

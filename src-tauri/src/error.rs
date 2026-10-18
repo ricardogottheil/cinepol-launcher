@@ -4,6 +4,7 @@
 use launcher_core::application::account_skin::AccountSkinError;
 use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
+use launcher_core::application::duplicate_instance::DuplicateInstanceError;
 use launcher_core::application::export_mrpack::ExportMrpackError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::install_modpack::InstallModpackError;
@@ -14,6 +15,7 @@ use launcher_core::application::modpack_files::PackSyncError;
 use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
+use launcher_core::application::update_instance_settings::UpdateInstanceSettingsError;
 use launcher_core::application::update_modpack::UpdateModpackError;
 use launcher_core::domain::account::AccountRepositoryError;
 use launcher_core::domain::account::AuthError;
@@ -428,9 +430,61 @@ impl From<ExportMrpackError> for AppError {
     }
 }
 
+impl From<DuplicateInstanceError> for AppError {
+    fn from(error: DuplicateInstanceError) -> Self {
+        let code = match &error {
+            DuplicateInstanceError::InvalidName(_) => ErrorCode::InvalidInput,
+            DuplicateInstanceError::Instance(InstanceRepositoryError::NotFound(_)) => {
+                ErrorCode::NotFound
+            }
+            DuplicateInstanceError::Instance(_) | DuplicateInstanceError::Copy(_) => {
+                ErrorCode::Internal
+            }
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<UpdateInstanceSettingsError> for AppError {
+    fn from(error: UpdateInstanceSettingsError) -> Self {
+        let code = match &error {
+            UpdateInstanceSettingsError::InvalidName(_)
+            | UpdateInstanceSettingsError::InvalidSettings(_) => ErrorCode::InvalidInput,
+            UpdateInstanceSettingsError::InvalidJava { .. } => ErrorCode::JavaUnavailable,
+            UpdateInstanceSettingsError::UnknownAccount(_) => ErrorCode::NotFound,
+            UpdateInstanceSettingsError::Instance(InstanceRepositoryError::NotFound(_)) => {
+                ErrorCode::NotFound
+            }
+            UpdateInstanceSettingsError::Instance(_) | UpdateInstanceSettingsError::Accounts(_) => {
+                ErrorCode::Internal
+            }
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maps_instance_management_errors_to_actionable_codes() {
+        assert_eq!(
+            AppError::from(UpdateInstanceSettingsError::InvalidJava {
+                path: "/x".into(),
+                reason: "not java".into(),
+            })
+            .code,
+            ErrorCode::JavaUnavailable
+        );
+        assert_eq!(
+            AppError::from(DuplicateInstanceError::InvalidName(
+                launcher_core::domain::instance::InstanceName::parse(" ").unwrap_err()
+            ))
+            .code,
+            ErrorCode::InvalidInput
+        );
+    }
 
     #[test]
     fn maps_modpack_errors_to_actionable_codes() {

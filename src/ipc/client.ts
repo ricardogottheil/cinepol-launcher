@@ -14,6 +14,9 @@ import type {
   GameVersionsDto,
   InstallSummaryDto,
   InstanceDto,
+  InstanceSettingsDto,
+  JavaChoiceDto,
+  JavaKindDto,
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLineDto,
@@ -50,6 +53,9 @@ export type {
   GameVersionsDto,
   InstallSummaryDto,
   InstanceDto,
+  InstanceSettingsDto,
+  JavaChoiceDto,
+  JavaKindDto,
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLineDto,
@@ -295,6 +301,33 @@ export function launchInstance(
 
 export function killInstance(instanceId: string): Promise<boolean> {
   return call("kill_instance", { instanceId });
+}
+
+/** Deletes an instance and its whole folder, worlds included. */
+export async function deleteInstance(instanceId: string): Promise<void> {
+  await call("delete_instance", { instanceId });
+}
+
+/** Copies an instance, worlds included, under a new name. */
+export function duplicateInstance(instanceId: string, name: string): Promise<InstanceDto> {
+  return call("duplicate_instance", { instanceId, name });
+}
+
+export function getInstanceSettings(instanceId: string): Promise<InstanceSettingsDto> {
+  return call("get_instance_settings", { instanceId });
+}
+
+/** Saves every editable value at once; rejects with `invalid_input` when one is invalid. */
+export function updateInstanceSettings(
+  instanceId: string,
+  settings: InstanceSettingsDto,
+): Promise<InstanceSettingsDto> {
+  return call("update_instance_settings", { instanceId, settings });
+}
+
+/** Asks for a Java executable; `null` when the picker is closed. */
+export function pickJavaExecutable(): Promise<string | null> {
+  return call("pick_java_executable");
 }
 
 export interface ModpackSearch {
