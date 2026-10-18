@@ -62,7 +62,7 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
         │
  launcher-core::infrastructure  adapters: http, auth, mojang, loaders, modrinth,
                                 curseforge, packwiz, java, nbt, server_ping,
-                                process, secrets, fs
+                                process, keychain, fs
 ```
 
 **Dependency rule**: `domain` ← `application` ← `infrastructure`.

@@ -6,6 +6,7 @@ pub mod cinepol;
 pub mod fs;
 pub mod http;
 pub mod java;
+pub mod keychain;
 pub mod mojang;
 pub mod msa;
 pub mod nbt;

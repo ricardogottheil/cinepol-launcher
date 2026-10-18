@@ -37,6 +37,7 @@ regex-lite.workspace = true
 tracing.workspace = true
 fastnbt.workspace = true
 hickory-resolver.workspace = true
+keyring.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
