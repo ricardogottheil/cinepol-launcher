@@ -11,6 +11,8 @@ interface ViewerOptions {
 
 const fakes = vi.hoisted(() => {
   const viewers: FakeViewer[] = [];
+  /** Makes the light setup throw, as a broken WebGL context would. */
+  const control = { failSetup: false };
 
   class FakeFunctionAnimation {
     constructor(readonly fn: unknown) {}
@@ -19,7 +21,11 @@ const fakes = vi.hoisted(() => {
   class FakeViewer {
     readonly options: ViewerOptions;
     readonly canvas = document.createElement("canvas");
-    readonly scene = { add: vi.fn() };
+    readonly scene = {
+      add: vi.fn(() => {
+        if (control.failSetup) throw new Error("setup failed");
+      }),
+    };
     readonly globalLight = { intensity: 3 };
     readonly cameraLight = { intensity: 0.6 };
     readonly playerObject = {
@@ -42,7 +48,7 @@ const fakes = vi.hoisted(() => {
     readonly position = { set: vi.fn() };
   }
 
-  return { viewers, FakeViewer, FakeFunctionAnimation, FakeLight };
+  return { viewers, control, FakeViewer, FakeFunctionAnimation, FakeLight };
 });
 
 vi.mock("skinview3d", () => ({
@@ -170,5 +176,21 @@ describe("SkinViewer", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(fakes.viewers).toHaveLength(0);
+  });
+
+  it("releases the viewer when its setup throws", async () => {
+    fakes.control.failSetup = true;
+    try {
+      const before = fakes.viewers.length;
+      const { container } = render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
+      await waitFor(() => expect(fakes.viewers.length).toBe(before + 1));
+      const viewer = fakes.viewers[before];
+      if (!viewer) throw new Error("no viewer");
+      await waitFor(() => expect(viewer.dispose).toHaveBeenCalledOnce());
+      expect(viewer.renderer.forceContextLoss).toHaveBeenCalledOnce();
+      expect(container.querySelector("canvas")).toBeNull();
+    } finally {
+      fakes.control.failSetup = false;
+    }
   });
 });

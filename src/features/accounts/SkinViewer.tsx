@@ -74,6 +74,15 @@ export function SkinViewer({ texture, slim, label, className }: SkinViewerProps)
         });
 
         const canvas = viewer.canvas;
+        // Released on every path, even if the setup below throws.
+        const release = () => {
+          viewer.dispose();
+          // dispose() keeps the context alive until garbage collection; release
+          // it now so swapping skins never piles up WebGL contexts.
+          viewer.renderer.forceContextLoss();
+          canvas.remove();
+        };
+        cleanup = release;
         canvas.setAttribute("aria-hidden", "true");
         canvas.className = "absolute inset-0 block size-full";
         host.append(canvas);
@@ -124,15 +133,14 @@ export function SkinViewer({ texture, slim, label, className }: SkinViewerProps)
         cleanup = () => {
           visibility?.disconnect();
           sizing?.disconnect();
-          viewer.dispose();
-          // dispose() keeps the context alive until garbage collection; release
-          // it now so swapping skins never piles up WebGL contexts.
-          viewer.renderer.forceContextLoss();
-          canvas.remove();
+          release();
         };
       })
       .catch(() => {
-        // No WebGL or the chunk failed to load: the empty frame stays.
+        // No WebGL, the chunk failed to load or the setup threw: release what
+        // was created and leave the empty frame.
+        cleanup?.();
+        cleanup = null;
       });
 
     return () => {

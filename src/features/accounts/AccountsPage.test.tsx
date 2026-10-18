@@ -4,6 +4,7 @@ import esCommon from "../../i18n/locales/es/common.json";
 import { type DeviceCodeDto, IpcError } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
 import { AccountsPage } from "./AccountsPage";
+import { useSignInStore } from "./signInStore";
 
 const client = vi.hoisted(() => ({
   listAccounts: vi.fn(),
@@ -49,6 +50,7 @@ beforeEach(() => {
   client.getAccountSkin.mockResolvedValue(null);
   client.removeAccount.mockResolvedValue(null);
   client.openExternal.mockResolvedValue(undefined);
+  useSignInStore.setState({ signIn: { kind: "idle", error: null } });
 });
 
 const code: DeviceCodeDto = {
@@ -212,5 +214,19 @@ describe("AccountsPage", () => {
     );
     expect(viewer).toHaveAttribute("data-slim", "true");
     expect(client.getAccountSkin).toHaveBeenCalledWith("9");
+  });
+
+  it("keeps a waiting sign-in across leaving the page and never starts a second one", async () => {
+    scriptSignIn();
+    const first = renderWithQuery(<AccountsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.microsoftSignIn }));
+    expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
+    first.unmount();
+
+    renderWithQuery(<AccountsPage />);
+    expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.microsoftSignIn })).not.toBeInTheDocument();
+    useSignInStore.getState().start(() => {});
+    expect(client.loginMicrosoft).toHaveBeenCalledOnce();
   });
 });
