@@ -120,7 +120,9 @@
     "not_entitled": "Esta cuenta no tiene Minecraft: Java Edition",
     "app_not_approved": "El inicio de sesión con Microsoft todavía no está habilitado para este launcher",
     "keychain_unavailable": "El llavero del sistema no está disponible para guardar la sesión",
-    "microsoft_not_configured": "Esta versión del launcher no incluye inicio de sesión con Microsoft"
+    "microsoft_not_configured": "Esta versión del launcher no incluye inicio de sesión con Microsoft",
+    "loader_unavailable": "Ese loader no está disponible para esta versión de Minecraft",
+    "unverified_file": "Un archivo no tiene suma de verificación, así que el launcher no lo usará"
   },
   "stages": {
     "metadata": "Leyendo la versión",
@@ -184,7 +186,15 @@
     },
     "playtime": "{{hours}} h {{minutes}} min",
     "logTitle": "Registro del juego",
-    "logEmpty": "Aquí aparece la salida del juego."
+    "logEmpty": "Aquí aparece la salida del juego.",
+    "loaderLabel": "Loader",
+    "loaderVersionLabel": "Versión del loader",
+    "loaders": {
+      "vanilla": "Vanilla",
+      "fabric": "Fabric",
+      "quilt": "Quilt"
+    },
+    "unstable": "{{version}} (beta)"
   },
   "settings": {
     "title": "Ajustes",

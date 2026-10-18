@@ -10,6 +10,7 @@ const client = vi.hoisted(() => ({
   listInstances: vi.fn(),
   listGameVersions: vi.fn(),
   createInstance: vi.fn(),
+  listLoaderVersions: vi.fn(),
   installInstance: vi.fn(),
   launchInstance: vi.fn(),
   killInstance: vi.fn(),
@@ -70,7 +71,50 @@ describe("InstancesPage", () => {
     await screen.findByRole("option", { name: "1.21.11" });
     fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "CINEPOL" } });
     fireEvent.click(screen.getByRole("button", { name: labels.create }));
-    await waitFor(() => expect(client.createInstance).toHaveBeenCalledWith("CINEPOL", "26.2"));
+    await waitFor(() =>
+      expect(client.createInstance).toHaveBeenCalledWith({
+        name: "CINEPOL",
+        gameVersion: "26.2",
+        loader: "vanilla",
+        loaderVersion: null,
+      }),
+    );
+    expect(client.listLoaderVersions).not.toHaveBeenCalled();
+  });
+
+  it("creates a Fabric instance on the newest stable loader by default", async () => {
+    client.listLoaderVersions.mockResolvedValue([
+      { version: "0.20.0", stable: false },
+      { version: "0.19.5", stable: true },
+      { version: "0.19.4", stable: true },
+    ]);
+    client.createInstance.mockResolvedValue({ ...instance, id: "fab", name: "Fab" });
+    renderWithQuery(<InstancesPage />);
+    await screen.findByRole("option", { name: "1.21.11" });
+    fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "fabric" } });
+    await waitFor(() => expect(client.listLoaderVersions).toHaveBeenCalledWith("fabric", "26.2"));
+    expect(await screen.findByLabelText(labels.loaderVersionLabel)).toHaveValue("0.19.5");
+
+    fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "Fab" } });
+    fireEvent.click(screen.getByRole("button", { name: labels.create }));
+    await waitFor(() =>
+      expect(client.createInstance).toHaveBeenCalledWith({
+        name: "Fab",
+        gameVersion: "26.2",
+        loader: "fabric",
+        loaderVersion: "0.19.5",
+      }),
+    );
+  });
+
+  it("explains a loader that does not support the chosen version", async () => {
+    client.listLoaderVersions.mockRejectedValue(new IpcError("loader_unavailable", "400"));
+    renderWithQuery(<InstancesPage />);
+    await screen.findByRole("option", { name: "1.21.11" });
+    fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "quilt" } });
+    fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "Q" } });
+    expect(await screen.findByText(esCommon.errors.loader_unavailable)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.create })).toBeDisabled();
   });
 
   it("shows install progress by stage and can cancel", async () => {

@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createInstance, listGameVersions, listInstances } from "../../ipc/client";
+import {
+  createInstance,
+  type InstanceLoader,
+  listGameVersions,
+  listInstances,
+  listLoaderVersions,
+  type NewInstanceRequest,
+} from "../../ipc/client";
 
 export const instancesKey = ["instances"] as const;
 
@@ -18,8 +25,18 @@ export function useGameVersions(includeSnapshots: boolean) {
 export function useCreateInstance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, gameVersion }: { name: string; gameVersion: string }) =>
-      createInstance(name, gameVersion),
+    mutationFn: (request: NewInstanceRequest) => createInstance(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: instancesKey }),
+  });
+}
+
+/** A loader's releases for a game version; nothing to list for vanilla. */
+export function useLoaderVersions(loader: InstanceLoader, gameVersion: string) {
+  return useQuery({
+    queryKey: ["loader-versions", loader, gameVersion],
+    queryFn: () =>
+      loader === "vanilla" ? Promise.resolve([]) : listLoaderVersions(loader, gameVersion),
+    enabled: loader !== "vanilla" && gameVersion !== "",
+    staleTime: 10 * 60 * 1000,
   });
 }

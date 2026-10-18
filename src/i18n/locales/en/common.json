@@ -120,7 +120,9 @@
     "not_entitled": "This account does not own Minecraft: Java Edition",
     "app_not_approved": "Microsoft sign-in is not enabled for this launcher yet",
     "keychain_unavailable": "The system keychain is not available to store the session",
-    "microsoft_not_configured": "This build of the launcher has no Microsoft sign-in"
+    "microsoft_not_configured": "This build of the launcher has no Microsoft sign-in",
+    "loader_unavailable": "That loader is not available for this Minecraft version",
+    "unverified_file": "A file has no checksum, so the launcher will not use it"
   },
   "stages": {
     "metadata": "Reading the version",
@@ -184,7 +186,15 @@
     },
     "playtime": "{{hours}} h {{minutes}} min",
     "logTitle": "Game log",
-    "logEmpty": "The game output appears here."
+    "logEmpty": "The game output appears here.",
+    "loaderLabel": "Loader",
+    "loaderVersionLabel": "Loader version",
+    "loaders": {
+      "vanilla": "Vanilla",
+      "fabric": "Fabric",
+      "quilt": "Quilt"
+    },
+    "unstable": "{{version}} (beta)"
   },
   "settings": {
     "title": "Settings",
