@@ -131,6 +131,40 @@ fn json_body(document: &serde_json::Value) -> HttpBody {
 }
 
 /// The OAuth `error` code of an HTTP 400 answer.
+/// An OAuth error answer, named by its `error` code and `AADSTS` numbers.
+/// Both are fixed identifiers that never hold tokens; the free-text
+/// description stays out because it can echo request details.
+fn oauth_failure(step: Step, response: &HttpResponse) -> AuthError {
+    let Ok(body) = serde_json::from_slice::<OAuthErrorResponse>(&response.body) else {
+        return unexpected(step, response.status);
+    };
+    let is_identifier = |text: &str| {
+        !text.is_empty()
+            && text.len() <= 64
+            && text.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    };
+    let error = if is_identifier(&body.error) {
+        body.error
+    } else {
+        "an unknown error".to_owned()
+    };
+    let codes: Vec<String> = body
+        .error_codes
+        .iter()
+        .map(|code| format!("AADSTS{code}"))
+        .collect();
+    AuthError::Unexpected(format!(
+        "the {} answered {error}{} (HTTP {})",
+        step.name(),
+        if codes.is_empty() {
+            String::new()
+        } else {
+            format!(" [{}]", codes.join(", "))
+        },
+        response.status
+    ))
+}
+
 fn oauth_error(step: Step, response: &HttpResponse) -> Result<String, AuthError> {
     if response.status != 400 {
         return Err(unexpected(step, response.status));
@@ -297,7 +331,7 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
             .send(step, HttpRequest::post(DEVICE_CODE_URL, form(&fields)))
             .await?;
         if !response.is_success() {
-            return Err(unexpected(step, response.status));
+            return Err(oauth_failure(step, &response));
         }
         let code: DeviceCodeResponse = parse(step, &response)?;
         Ok(DeviceCode {
@@ -336,7 +370,7 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
             "slow_down" => Ok(DevicePoll::SlowDown),
             "expired_token" => Err(AuthError::CodeExpired),
             "authorization_declined" => Err(AuthError::Declined),
-            _ => Err(unexpected(step, response.status)),
+            _ => Err(oauth_failure(step, &response)),
         }
     }
 
@@ -365,7 +399,7 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
         }
         match oauth_error(step, &response)?.as_str() {
             "invalid_grant" => Err(AuthError::SessionExpired),
-            _ => Err(unexpected(step, response.status)),
+            _ => Err(oauth_failure(step, &response)),
         }
     }
 

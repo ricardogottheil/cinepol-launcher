@@ -29,6 +29,9 @@ pub struct TokenResponse {
 #[derive(Deserialize)]
 pub struct OAuthErrorResponse {
     pub error: String,
+    /// The `AADSTS` numbers; safe to log, unlike the free-text description.
+    #[serde(default)]
+    pub error_codes: Vec<u64>,
 }
 
 /// The answer of both the Xbox Live and the XSTS endpoints.

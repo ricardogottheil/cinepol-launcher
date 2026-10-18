@@ -698,3 +698,23 @@ async fn later_steps_report_network_errors_too() {
     assert!(matches!(error, AuthError::Network(_)), "{error:?}");
     assert_no_secret(&error);
 }
+
+#[tokio::test]
+async fn an_oauth_failure_names_its_error_and_aadsts_codes_but_not_the_description() {
+    let http = FakeHttpRequester::default().reply(
+        DEVICE_CODE_URL,
+        400,
+        r#"{"error":"unauthorized_client","error_description":"AADSTS700016: Application with identifier 'x' was not found. Trace ID: 1","error_codes":[700016]}"#,
+    );
+    let error = client(http).start_device_code().await.unwrap_err();
+    let AuthError::Unexpected(message) = error else {
+        panic!("expected Unexpected, got {error:?}");
+    };
+    assert!(message.contains("unauthorized_client"), "{message}");
+    assert!(message.contains("AADSTS700016"), "{message}");
+    assert!(message.contains("HTTP 400"), "{message}");
+    assert!(
+        !message.contains("Trace ID"),
+        "the free-text description stays out: {message}"
+    );
+}

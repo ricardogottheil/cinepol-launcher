@@ -58,10 +58,18 @@ pub struct AppError {
 }
 
 impl AppError {
+    /// Internal errors are logged here, once, because the UI only shows a
+    /// generic message and points to the log. Messages never hold secrets
+    /// (core errors are written without request bodies or tokens), and the
+    /// redacting writer masks anything token-shaped anyway.
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
+        let message = message.into();
+        if code == ErrorCode::Internal {
+            tracing::error!(%message, "a command failed");
+        }
         Self {
             code,
-            message: message.into(),
+            message,
             details: None,
         }
     }
