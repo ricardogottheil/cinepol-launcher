@@ -86,8 +86,13 @@ Ores (`ore-coal`, `ore-emerald`, `ore-gold`, `ore-lapis`, `ore-diamond`,
 
 `live #2cb302` and `stale #de9133` (GC:73-74). **There is no error red**
 (D:381): a failed server status reads in `engrave` with plain words, never red.
-Open question for later milestones: destructive confirmations (deleting an
-instance) and crash reports have no token yet. Propose one here before using it.
+Destructive confirmations (deleting an instance) use the launcher-only
+`hazard` pair: `hazard #de9133` ink on `hazard-ground #2e130d`, the Nether's
+lava on its own ground (6.75:1, text-safe). It is the Nether reading, not a
+new red, so the "no error red" rule holds. The dialog sits on `scrim`
+(`panel-deep` at 80%). The destructive button is the only `hazard` element on
+screen; the safe choice (Cancel) takes the initial focus. Crash reports still
+have no token; propose one here before using it.
 
 ## 3. Typography
 

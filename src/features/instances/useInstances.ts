@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createInstance,
+  deleteInstance,
+  duplicateInstance,
+  getInstanceSettings,
   type InstanceLoader,
+  type InstanceSettingsDto,
   listGameVersions,
   listInstances,
   listLoaderVersions,
   type NewInstanceRequest,
+  updateInstanceSettings,
 } from "../../ipc/client";
 
 export const instancesKey = ["instances"] as const;
@@ -38,5 +43,40 @@ export function useLoaderVersions(loader: InstanceLoader, gameVersion: string) {
       loader === "vanilla" ? Promise.resolve([]) : listLoaderVersions(loader, gameVersion),
     enabled: loader !== "vanilla" && gameVersion !== "",
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useInstanceSettings(instanceId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["instance-settings", instanceId],
+    queryFn: () => getInstanceSettings(instanceId),
+    enabled,
+  });
+}
+
+export function useUpdateInstanceSettings(instanceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: InstanceSettingsDto) => updateInstanceSettings(instanceId, settings),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["instance-settings", instanceId], saved);
+      return queryClient.invalidateQueries({ queryKey: instancesKey });
+    },
+  });
+}
+
+export function useDuplicateInstance(instanceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => duplicateInstance(instanceId, name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: instancesKey }),
+  });
+}
+
+export function useDeleteInstance(instanceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => deleteInstance(instanceId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: instancesKey }),
   });
 }

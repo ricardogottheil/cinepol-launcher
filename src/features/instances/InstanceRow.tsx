@@ -1,11 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
 import type { InstanceDto } from "../../ipc/client";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "./activityStore";
 import { splitPlaytime } from "./formatPlaytime";
+import { InstanceSettingsPanel } from "./InstanceSettingsPanel";
 import { LogPanel } from "./LogPanel";
 import { ProgressMeter } from "./ProgressMeter";
 import { instancesKey } from "./useInstances";
@@ -21,6 +22,7 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
       : own;
   const { install, play, stop, updatePack, exportPack } = useActivityStore();
   const busy = activity.kind !== "idle";
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const queryClient = useQueryClient();
   // An update may move the instance to another game or loader version.
   useEffect(() => {
@@ -43,7 +45,10 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
             size="sm"
           />
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Button aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>
+            {settingsOpen ? t("instances.settings.close") : t("instances.settings.open")}
+          </Button>
           {activity.kind === "installing" ? (
             <Button onClick={() => void activity.cancel()}>{t("instances.cancel")}</Button>
           ) : activity.kind === "running" ? (
@@ -108,6 +113,8 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           </span>
         ) : null}
       </p>
+
+      {settingsOpen ? <InstanceSettingsPanel instance={instance} busy={busy} /> : null}
 
       {activity.kind === "running" || logs.length > 0 ? <LogPanel lines={logs} /> : null}
     </li>

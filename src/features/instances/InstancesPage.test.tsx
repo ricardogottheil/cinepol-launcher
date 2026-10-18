@@ -17,6 +17,12 @@ const client = vi.hoisted(() => ({
   openExternal: vi.fn(),
   updateModpack: vi.fn(),
   exportMrpack: vi.fn(),
+  getInstanceSettings: vi.fn(),
+  updateInstanceSettings: vi.fn(),
+  pickJavaExecutable: vi.fn(),
+  duplicateInstance: vi.fn(),
+  deleteInstance: vi.fn(),
+  listAccounts: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -34,6 +40,17 @@ const instance = {
   playtimeSecs: 3_900,
 } as const;
 const labels = esCommon.instances;
+const settingsLabels = esCommon.instances.settings;
+const stored = {
+  name: "Survival",
+  defaultAccountId: null,
+  java: { kind: "managed", path: null },
+  minMemoryMb: 512,
+  maxMemoryMb: 4096,
+  jvmArgs: [],
+  window: null,
+  env: {},
+} as const;
 const outcome = { instanceId: "survival", exitCode: 0, killed: false, playedSecs: 60 };
 
 function deferred<T>() {
@@ -50,6 +67,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   useActivityStore.setState({ byInstance: {} });
   client.listInstances.mockResolvedValue([instance]);
+  client.getInstanceSettings.mockResolvedValue(stored);
+  client.listAccounts.mockResolvedValue({
+    accounts: [{ id: "a1", kind: "offline", username: "Steve", profileUuid: "u1" }],
+    activeId: "a1",
+  });
   client.listGameVersions.mockResolvedValue({
     latestRelease: "26.2",
     versions: [
@@ -359,5 +381,139 @@ describe("InstancesPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.update })).toBeEnabled();
+  });
+
+  async function openSettings() {
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: settingsLabels.open }));
+    return screen.findByRole("region", { name: settingsLabels.title });
+  }
+
+  it("edits and saves an instance's settings", async () => {
+    client.updateInstanceSettings.mockImplementation((_id: string, settings: unknown) =>
+      Promise.resolve(settings),
+    );
+    const panel = await openSettings();
+    const name = await within(panel).findByLabelText(labels.nameLabel);
+    expect(name).toHaveValue("Survival");
+    fireEvent.change(name, { target: { value: "Survival 2" } });
+    fireEvent.change(within(panel).getByLabelText(settingsLabels.maxMemory), {
+      target: { value: "6144" },
+    });
+    fireEvent.change(within(panel).getByLabelText(settingsLabels.account), {
+      target: { value: "a1" },
+    });
+    fireEvent.change(within(panel).getByLabelText(settingsLabels.env), {
+      target: { value: "MESA_GL_VERSION_OVERRIDE=4.6" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.save }));
+    await waitFor(() =>
+      expect(client.updateInstanceSettings).toHaveBeenCalledWith("survival", {
+        ...stored,
+        name: "Survival 2",
+        maxMemoryMb: 6144,
+        defaultAccountId: "a1",
+        env: { MESA_GL_VERSION_OVERRIDE: "4.6" },
+      }),
+    );
+    expect(await within(panel).findByText(settingsLabels.saved)).toBeInTheDocument();
+  });
+
+  it("does not save a malformed environment line", async () => {
+    const panel = await openSettings();
+    fireEvent.change(await within(panel).findByLabelText(settingsLabels.env), {
+      target: { value: "A=1\nnot a pair" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.save }));
+    expect(
+      await within(panel).findByText(settingsLabels.envInvalid.replace("{{line}}", "2")),
+    ).toBeInTheDocument();
+    expect(client.updateInstanceSettings).not.toHaveBeenCalled();
+  });
+
+  it("uses a Java executable chosen with the picker", async () => {
+    client.pickJavaExecutable.mockResolvedValue("/opt/jdk-25/bin/java");
+    client.updateInstanceSettings.mockImplementation((_id: string, settings: unknown) =>
+      Promise.resolve(settings),
+    );
+    const panel = await openSettings();
+    fireEvent.change(await within(panel).findByLabelText(settingsLabels.java), {
+      target: { value: "custom" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.pickJava }));
+    expect(await within(panel).findByText("/opt/jdk-25/bin/java")).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.save }));
+    await waitFor(() =>
+      expect(client.updateInstanceSettings).toHaveBeenCalledWith(
+        "survival",
+        expect.objectContaining({ java: { kind: "custom", path: "/opt/jdk-25/bin/java" } }),
+      ),
+    );
+  });
+
+  it("shows why the backend refused the settings", async () => {
+    client.updateInstanceSettings.mockRejectedValue(new IpcError("invalid_input", "memory"));
+    const panel = await openSettings();
+    fireEvent.click(await within(panel).findByRole("button", { name: settingsLabels.save }));
+    expect(await within(panel).findByText(esCommon.errors.invalid_input)).toBeInTheDocument();
+  });
+
+  it("duplicates an instance under a localized copy name", async () => {
+    client.duplicateInstance.mockResolvedValue({
+      ...instance,
+      id: "survival-copia",
+      name: "Survival (copia)",
+    });
+    const panel = await openSettings();
+    fireEvent.click(await within(panel).findByRole("button", { name: settingsLabels.duplicate }));
+    await waitFor(() =>
+      expect(client.duplicateInstance).toHaveBeenCalledWith("survival", "Survival (copia)"),
+    );
+    expect(
+      await within(panel).findByText(
+        settingsLabels.duplicated.replace("{{name}}", "Survival (copia)"),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("deletes an instance only after the player confirms", async () => {
+    client.deleteInstance.mockResolvedValue(undefined);
+    const panel = await openSettings();
+    fireEvent.click(await within(panel).findByRole("button", { name: settingsLabels.delete }));
+    const dialog = screen.getByRole("alertdialog", {
+      name: settingsLabels.deleteTitle.replace("{{name}}", "Survival"),
+    });
+    expect(within(dialog).getByText(settingsLabels.deleteBody)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: labels.cancel })).toHaveFocus();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: labels.cancel }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(client.deleteInstance).not.toHaveBeenCalled();
+
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.delete }));
+    fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    client.listInstances.mockResolvedValue([]);
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.delete }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: settingsLabels.deleteConfirm,
+      }),
+    );
+    await waitFor(() => expect(client.deleteInstance).toHaveBeenCalledWith("survival"));
+    expect(await screen.findByText(labels.empty)).toBeInTheDocument();
+  });
+
+  it("explains why a running instance cannot be deleted", async () => {
+    client.deleteInstance.mockRejectedValue(new IpcError("already_running", "busy"));
+    const panel = await openSettings();
+    fireEvent.click(await within(panel).findByRole("button", { name: settingsLabels.delete }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: settingsLabels.deleteConfirm,
+      }),
+    );
+    expect(await within(panel).findByText(esCommon.errors.already_running)).toBeInTheDocument();
   });
 });

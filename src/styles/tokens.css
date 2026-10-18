@@ -88,6 +88,13 @@
   --spacing-titlebar: 44px;
   --spacing-sidebar: 248px;
   --spacing-control: 44px; /* minimum target size (DESIGN.md:1007-1015) */
+
+  /* LAUNCHER: destructive confirmations read in the Nether's lava, never red
+     (there is no error red). Ink is text-safe on its ground (6.75:1). */
+  --color-hazard: #de9133; /* = nt-lava */
+  --color-hazard-ground: #2e130d; /* = nt-ground */
+  /* LAUNCHER: behind a modal dialog; panel-deep at 80% */
+  --color-scrim: rgb(8 10 8 / 0.8);
 }
 
 /* ---------------------------------------------------------------------------

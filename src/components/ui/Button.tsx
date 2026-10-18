@@ -1,15 +1,11 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 import { cx } from "./cx";
 
 /**
  * Secondary control: an engraved plate with a hairline edge. It never uses
  * `signal`; that colour belongs to the single primary signal control.
  */
-export function Button({
-  className,
-  type = "button",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+export function Button({ className, type = "button", ...props }: ComponentProps<"button">) {
   return (
     <button
       type={type}
