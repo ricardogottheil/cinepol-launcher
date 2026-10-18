@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::Secret;
 
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum HttpError {
     #[error("{0} was not found")]
     NotFound(String),
