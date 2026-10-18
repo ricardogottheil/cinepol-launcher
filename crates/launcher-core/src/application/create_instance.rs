@@ -39,21 +39,7 @@ pub async fn create_instance<R: InstanceRepository, S: ServerListStore>(
 ) -> Result<Instance, CreateInstanceError> {
     let name = InstanceName::parse(request.name)?;
     let game_version = GameVersion::parse(request.game_version.trim())?;
-    let mut taken: Vec<InstanceId> = instances
-        .list()
-        .await?
-        .into_iter()
-        .map(|instance| instance.id)
-        .collect();
-    let base = InstanceId::slug_from(&name);
-    // `list` skips folders it cannot read; those ids are taken too.
-    let id = loop {
-        let candidate = InstanceId::unique(&base, |candidate| taken.contains(candidate));
-        if !instances.id_taken(&candidate).await? {
-            break candidate;
-        }
-        taken.push(candidate);
-    };
+    let id = free_id(&name, instances).await?;
     let instance = Instance::new(id, name, game_version, request.loader, request.origin);
     instances.save(&instance).await?;
 
@@ -71,6 +57,28 @@ pub async fn create_instance<R: InstanceRepository, S: ServerListStore>(
         }
     }
     Ok(instance)
+}
+
+/// A path-safe slug of `name` that no instance (listed or not) uses yet.
+pub(crate) async fn free_id<R: InstanceRepository>(
+    name: &InstanceName,
+    instances: &R,
+) -> Result<InstanceId, InstanceRepositoryError> {
+    let mut taken: Vec<InstanceId> = instances
+        .list()
+        .await?
+        .into_iter()
+        .map(|instance| instance.id)
+        .collect();
+    let base = InstanceId::slug_from(name);
+    // `list` skips folders it cannot read; those ids are taken too.
+    loop {
+        let candidate = InstanceId::unique(&base, |candidate| taken.contains(candidate));
+        if !instances.id_taken(&candidate).await? {
+            return Ok(candidate);
+        }
+        taken.push(candidate);
+    }
 }
 
 #[cfg(test)]

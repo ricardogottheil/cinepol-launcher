@@ -204,6 +204,7 @@ impl GameProcessRunner for FakeGameProcess {
 pub struct FakeFileSystem {
     paths: Mutex<HashSet<PathBuf>>,
     removed: Mutex<Vec<PathBuf>>,
+    copies: Mutex<Vec<(PathBuf, PathBuf)>>,
 }
 
 impl FakeFileSystem {
@@ -211,6 +212,7 @@ impl FakeFileSystem {
         Self {
             paths: Mutex::new(paths.into_iter().collect()),
             removed: Mutex::default(),
+            copies: Mutex::default(),
         }
     }
 
@@ -220,6 +222,11 @@ impl FakeFileSystem {
 
     pub fn removed(&self) -> Vec<PathBuf> {
         self.removed.lock().unwrap().clone()
+    }
+
+    /// Every `copy_dir_all` call, as (from, to).
+    pub fn copies(&self) -> Vec<(PathBuf, PathBuf)> {
+        self.copies.lock().unwrap().clone()
     }
 
     pub fn contains(&self, path: &Path) -> bool {
@@ -243,6 +250,26 @@ impl FileSystem for FakeFileSystem {
             .unwrap()
             .retain(|existing| !existing.starts_with(path));
         self.removed.lock().unwrap().push(path.to_path_buf());
+        Ok(())
+    }
+
+    async fn copy_dir_all(&self, from: &Path, to: &Path) -> Result<(), FileSystemError> {
+        let mut paths = self.paths.lock().unwrap();
+        if paths.iter().any(|existing| existing.starts_with(to)) {
+            return Err(FileSystemError {
+                path: to.display().to_string(),
+                reason: "already exists".into(),
+            });
+        }
+        let copied: Vec<PathBuf> = paths
+            .iter()
+            .filter_map(|existing| Some(to.join(existing.strip_prefix(from).ok()?)))
+            .collect();
+        paths.extend(copied);
+        self.copies
+            .lock()
+            .unwrap()
+            .push((from.to_path_buf(), to.to_path_buf()));
         Ok(())
     }
 }
