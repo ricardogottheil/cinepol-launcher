@@ -101,6 +101,17 @@ pub struct InMemorySecretStore {
     secrets: Mutex<HashMap<SecretKey, Secret>>,
 }
 
+impl InMemorySecretStore {
+    /// How many secrets are stored.
+    pub fn len(&self) -> usize {
+        self.secrets.lock().unwrap().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
 impl SecretStore for InMemorySecretStore {
     async fn get(&self, key: &SecretKey) -> Result<Option<Secret>, SecretStoreError> {
         Ok(self.secrets.lock().unwrap().get(key).cloned())
@@ -178,6 +189,10 @@ impl AccountRepository for InMemoryAccountRepository {
             .lock()
             .unwrap()
             .retain(|account| account.id != id);
+        let mut active = self.active.lock().unwrap();
+        if *active == Some(id) {
+            *active = None;
+        }
         Ok(())
     }
 

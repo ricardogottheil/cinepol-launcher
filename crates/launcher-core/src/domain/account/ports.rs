@@ -17,6 +17,7 @@ pub trait AccountRepository: Send + Sync {
         &self,
         account: &Account,
     ) -> impl Future<Output = Result<(), AccountRepositoryError>> + Send;
+    /// Removing the active account also clears the active selection.
     fn remove(
         &self,
         id: AccountId,
