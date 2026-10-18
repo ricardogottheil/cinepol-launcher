@@ -92,6 +92,7 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
 | Rust tests | `cargo test --workspace` |
 | Network tests (opt-in) | `cargo test -p cinepol-launcher-core --features network-tests` |
 | Real vanilla E2E (opt-in, ~1 GB, opens the game) | `cargo test -p cinepol-launcher-core --features network-tests --test e2e_vanilla -- --nocapture` (data in `target/e2e-data`; delete it afterwards) |
+| Real Fabric/Quilt E2E | the same command with `CINEPOL_E2E_LOADER=fabric` (or `quilt`) |
 | Frontend tests | `pnpm test` |
 | English-only check | `pnpm check:english` |
 | Regenerate bindings | `pnpm bindings` |

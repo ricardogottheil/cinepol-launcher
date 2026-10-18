@@ -1,11 +1,13 @@
-//! End-to-end vanilla flow against the real Mojang services:
-//! offline profile -> instance -> install (client, libraries, assets, Java) ->
-//! launch -> wait for the game to log the player -> stop it.
+//! End-to-end flow against the real Mojang (and loader) services:
+//! offline profile -> instance -> install (loader profile, client, libraries,
+//! assets, Java) -> launch -> wait for the game to log the player -> stop it.
 //!
 //! Opt-in only (downloads about 1 GB on the first run and opens a game window):
 //! `cargo test -p cinepol-launcher-core --features network-tests --test e2e_vanilla -- --nocapture`
 //! Set `CINEPOL_E2E_DIR` to reuse a data directory between runs (default:
-//! `target/e2e-data` in the workspace) and `CINEPOL_E2E_VERSION` to try another version.
+//! `target/e2e-data` in the workspace), `CINEPOL_E2E_VERSION` to try another
+//! version, and `CINEPOL_E2E_LOADER=fabric` or `quilt` to launch through that
+//! loader's newest stable release (the game must then log the loader too).
 #![cfg(feature = "network-tests")]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -20,7 +22,8 @@ use launcher_core::application::launch_instance::{LaunchDeps, LaunchRequest, lau
 use launcher_core::domain::account::{AccountRepository, OfflinePolicy};
 use launcher_core::domain::instance::{InstanceOrigin, InstanceRepository};
 use launcher_core::domain::launch::{LauncherPaths, LogSink, LogStream, Platform};
-use launcher_core::domain::loader::LoaderSpec;
+use launcher_core::application::list_loader_versions::list_loader_versions;
+use launcher_core::domain::loader::{LoaderKind, LoaderSpec};
 use launcher_core::domain::ports::{ProgressReporter, ProgressUpdate};
 use launcher_core::infrastructure::archive::ZipNativesExtractor;
 use launcher_core::infrastructure::fs::{
@@ -28,7 +31,7 @@ use launcher_core::infrastructure::fs::{
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
-use launcher_core::infrastructure::loaders::LoaderInstallers;
+use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadata};
 use launcher_core::infrastructure::mojang::MojangVersionSource;
 use launcher_core::infrastructure::process::TokioGameProcessRunner;
 use launcher_core::infrastructure::time::SystemClock;
@@ -131,6 +134,31 @@ async fn installs_and_launches_vanilla_offline() {
     let instances = JsonInstanceRepository::new(paths.clone());
     let accounts = JsonAccountRepository::new(paths.accounts_file());
 
+    let loader = match std::env::var("CINEPOL_E2E_LOADER").ok().as_deref() {
+        None | Some("vanilla") => LoaderSpec::vanilla(),
+        Some(raw) => {
+            let kind = LoaderKind::from_id(raw).expect("CINEPOL_E2E_LOADER is fabric or quilt");
+            let http = ReqwestHttpClient::new(
+                "ricardogottheil/cinepol-launcher/e2e (https://cinepol.policarpiers.com)",
+            )
+            .expect("http client");
+            let metadata = match kind {
+                LoaderKind::Fabric => MetaLoaderMetadata::fabric(http),
+                LoaderKind::Quilt => MetaLoaderMetadata::quilt(http),
+                other => panic!("{other:?} is not installable yet"),
+            };
+            let releases = list_loader_versions(&version, &metadata)
+                .await
+                .expect("loader releases");
+            let newest_stable = releases
+                .into_iter()
+                .find(|release| release.stable)
+                .expect("a stable loader release");
+            LoaderSpec::new(kind, Some(newest_stable.version)).expect("loader spec")
+        }
+    };
+    println!("loader: {loader:?}");
+
     if accounts.list().await.unwrap().is_empty() {
         create_offline_profile(PLAYER, OfflinePolicy::default(), &accounts)
             .await
@@ -141,14 +169,14 @@ async fn installs_and_launches_vanilla_offline() {
         .await
         .unwrap()
         .into_iter()
-        .find(|i| i.game_version.as_str() == version)
+        .find(|i| i.game_version.as_str() == version && i.loader == loader)
     {
         Some(existing) => existing,
         None => create_instance(
             NewInstance {
-                name: &format!("E2E {version}"),
+                name: &format!("E2E {version} {}", loader.kind().id()),
                 game_version: &version,
-                loader: LoaderSpec::vanilla(),
+                loader: loader.clone(),
                 origin: InstanceOrigin::Custom,
                 seed_server: None,
             },
@@ -229,6 +257,16 @@ async fn installs_and_launches_vanilla_offline() {
         "the game never logged the player in; last lines: {:#?}",
         lines.iter().rev().take(30).collect::<Vec<_>>()
     );
+    if let Some(loader_version) = loader.version() {
+        let expected = match loader.kind() {
+            LoaderKind::Quilt => format!("with Quilt Loader {}", loader_version.as_str()),
+            _ => format!("with Fabric Loader {}", loader_version.as_str()),
+        };
+        assert!(
+            lines.iter().any(|line| line.contains(&expected)),
+            "the loader never started ({expected:?} missing)"
+        );
+    }
     assert!(
         outcome.exit.killed_by_launcher,
         "the game should still be running when the test stops it"
