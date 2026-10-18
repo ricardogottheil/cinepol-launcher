@@ -1,0 +1,12 @@
+{
+  "homepage": "https://files.minecraftforge.net/net/minecraftforge/forge/",
+  "promos": {
+    "1.7.10-latest": "10.13.4.1614",
+    "1.7.10-recommended": "10.13.4.1614",
+    "1.21.11-latest": "61.2.4",
+    "1.21.11-recommended": "61.2.0",
+    "26.2-latest": "65.1.5",
+    "26.2-recommended": "65.1.0",
+    "26.3-latest": "66.0.13"
+  }
+}
