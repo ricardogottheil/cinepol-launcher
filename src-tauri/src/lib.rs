@@ -12,6 +12,7 @@ mod events;
 mod logs;
 mod operations;
 mod progress;
+mod redact;
 mod state;
 
 use tauri::Manager;
@@ -26,6 +27,8 @@ pub fn run() -> Result<(), tauri::Error> {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
+        // Masks tokens, auth codes and API keys before any line is written.
+        .with_writer(redact::RedactingMakeWriter::new(std::io::stdout))
         .init();
 
     tauri::Builder::default()

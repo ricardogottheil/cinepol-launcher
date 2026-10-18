@@ -528,6 +528,7 @@ name = "cinepol-launcher"
 version = "0.1.0"
 dependencies = [
  "cinepol-launcher-core",
+ "regex-lite",
  "serde",
  "serde_json",
  "tauri",
