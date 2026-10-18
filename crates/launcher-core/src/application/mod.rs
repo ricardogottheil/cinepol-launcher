@@ -8,6 +8,7 @@ pub mod check_premium_name;
 pub mod check_server_status;
 pub mod create_instance;
 pub mod create_offline_profile;
+pub mod export_mrpack;
 pub mod get_modpack_details;
 pub mod get_settings;
 pub mod install_instance;
