@@ -382,6 +382,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolves_a_vanilla_version_whose_id_holds_spaces() {
+        let dir = tempfile::tempdir().unwrap();
+        write_cached(
+            dir.path(),
+            "1.14 Pre-Release 1",
+            r#"{"id": "1.14 Pre-Release 1", "type": "snapshot", "mainClass": "net.minecraft.client.main.Main", "libraries": []}"#,
+        );
+        let spec = source(online(), dir.path())
+            .version("1.14 Pre-Release 1")
+            .await
+            .unwrap();
+        assert_eq!(spec.id, "1.14 Pre-Release 1");
+    }
+
+    #[tokio::test]
     async fn rejects_inheritance_loops() {
         let dir = tempfile::tempdir().unwrap();
         write_cached(

@@ -556,14 +556,21 @@ async fn writes_nothing_outside_the_profile_directory() {
 }
 
 #[tokio::test]
-async fn unsafe_game_versions_never_reach_the_network() {
+async fn spaced_game_versions_are_escaped_in_the_profile_url() {
     let dir = tempfile::tempdir().unwrap();
     let installer = installers(FakeHttpClient::default(), dir.path());
-    // Game versions may hold spaces, which a profile id cannot.
+    // Old pre-release ids hold spaces; a profile id may too, the URL may not.
     let spaced = GameVersion::parse("1.14 Pre-Release 1").unwrap();
     assert!(matches!(
         installer.install(&fabric(), &spaced).await,
-        Err(LoaderInstallError::Invalid(_))
+        Err(LoaderInstallError::UnknownLoaderVersion(..))
     ));
-    assert!(installer.http.requests().is_empty());
+    let requests = installer.http.requests();
+    assert_eq!(requests.len(), 1);
+    assert!(
+        requests[0].contains("1.14%20Pre-Release%201"),
+        "{}",
+        requests[0]
+    );
+    assert!(!requests[0].contains(' '));
 }
