@@ -7,6 +7,8 @@ pub enum ProgressStage {
     Java,
     /// Loader installer processors (Forge, NeoForge).
     Loader,
+    /// Modpack files (mods, configs, overrides).
+    Modpack,
     Natives,
     Launching,
 }

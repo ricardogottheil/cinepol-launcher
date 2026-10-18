@@ -5,7 +5,7 @@ import type { Channel } from "@tauri-apps/api/core";
 
 export type AppInfo = { name: string, version: string, };
 
-export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "loader" | "natives" | "launching";
+export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "loader" | "modpack" | "natives" | "launching";
 
 export type ProgressUnitDto = "steps" | "bytes";
 

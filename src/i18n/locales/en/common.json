@@ -131,7 +131,8 @@
     "java": "Preparing Java",
     "natives": "Preparing natives",
     "launching": "Starting the game",
-    "loader": "Installing the loader"
+    "loader": "Installing the loader",
+    "modpack": "Installing the modpack files"
   },
   "accounts": {
     "title": "Accounts",
