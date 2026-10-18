@@ -99,9 +99,16 @@ impl Clock for FixedClock {
 #[derive(Debug, Default)]
 pub struct InMemorySecretStore {
     secrets: Mutex<HashMap<SecretKey, Secret>>,
+    /// When set, `set` succeeds this many more times and then fails.
+    sets_before_failure: Mutex<Option<usize>>,
 }
 
 impl InMemorySecretStore {
+    /// Lets `successful_sets` writes through, then fails every later one.
+    pub fn fail_sets_after(&self, successful_sets: usize) {
+        *self.sets_before_failure.lock().unwrap() = Some(successful_sets);
+    }
+
     /// How many secrets are stored.
     pub fn len(&self) -> usize {
         self.secrets.lock().unwrap().len()
@@ -118,6 +125,12 @@ impl SecretStore for InMemorySecretStore {
     }
 
     async fn set(&self, key: &SecretKey, secret: &Secret) -> Result<(), SecretStoreError> {
+        if let Some(remaining) = self.sets_before_failure.lock().unwrap().as_mut() {
+            if *remaining == 0 {
+                return Err(SecretStoreError::Access("locked".into()));
+            }
+            *remaining -= 1;
+        }
         self.secrets
             .lock()
             .unwrap()
@@ -138,6 +151,7 @@ pub struct InMemoryAccountRepository {
     active: Mutex<Option<AccountId>>,
     fail_writes: AtomicBool,
     fail_activation: AtomicBool,
+    fail_active_read: AtomicBool,
 }
 
 impl InMemoryAccountRepository {
@@ -150,6 +164,11 @@ impl InMemoryAccountRepository {
 
     pub fn fail_writes(&self) {
         self.fail_writes.store(true, Ordering::SeqCst);
+    }
+
+    /// Only reading the active selection fails.
+    pub fn fail_active_read(&self) {
+        self.fail_active_read.store(true, Ordering::SeqCst);
     }
 
     /// Only `set_active` fails; saves and removals still work.
@@ -197,6 +216,9 @@ impl AccountRepository for InMemoryAccountRepository {
     }
 
     async fn active(&self) -> Result<Option<AccountId>, AccountRepositoryError> {
+        if self.fail_active_read.load(Ordering::SeqCst) {
+            return Err(AccountRepositoryError::Storage("unreadable".into()));
+        }
         Ok(*self.active.lock().unwrap())
     }
 

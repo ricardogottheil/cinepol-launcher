@@ -439,21 +439,29 @@ async fn malformed_minecraft_logins_are_unexpected_without_leaking_tokens() {
 }
 
 #[tokio::test]
-async fn a_missing_or_invalid_xuid_is_unexpected() {
+async fn a_missing_invalid_or_unreachable_xuid_falls_back_to_zero() {
     for xboxlive in [
-        r#"{"Token":"FAKE-xsts-xboxlive-token","DisplayClaims":{"xui":[{"uhs":"1234567890123456789"}]}}"#,
-        r#"{"Token":"FAKE-xsts-xboxlive-token","DisplayClaims":{"xui":[{"uhs":"1","xid":"12 -Dx=y"}]}}"#,
+        Some(
+            r#"{"Token":"FAKE-xsts-xboxlive-token","DisplayClaims":{"xui":[{"uhs":"1234567890123456789"}]}}"#,
+        ),
+        Some(
+            r#"{"Token":"FAKE-xsts-xboxlive-token","DisplayClaims":{"xui":[{"uhs":"1","xid":"12 -Dx=y"}]}}"#,
+        ),
+        // No answer at all: the extra lookup fails at the transport.
+        None,
     ] {
-        let http = FakeHttpRequester::default()
+        let mut http = FakeHttpRequester::default()
             .reply(XBOX_LIVE_URL, 200, fixture!("xbl-authenticate.json"))
             .reply(XSTS_URL, 200, fixture!("xsts-minecraft.json"))
-            .reply(LOGIN_WITH_XBOX_URL, 200, fixture!("login-with-xbox.json"))
-            .reply(XSTS_URL, 200, xboxlive);
-        let error = client(http)
+            .reply(LOGIN_WITH_XBOX_URL, 200, fixture!("login-with-xbox.json"));
+        if let Some(body) = xboxlive {
+            http = http.reply(XSTS_URL, 200, body);
+        }
+        let login = client(http)
             .minecraft_login(&secret("FAKE-msa-access-token"))
             .await
-            .unwrap_err();
-        assert_unexpected(error, "Xbox user id");
+            .unwrap();
+        assert_eq!(login.xuid, "0", "the game accepts a zero xuid");
     }
 }
 

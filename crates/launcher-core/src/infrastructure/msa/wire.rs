@@ -1,9 +1,10 @@
 //! The JSON answers of the Microsoft, Xbox and Minecraft Services endpoints.
 //! Unknown fields are ignored; only what the launcher reads is declared.
+//! These types hold raw tokens, so none of them implements `Debug`.
 
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct DeviceCodeResponse {
     pub user_code: String,
     pub device_code: String,
@@ -18,20 +19,20 @@ fn default_interval() -> u64 {
     5
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: Option<String>,
 }
 
 /// The body of an OAuth error answer (HTTP 400).
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct OAuthErrorResponse {
     pub error: String,
 }
 
 /// The answer of both the Xbox Live and the XSTS endpoints.
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct XboxTokenResponse {
     #[serde(rename = "Token")]
     pub token: String,
@@ -39,12 +40,12 @@ pub struct XboxTokenResponse {
     pub display_claims: DisplayClaims,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct DisplayClaims {
     pub xui: Vec<XboxUserClaims>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct XboxUserClaims {
     /// The user hash, part of the Minecraft identity token.
     pub uhs: String,
@@ -53,30 +54,30 @@ pub struct XboxUserClaims {
 }
 
 /// The body of an XSTS refusal (HTTP 401).
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct XstsErrorResponse {
     #[serde(rename = "XErr")]
     pub xerr: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MinecraftLoginResponse {
     pub access_token: String,
     pub expires_in: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct EntitlementsResponse {
     #[serde(default)]
     pub items: Vec<EntitlementItem>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct EntitlementItem {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct ProfileResponse {
     pub id: String,
     pub name: String,
@@ -86,7 +87,7 @@ pub struct ProfileResponse {
 
 /// Lenient on purpose: a skin the launcher cannot read is dropped instead of
 /// failing the whole sign-in.
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct ProfileSkin {
     pub state: Option<String>,
     pub url: Option<String>,

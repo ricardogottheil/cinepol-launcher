@@ -125,23 +125,34 @@ where
         access_token: game_token.clone(),
         expires_at_unix: unix_seconds(deps.clock.now()).saturating_add(login.token.expires_in_secs),
     };
-    deps.secrets
-        .set(&refresh_key, &tokens.refresh_token)
-        .await?;
-    deps.secrets.set(&token_key, &stored.encode()).await?;
-    if let Err(error) = deps.accounts.save(&account).await {
-        // A new account that could not be saved must not leave tokens behind.
+    // A new account that fails half-way must not leave tokens behind.
+    let forget = || async {
         if existing.is_none() {
             let _ = deps.secrets.delete(&refresh_key).await;
             let _ = deps.secrets.delete(&token_key).await;
         }
+    };
+    deps.secrets
+        .set(&refresh_key, &tokens.refresh_token)
+        .await?;
+    if let Err(error) = deps.secrets.set(&token_key, &stored.encode()).await {
+        forget().await;
         return Err(error.into());
     }
-    if deps.accounts.active().await?.is_none() {
-        // The account is usable without being active, so this is not fatal.
-        if let Err(error) = deps.accounts.set_active(Some(id)).await {
-            tracing::warn!(%error, "could not make the new account active");
+    if let Err(error) = deps.accounts.save(&account).await {
+        forget().await;
+        return Err(error.into());
+    }
+    // The account is saved and usable from here on: a failed selection is
+    // only a warning, never a failed sign-in.
+    match deps.accounts.active().await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            if let Err(error) = deps.accounts.set_active(Some(id)).await {
+                tracing::warn!(%error, "could not make the new account active");
+            }
         }
+        Err(error) => tracing::warn!(%error, "could not read the active account"),
     }
     Ok(account)
 }
@@ -357,5 +368,27 @@ mod tests {
         let (result, _) = world.login(&CancellationToken::new()).await;
         assert!(matches!(result, Err(LoginError::Storage(_))));
         assert!(world.secrets.is_empty(), "no orphaned keychain entries");
+    }
+
+    #[tokio::test]
+    async fn a_failed_second_keychain_write_removes_the_first() {
+        let world = World::new(FakeMicrosoftAuth::approving());
+        world.secrets.fail_sets_after(1);
+        let (result, _) = world.login(&CancellationToken::new()).await;
+        assert!(matches!(result, Err(LoginError::Keychain(_))));
+        assert!(world.secrets.is_empty(), "no orphaned refresh token");
+        assert!(world.accounts.list().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_saved_account_is_returned_even_if_the_selection_cannot_be_read() {
+        let world = World::new(FakeMicrosoftAuth::approving());
+        world.accounts.fail_active_read();
+        let (result, _) = world.login(&CancellationToken::new()).await;
+        let account = result.unwrap();
+        assert_eq!(
+            world.accounts.list().await.unwrap(),
+            std::slice::from_ref(&account)
+        );
     }
 }

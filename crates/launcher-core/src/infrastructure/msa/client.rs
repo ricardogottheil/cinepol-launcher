@@ -380,14 +380,20 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
         let token = self.login_with_xbox(&xsts).await?;
         let xuid = match xsts.user.xid {
             Some(xid) => valid_xuid(Some(xid)),
-            None => {
-                let xbox = self
-                    .xsts(Step::Xuid, &xbl.token, XBOX_LIVE_RELYING_PARTY)
-                    .await?;
-                valid_xuid(xbox.user.xid)
-            }
-        }
-        .ok_or_else(|| unexpected(Step::Xuid, 200))?;
+            None => match self
+                .xsts(Step::Xuid, &xbl.token, XBOX_LIVE_RELYING_PARTY)
+                .await
+            {
+                Ok(xbox) => valid_xuid(xbox.user.xid),
+                Err(error) => {
+                    tracing::warn!(%error, "could not look up the Xbox user id");
+                    None
+                }
+            },
+        };
+        // The game only forwards the xuid to Mojang's telemetry and accepts
+        // "0", so a missing one must not fail an otherwise complete sign-in.
+        let xuid = xuid.unwrap_or_else(|| "0".to_owned());
         Ok(MinecraftLogin { token, xuid })
     }
 
