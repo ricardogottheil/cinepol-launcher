@@ -29,9 +29,27 @@ pnpm install
 pnpm tauri dev
 ```
 
-Copy `.env.example` to `.env` to configure `MSA_CLIENT_ID` (an Azure app
-registration that also needs Mojang approval to call the Minecraft Services API)
-and `CURSEFORGE_API_KEY`. Never commit real values.
+Copy `.env.example` to `.env` to configure `MSA_CLIENT_ID` and
+`CURSEFORGE_API_KEY`. Never commit real values.
+
+`MSA_CLIENT_ID` enables Microsoft sign-in. To get one:
+
+1. In the Azure portal, open **Microsoft Entra ID > App registrations > New
+   registration** (a personal Microsoft account needs its own directory first;
+   creating a free Azure account makes one).
+2. Supported account types: **Personal Microsoft accounts only**. No redirect URI.
+3. **Authentication > Advanced settings > Allow public client flows: Yes**
+   (the device code flow needs it; no client secret is used).
+4. Copy the **Application (client) ID** into `.env` as `MSA_CLIENT_ID=...`.
+5. Ask Mojang for Minecraft Services access at https://aka.ms/mce-reviewappid.
+   Until it is approved, sign-in fails with "not enabled for this launcher yet".
+
+`src-tauri/build.rs` reads `MSA_CLIENT_ID` from the environment or `.env` at
+build time. Builds without it hide Microsoft sign-in. Set
+`CINEPOL_REQUIRE_PREMIUM_FOR_OFFLINE=true` at build time to require a Microsoft
+account before offline profiles can be created (off by default, because the
+CINEPOL server accepts non-premium players). See
+[ADR 0005](docs/adr/0005-microsoft-sign-in-and-token-storage.md).
 
 All checks, conventions and recipes are in [`AGENTS.md`](AGENTS.md).
 

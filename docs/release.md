@@ -26,8 +26,14 @@ CI builds on `windows-latest`, `macos-latest` (arm64), `macos-15-intel` (x64;
 | `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: <Name> (<TEAMID>)`. |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarization (app-specific password). |
 | `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | Authenticode signing. |
-| `MSA_CLIENT_ID` | Microsoft login client ID injected at build time. |
+| `MSA_CLIENT_ID` | Microsoft login client ID injected at build time (`src-tauri/build.rs`). Needs an Azure app approved by Mojang; see the README. |
 | `CURSEFORGE_API_KEY` | CurseForge API key injected at build time. |
+
+Build-time settings (not secrets):
+
+| Variable | Effect |
+| --- | --- |
+| `CINEPOL_REQUIRE_PREMIUM_FOR_OFFLINE` | `true` requires a Microsoft account before offline profiles can be created. Default off. |
 
 The updater public key goes in `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
 It is public by design; the private key never leaves the secrets store.
