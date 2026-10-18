@@ -197,7 +197,9 @@
       "forge": "Forge",
       "neoforge": "NeoForge"
     },
-    "unstable": "{{version}} (no recomendada)"
+    "unstable": "{{version}} (no recomendada)",
+    "forgeNote": "Forge se financia con los anuncios de su página de descarga, que el launcher se salta.",
+    "supportForge": "Apoyar a Forge"
   },
   "settings": {
     "title": "Ajustes",

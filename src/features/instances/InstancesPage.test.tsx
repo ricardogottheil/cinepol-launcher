@@ -14,6 +14,7 @@ const client = vi.hoisted(() => ({
   installInstance: vi.fn(),
   launchInstance: vi.fn(),
   killInstance: vi.fn(),
+  openExternal: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -157,6 +158,22 @@ describe("InstancesPage", () => {
         expect.objectContaining({ loader: "forge", loaderVersion: "65.1.0" }),
       ),
     );
+  });
+
+  it("asks to support Forge, since its installer is downloaded automatically", async () => {
+    client.listLoaderVersions.mockResolvedValue([{ version: "65.1.0", stable: true }]);
+    client.openExternal.mockResolvedValue(undefined);
+    renderWithQuery(<InstancesPage />);
+    await screen.findByRole("option", { name: "1.21.11" });
+    expect(screen.queryByRole("link", { name: labels.supportForge })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "forge" } });
+    expect(screen.getByText(labels.forgeNote)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: labels.supportForge }));
+    expect(client.openExternal).toHaveBeenCalledWith("https://www.patreon.com/LexManos/");
+
+    fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "neoforge" } });
+    expect(screen.queryByRole("link", { name: labels.supportForge })).not.toBeInTheDocument();
   });
 
   it("explains a loader that does not support the chosen version", async () => {

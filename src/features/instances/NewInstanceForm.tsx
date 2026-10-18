@@ -3,10 +3,16 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { SelectField } from "../../components/ui/SelectField";
 import { TextField } from "../../components/ui/TextField";
-import { type InstanceLoader, toIpcError } from "../../ipc/client";
+import { type InstanceLoader, openExternal, toIpcError } from "../../ipc/client";
 import { useCreateInstance, useGameVersions, useLoaderVersions } from "./useInstances";
 
 const LOADERS: InstanceLoader[] = ["vanilla", "fabric", "quilt", "forge", "neoforge"];
+
+/**
+ * Forge asks launchers that download its installer automatically to point
+ * players at its funding instead of the ad-supported download page.
+ */
+const FORGE_SUPPORT_URL = "https://www.patreon.com/LexManos/";
 
 export function NewInstanceForm() {
   const { t } = useTranslation();
@@ -108,6 +114,21 @@ export function NewInstanceForm() {
         />
         {t("instances.showSnapshots")}
       </label>
+      {loader === "forge" ? (
+        <p className="m-0 max-w-[640px] text-[0.875rem] text-silk-dim">
+          {t("instances.forgeNote")}{" "}
+          <a
+            href={FORGE_SUPPORT_URL}
+            onClick={(event) => {
+              event.preventDefault();
+              void openExternal(FORGE_SUPPORT_URL);
+            }}
+            className="text-silk underline"
+          >
+            {t("instances.supportForge")}
+          </a>
+        </p>
+      ) : null}
       {versions.isError ? (
         <p className="m-0 text-[0.875rem] text-stale">
           {t(`errors.${toIpcError(versions.error).code}`)}
