@@ -482,6 +482,12 @@ pub(crate) mod fixtures {
             rel(path).under(&self.paths.game_dir(&id))
         }
 
+        pub fn write_game_file(&self, id: &str, path: &str, bytes: &[u8]) {
+            let target = self.game_file(id, path);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::write(target, bytes).unwrap();
+        }
+
         pub fn read_game_file(&self, id: &str, path: &str) -> Option<Vec<u8>> {
             std::fs::read(self.game_file(id, path)).ok()
         }

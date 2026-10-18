@@ -27,4 +27,5 @@ pub mod remove_account;
 pub mod run_progress_demo;
 pub mod search_modpacks;
 pub mod select_account;
+pub mod update_modpack;
 pub mod update_settings;
