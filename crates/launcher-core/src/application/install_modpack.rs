@@ -39,6 +39,8 @@ pub enum InstallModpackError {
     Pack(PackSyncError),
     #[error("the modpack installation was cancelled")]
     Cancelled,
+    #[error("instance {0} is busy")]
+    Busy(InstanceId),
 }
 
 impl From<PackSyncError> for InstallModpackError {
@@ -71,7 +73,14 @@ pub struct InstallModpackRequest<'a> {
     pub name: Option<&'a str>,
     /// Put first in the new instance's `servers.dat` (the CINEPOL server).
     pub seed_server: Option<ServerEntry>,
+    /// Called once the new instance exists and before any file is written, so
+    /// the caller can mark it busy (no launch or install during the sync).
+    /// Returning `false` aborts with [`InstallModpackError::Busy`].
+    pub claim: Option<ClaimInstance<'a>>,
 }
+
+/// Marks an instance busy; `false` when something else already holds it.
+pub type ClaimInstance<'a> = &'a (dyn Fn(&InstanceId) -> bool + Send + Sync);
 
 /// Everything the modpack installer talks to.
 pub struct InstallModpackDeps<'a, I, S, C, A, D, F, P, M> {
@@ -185,6 +194,12 @@ where
         deps.servers,
     )
     .await?;
+    if let Some(claim) = request.claim
+        && !claim(&instance.id)
+    {
+        discard(deps, &instance.id).await;
+        return Err(InstallModpackError::Busy(instance.id));
+    }
     let synced = sync_pack(
         &deps.pack,
         &instance.id,
@@ -279,6 +294,7 @@ mod tests {
             pack: PackInput::File(Path::new(LOCAL)),
             name,
             seed_server: None,
+            claim: None,
         }
     }
 
@@ -397,6 +413,7 @@ mod tests {
         );
         let request = InstallModpackRequest {
             seed_server: Some(entry.clone()),
+            claim: None,
             ..local(Some("My Pack"))
         };
         let installed = install(&world, request).await.unwrap();
@@ -420,6 +437,7 @@ mod tests {
             },
             name: None,
             seed_server: None,
+            claim: None,
         };
         let installed = install(&world, request).await.unwrap();
 
@@ -458,6 +476,7 @@ mod tests {
             },
             name: None,
             seed_server: None,
+            claim: None,
         };
         assert_eq!(
             install(&world, request("v2")).await,
@@ -559,5 +578,40 @@ mod tests {
             .read_game_file(installed.instance.id.as_str(), "mods/sodium.jar")
             .unwrap();
         assert_eq!(manifest.files[&rel("mods/sodium.jar")], sha1_hex(&written));
+    }
+
+    #[tokio::test]
+    async fn claims_the_new_instance_before_writing_any_file() {
+        let world = World::new(vec![v1_pack(LOCAL)]);
+        let seen = std::sync::Mutex::new(Vec::new());
+        let claim = |id: &InstanceId| {
+            seen.lock()
+                .unwrap()
+                .push((id.clone(), world.downloader.requests().len()));
+            true
+        };
+        let request = InstallModpackRequest {
+            claim: Some(&claim),
+            ..local(None)
+        };
+        let installed = install(&world, request).await.unwrap();
+        assert_eq!(*seen.lock().unwrap(), [(installed.instance.id.clone(), 0)]);
+    }
+
+    #[tokio::test]
+    async fn a_busy_instance_aborts_the_install_and_removes_it() {
+        let world = World::new(vec![v1_pack(LOCAL)]);
+        let claim = |_: &InstanceId| false;
+        let request = InstallModpackRequest {
+            claim: Some(&claim),
+            ..local(None)
+        };
+        let result = install(&world, request).await;
+        assert_eq!(
+            result,
+            Err(InstallModpackError::Busy(InstanceId::parse(ID).unwrap()))
+        );
+        assert!(world.instances.list().await.unwrap().is_empty());
+        assert!(world.downloader.requests().is_empty());
     }
 }

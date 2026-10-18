@@ -88,6 +88,8 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           <span className="text-stale">{t(`errors.${error}`)}</span>
         ) : activity.kind === "running" ? (
           <span className="text-silk-dim">{t("instances.playing")}</span>
+        ) : activity.kind === "exporting" ? (
+          <span className="text-silk-dim">{t("instances.exporting")}</span>
         ) : notice?.kind === "upToDate" ? (
           <span className="text-silk-dim">{t("instances.upToDate")}</span>
         ) : notice?.kind === "updated" ? (

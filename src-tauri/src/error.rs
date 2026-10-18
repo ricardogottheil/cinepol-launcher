@@ -386,6 +386,7 @@ impl From<InstallModpackError> for AppError {
             InstallModpackError::Create(_) => ErrorCode::InvalidModpack,
             InstallModpackError::Pack(pack) => pack_sync_code(pack),
             InstallModpackError::Cancelled => ErrorCode::Cancelled,
+            InstallModpackError::Busy(_) => ErrorCode::AlreadyRunning,
         };
         Self::new(code, error.to_string())
     }

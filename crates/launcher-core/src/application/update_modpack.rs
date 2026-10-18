@@ -272,6 +272,7 @@ mod tests {
             pack,
             name: None,
             seed_server: None,
+            claim: None,
         };
         install_modpack(
             request,

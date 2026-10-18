@@ -32,6 +32,7 @@ export type Activity =
       unit: ProgressUnitDto;
       cancel: () => Promise<boolean>;
     }
+  | { kind: "exporting" }
   | {
       kind: "running";
       /** Stops a game started by an operation (Play on CINEPOL); per-instance games use `stop`. */
@@ -154,12 +155,15 @@ export const useActivityStore = create<ActivityState>((set) => {
   };
 
   const exportPack = async (instanceId: string) => {
-    update(instanceId, { error: null, notice: null });
+    update(instanceId, { activity: { kind: "exporting" }, error: null, notice: null });
     try {
       const exported = await exportMrpack(instanceId);
-      if (exported) update(instanceId, { notice: { kind: "exported", path: exported.path } });
+      update(instanceId, {
+        activity: { kind: "idle" },
+        notice: exported ? { kind: "exported", path: exported.path } : null,
+      });
     } catch (error) {
-      update(instanceId, { error: toIpcError(error).code });
+      update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
     }
   };
 

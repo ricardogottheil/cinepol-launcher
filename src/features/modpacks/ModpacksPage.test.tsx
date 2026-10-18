@@ -152,11 +152,11 @@ describe("ModpacksPage", () => {
   });
 
   it("shows why an install failed", async () => {
-    client.installModpack.mockReturnValue({
+    client.installModpack.mockImplementation(() => ({
       operationId: "op",
       done: Promise.reject(new IpcError("invalid_modpack", "bad pack")),
       cancel: vi.fn(),
-    });
+    }));
     const row = await openVersions();
     fireEvent.click(within(row).getByRole("button", { name: labels.install }));
     expect(await screen.findByText(esCommon.errors.invalid_modpack)).toBeInTheDocument();

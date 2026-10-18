@@ -335,4 +335,29 @@ describe("InstancesPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: labels.export }));
     expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
+
+  it("keeps the row busy while an export runs", async () => {
+    const exported = deferred<{ path: string; indexed: number; overrides: number } | null>();
+    client.exportMrpack.mockReturnValue(exported.promise);
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.export }));
+    expect(await screen.findByText(labels.exporting)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.export })).toBeDisabled();
+    expect(screen.getByRole("button", { name: labels.play })).toBeDisabled();
+    await act(async () => exported.resolve(null));
+    expect(screen.getByRole("button", { name: labels.play })).toBeEnabled();
+  });
+
+  it("shows why an update failed and frees the row", async () => {
+    client.listInstances.mockResolvedValue([{ ...instance, origin: "modpack" }]);
+    client.updateModpack.mockImplementation(() => ({
+      operationId: "op",
+      done: Promise.reject(new IpcError("network", "offline")),
+      cancel: vi.fn(),
+    }));
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.update }));
+    expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.update })).toBeEnabled();
+  });
 });

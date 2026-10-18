@@ -69,6 +69,9 @@ function QuickPlay({ recommended }: { recommended: string }) {
     }
   }, [activity.kind, queryClient]);
 
+  // A Play on CINEPOL session installs or runs; only those can be stopped.
+  const cancel = "cancel" in activity ? activity.cancel : undefined;
+
   return (
     <div data-enter-control className="mt-8 flex flex-col gap-4">
       {activity.kind === "idle" ? (
@@ -83,9 +86,11 @@ function QuickPlay({ recommended }: { recommended: string }) {
             <span className="plate text-silk">
               {activity.kind === "running"
                 ? t("home.session.playing")
-                : t(`stages.${activity.stage ?? "metadata"}`)}
+                : t(
+                    `stages.${activity.kind === "installing" ? (activity.stage ?? "metadata") : "metadata"}`,
+                  )}
             </span>
-            <Button onClick={() => void activity.cancel?.()} disabled={!activity.cancel}>
+            <Button onClick={() => void cancel?.()} disabled={!cancel}>
               {activity.kind === "running" ? t("instances.stop") : t("instances.cancel")}
             </Button>
           </div>

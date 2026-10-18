@@ -6,6 +6,7 @@
 //! the webview never gets file-system or dialog permissions.
 
 use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
 
 use launcher_core::application::export_mrpack::{
     ExportMrpackDeps, ExportMrpackRequest, export_mrpack as export,
@@ -117,13 +118,19 @@ pub async fn import_mrpack(
     operation_id: String,
     on_progress: Channel<ProgressEvent>,
 ) -> Result<Option<ModpackInstallDto>, AppError> {
-    let Some(path) = pick_mrpack(&app).await? else {
-        return Ok(None);
-    };
+    // Registered before the picker opens, so the UI's Cancel works from the start.
     let token = state.operations.start(&operation_id)?;
-    let result = install_new(&state, PackInput::File(&path), &token, on_progress).await;
+    let result = match pick_mrpack(&app).await {
+        Ok(Some(path)) if !token.is_cancelled() => {
+            install_new(&state, PackInput::File(&path), &token, on_progress)
+                .await
+                .map(Some)
+        }
+        Ok(_) => Ok(None),
+        Err(error) => Err(error),
+    };
     state.operations.finish(&operation_id);
-    result.map(Some)
+    result
 }
 
 /// Updates a Modrinth modpack instance to its newest version, keeping the
@@ -151,6 +158,9 @@ pub async fn export_mrpack(
     instance_id: String,
 ) -> Result<Option<ModpackExportDto>, AppError> {
     let id = parse_instance_id(&instance_id)?;
+    // Held like a running game: no export while the game, an install or an
+    // update changes the folder, and none of those while the export reads it.
+    let _claim = hold(&state, &id, &CancellationToken::new())?;
     let instance = state.instances.get(&id).await?;
     let Some(destination) = pick_destination(&app, &instance.name.to_string()).await? else {
         return Ok(None);
@@ -178,10 +188,20 @@ async fn install_new(
     on_progress: Channel<ProgressEvent>,
 ) -> Result<ModpackInstallDto, AppError> {
     let reporter = ChannelReporter::new(on_progress);
+    // The new instance is held from the moment it exists until the game is installed.
+    let held: Mutex<Option<Hold<'_>>> = Mutex::new(None);
+    let claim = |id: &InstanceId| match hold(state, id, token) {
+        Ok(guard) => {
+            *held.lock().unwrap_or_else(PoisonError::into_inner) = Some(guard);
+            true
+        }
+        Err(_) => false,
+    };
     let request = InstallModpackRequest {
         pack,
         name: None,
         seed_server: Some(cinepol_server_entry(&state.current_config())),
+        claim: Some(&claim),
     };
     let deps = InstallModpackDeps {
         instances: &state.instances,
@@ -191,7 +211,6 @@ async fn install_new(
     };
     let installed = install_pack(request, &deps, &reporter, token).await?;
     let id = &installed.instance.id;
-    let _claim = hold(state, id, token)?;
     let summary = install(id, &state.install_deps(), &reporter, token).await?;
     Ok(ModpackInstallDto {
         instance: InstanceDto::from(&installed.instance),
@@ -248,7 +267,7 @@ fn hold<'a>(
     state.games.hold(id.as_str(), token.clone()).map_err(|_| {
         AppError::new(
             ErrorCode::AlreadyRunning,
-            format!("{id} is already running"),
+            format!("{id} is busy (running, installing, updating or exporting)"),
         )
     })
 }

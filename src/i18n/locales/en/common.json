@@ -206,7 +206,8 @@
     "updated": "Modpack updated.",
     "keptChanges_one": "Modpack updated. {{count}} file you changed was kept.",
     "keptChanges_other": "Modpack updated. {{count}} files you changed were kept.",
-    "exported": "Saved to {{path}}"
+    "exported": "Saved to {{path}}",
+    "exporting": "Exporting the modpack"
   },
   "settings": {
     "title": "Settings",
