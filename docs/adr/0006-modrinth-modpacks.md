@@ -21,6 +21,8 @@ their own, and an update must not throw that work away.
   `raw.githubusercontent.com`, `gitlab.com`). Only format version 1 and the
   `minecraft`, `fabric-loader`, `quilt-loader`, `forge` and `neoforge`
   dependencies are accepted.
+- **Case:** two index paths that differ only in letter case are rejected as
+  duplicates, because macOS and Windows folders ignore case.
 - **Sides:** the client installs files whose `env.client` is `required` or
   `optional`; `unsupported` ones are skipped. `overrides/` is applied, then
   `client-overrides/` on top; `server-overrides/` is never extracted.
@@ -32,8 +34,14 @@ their own, and an update must not throw that work away.
   `pack-manifest.json` with the path and sha1 of every file the pack installed.
   The pure `plan_sync` writes a file only when it is missing or still matches
   the recorded hash, leaves files the player changed or added alone, and
-  removes dropped pack files only while they are intact. The manifest is saved
-  only after the whole sync succeeded, so a failed update can be retried.
+  removes dropped pack files only while they are intact. Every file is
+  downloaded and verified in a staging folder first, so a network failure leaves
+  the game folder as it was; only local moves and deletions follow. The
+  manifest is saved only after the whole sync succeeded, so a failed update can
+  be retried.
+- **Busy instances:** an install, update or export holds the instance like a
+  running game. A new modpack instance is held from the moment it is created,
+  before any file is written, until its game is installed.
 - **Export:** mods, configs, resource packs, shader packs and `options.txt` are
   packed. Files Modrinth knows by sha512 (`POST /v2/version_files`) become
   index entries; the rest go to `overrides/`. A catalog failure fails the
