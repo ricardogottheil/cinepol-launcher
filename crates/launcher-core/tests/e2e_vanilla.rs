@@ -6,8 +6,9 @@
 //! `cargo test -p cinepol-launcher-core --features network-tests --test e2e_vanilla -- --nocapture`
 //! Set `CINEPOL_E2E_DIR` to reuse a data directory between runs (default:
 //! `target/e2e-data` in the workspace), `CINEPOL_E2E_VERSION` to try another
-//! version, and `CINEPOL_E2E_LOADER=fabric` or `quilt` to launch through that
-//! loader's newest stable release (the game must then log the loader too).
+//! version, and `CINEPOL_E2E_LOADER=fabric`, `quilt`, `forge` or `neoforge` to
+//! launch through that loader's newest stable (or recommended) release; the
+//! game must then log the loader too.
 #![cfg(feature = "network-tests")]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -31,7 +32,9 @@ use launcher_core::infrastructure::fs::{
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
-use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadata};
+use launcher_core::infrastructure::loaders::{
+    ForgeLoaderMetadata, LoaderInstallers, MetaLoaderMetadata,
+};
 use launcher_core::infrastructure::mojang::MojangVersionSource;
 use launcher_core::infrastructure::process::{TokioGameProcessRunner, TokioProcessorRunner};
 use launcher_core::infrastructure::time::SystemClock;
@@ -142,14 +145,22 @@ async fn installs_and_launches_vanilla_offline() {
                 "ricardogottheil/cinepol-launcher/e2e (https://cinepol.policarpiers.com)",
             )
             .expect("http client");
-            let metadata = match kind {
-                LoaderKind::Fabric => MetaLoaderMetadata::fabric(http),
-                LoaderKind::Quilt => MetaLoaderMetadata::quilt(http),
-                other => panic!("{other:?} is not installable yet"),
-            };
-            let releases = list_loader_versions(&version, &metadata)
-                .await
-                .expect("loader releases");
+            let releases = match kind {
+                LoaderKind::Fabric => {
+                    list_loader_versions(&version, &MetaLoaderMetadata::fabric(http)).await
+                }
+                LoaderKind::Quilt => {
+                    list_loader_versions(&version, &MetaLoaderMetadata::quilt(http)).await
+                }
+                LoaderKind::Forge => {
+                    list_loader_versions(&version, &ForgeLoaderMetadata::forge(http)).await
+                }
+                LoaderKind::NeoForge => {
+                    list_loader_versions(&version, &ForgeLoaderMetadata::neoforge(http)).await
+                }
+                LoaderKind::Vanilla => unreachable!("vanilla is handled above"),
+            }
+            .expect("loader releases");
             let newest_stable = releases
                 .into_iter()
                 .find(|release| release.stable)
@@ -258,14 +269,21 @@ async fn installs_and_launches_vanilla_offline() {
         lines.iter().rev().take(30).collect::<Vec<_>>()
     );
     if let Some(loader_version) = loader.version() {
-        let expected = match loader.kind() {
-            LoaderKind::Quilt => format!("with Quilt Loader {}", loader_version.as_str()),
-            _ => format!("with Fabric Loader {}", loader_version.as_str()),
+        let started = match loader.kind() {
+            LoaderKind::Fabric => {
+                let expected = format!("with Fabric Loader {}", loader_version.as_str());
+                lines.iter().any(|line| line.contains(&expected))
+            }
+            LoaderKind::Quilt => {
+                let expected = format!("with Quilt Loader {}", loader_version.as_str());
+                lines.iter().any(|line| line.contains(&expected))
+            }
+            // Forge and NeoForge log through their own loaders (FML).
+            _ => lines
+                .iter()
+                .any(|line| line.to_ascii_lowercase().contains("forge")),
         };
-        assert!(
-            lines.iter().any(|line| line.contains(&expected)),
-            "the loader never started ({expected:?} missing)"
-        );
+        assert!(started, "the {:?} loader never started", loader.kind());
     }
     assert!(
         outcome.exit.killed_by_launcher,
