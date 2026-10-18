@@ -28,7 +28,8 @@ pub async fn list_instances(state: State<'_, AppState>) -> Result<Vec<InstanceDt
 }
 
 /// Creates an instance with CINEPOL first in its server list. `loader` is
-/// `vanilla`, `fabric` or `quilt`; the last two need a `loader_version`.
+/// `vanilla`, `fabric`, `quilt`, `forge` or `neoforge`; all but vanilla need a
+/// `loader_version`.
 #[tauri::command]
 pub async fn create_instance(
     state: State<'_, AppState>,
@@ -133,15 +134,9 @@ pub fn kill_instance(state: State<'_, AppState>, instance_id: String) -> Result<
     Ok(state.games.cancel(id.as_str()))
 }
 
-/// Validates a loader choice from the UI; Forge and NeoForge arrive later.
+/// Validates a loader choice from the UI.
 fn parse_loader(kind: &str, version: Option<&str>) -> Result<LoaderSpec, AppError> {
     let kind = LoaderKind::from_id(kind)
-        .filter(|kind| {
-            matches!(
-                kind,
-                LoaderKind::Vanilla | LoaderKind::Fabric | LoaderKind::Quilt
-            )
-        })
         .ok_or_else(|| AppError::invalid_input(format!("unsupported loader {kind:?}")))?;
     let version = version
         .map(|raw| LoaderVersion::parse(raw.trim()))

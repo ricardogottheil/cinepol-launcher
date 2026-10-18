@@ -6,7 +6,7 @@ import { TextField } from "../../components/ui/TextField";
 import { type InstanceLoader, toIpcError } from "../../ipc/client";
 import { useCreateInstance, useGameVersions, useLoaderVersions } from "./useInstances";
 
-const LOADERS: InstanceLoader[] = ["vanilla", "fabric", "quilt"];
+const LOADERS: InstanceLoader[] = ["vanilla", "fabric", "quilt", "forge", "neoforge"];
 
 export function NewInstanceForm() {
   const { t } = useTranslation();

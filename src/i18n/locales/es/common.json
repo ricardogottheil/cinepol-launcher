@@ -193,9 +193,11 @@
     "loaders": {
       "vanilla": "Vanilla",
       "fabric": "Fabric",
-      "quilt": "Quilt"
+      "quilt": "Quilt",
+      "forge": "Forge",
+      "neoforge": "NeoForge"
     },
-    "unstable": "{{version}} (beta)"
+    "unstable": "{{version}} (no recomendada)"
   },
   "settings": {
     "title": "Ajustes",

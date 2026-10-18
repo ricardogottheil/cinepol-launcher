@@ -18,7 +18,9 @@ use launcher_core::infrastructure::fs::{
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
 use launcher_core::infrastructure::keychain::KeyringSecretStore;
-use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadata};
+use launcher_core::infrastructure::loaders::{
+    ForgeLoaderMetadata, LoaderInstallers, MetaLoaderMetadata,
+};
 use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
 use launcher_core::infrastructure::msa::MsaClient;
 use launcher_core::infrastructure::nbt::NbtServerListStore;
@@ -90,6 +92,8 @@ pub struct AppState {
     pub loaders: LoaderInstallers<ReqwestHttpClient>,
     pub fabric_releases: MetaLoaderMetadata<ReqwestHttpClient>,
     pub quilt_releases: MetaLoaderMetadata<ReqwestHttpClient>,
+    pub forge_releases: ForgeLoaderMetadata<ReqwestHttpClient>,
+    pub neoforge_releases: ForgeLoaderMetadata<ReqwestHttpClient>,
     pub config_source: HttpServerConfigSource<ReqwestHttpClient>,
     pub settings: JsonSettingsRepository,
     pub bundled_config: ServerConfig,
@@ -151,6 +155,8 @@ impl AppState {
             loaders: LoaderInstallers::new(http.clone(), paths.clone(), TokioProcessorRunner),
             fabric_releases: MetaLoaderMetadata::fabric(http.clone()),
             quilt_releases: MetaLoaderMetadata::quilt(http.clone()),
+            forge_releases: ForgeLoaderMetadata::forge(http.clone()),
+            neoforge_releases: ForgeLoaderMetadata::neoforge(http.clone()),
             current_config: RwLock::new(bundled_config.clone()),
             bundled_config,
             java: ManagedJavaRuntimes::new(

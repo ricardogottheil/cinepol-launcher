@@ -29,6 +29,10 @@ pub async fn list_loader_versions(
     let releases = match LoaderKind::from_id(&loader) {
         Some(LoaderKind::Fabric) => list_releases(&game_version, &state.fabric_releases).await?,
         Some(LoaderKind::Quilt) => list_releases(&game_version, &state.quilt_releases).await?,
+        Some(LoaderKind::Forge) => list_releases(&game_version, &state.forge_releases).await?,
+        Some(LoaderKind::NeoForge) => {
+            list_releases(&game_version, &state.neoforge_releases).await?
+        }
         _ => {
             return Err(AppError::invalid_input(format!(
                 "{loader:?} has no release list"

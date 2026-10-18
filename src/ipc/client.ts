@@ -235,13 +235,13 @@ export function listInstances(): Promise<InstanceDto[]> {
 }
 
 /** Loaders an instance can be created with in this version of the launcher. */
-export type InstanceLoader = "vanilla" | "fabric" | "quilt";
+export type InstanceLoader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";
 
 export interface NewInstanceRequest {
   name: string;
   gameVersion: string;
   loader: InstanceLoader;
-  /** Required for Fabric and Quilt, `null` for vanilla. */
+  /** Required for every loader but vanilla, `null` for vanilla. */
   loaderVersion: string | null;
 }
 

@@ -138,6 +138,27 @@ describe("InstancesPage", () => {
     );
   });
 
+  it("offers Forge and NeoForge with their recommended release by default", async () => {
+    client.listLoaderVersions.mockResolvedValue([
+      { version: "65.1.5", stable: false },
+      { version: "65.1.0", stable: true },
+    ]);
+    client.createInstance.mockResolvedValue({ ...instance, id: "forge", name: "Forge" });
+    renderWithQuery(<InstancesPage />);
+    await screen.findByRole("option", { name: "1.21.11" });
+    expect(screen.getByRole("option", { name: labels.loaders.neoforge })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "forge" } });
+    await waitFor(() => expect(client.listLoaderVersions).toHaveBeenCalledWith("forge", "26.2"));
+    expect(await screen.findByLabelText(labels.loaderVersionLabel)).toHaveValue("65.1.0");
+    fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "Forge" } });
+    fireEvent.click(screen.getByRole("button", { name: labels.create }));
+    await waitFor(() =>
+      expect(client.createInstance).toHaveBeenCalledWith(
+        expect.objectContaining({ loader: "forge", loaderVersion: "65.1.0" }),
+      ),
+    );
+  });
+
   it("explains a loader that does not support the chosen version", async () => {
     client.listLoaderVersions.mockRejectedValue(new IpcError("loader_unavailable", "400"));
     renderWithQuery(<InstancesPage />);
