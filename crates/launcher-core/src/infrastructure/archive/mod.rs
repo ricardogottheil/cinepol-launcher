@@ -6,10 +6,12 @@
 //! Symbolic and hard links are only created when they resolve inside it.
 
 mod extract;
+mod mrpack;
 mod natives;
 
 pub(crate) use extract::create_link_inside;
 pub use extract::{extract_tar_gz, extract_tar_gz_async, extract_zip, extract_zip_async};
+pub use mrpack::ZipMrpackArchive;
 pub use natives::ZipNativesExtractor;
 
 #[cfg(test)]

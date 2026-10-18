@@ -159,7 +159,7 @@ pub async fn extract_tar_gz_async(
 
 /// Splits an entry name into plain components. Rejects absolute paths, `..`,
 /// drive letters, UNC prefixes and NUL bytes. `.` and empty segments are dropped.
-fn entry_components(name: &str) -> Result<Vec<&str>, ExtractError> {
+pub(super) fn entry_components(name: &str) -> Result<Vec<&str>, ExtractError> {
     let unsafe_entry = || ExtractError::UnsafeEntry(name.to_owned());
     if name.starts_with(['/', '\\']) || name.contains([':', '\0']) {
         return Err(unsafe_entry());
@@ -191,12 +191,12 @@ fn io_error(path: &Path, error: &io::Error) -> ExtractError {
 }
 
 /// The canonicalized destination; every write is checked against it.
-struct Root {
+pub(super) struct Root {
     canonical: PathBuf,
 }
 
 impl Root {
-    fn prepare(dest: &Path) -> Result<Self, ExtractError> {
+    pub(super) fn prepare(dest: &Path) -> Result<Self, ExtractError> {
         fs::create_dir_all(dest).map_err(|error| io_error(dest, &error))?;
         let canonical = dest
             .canonicalize()
@@ -204,14 +204,14 @@ impl Root {
         Ok(Self { canonical })
     }
 
-    fn join(&self, components: &[&str]) -> PathBuf {
+    pub(super) fn join(&self, components: &[&str]) -> PathBuf {
         components
             .iter()
             .fold(self.canonical.clone(), |path, part| path.join(part))
     }
 
     /// Canonicalizes `dir` and fails unless it is the root or below it.
-    fn check_inside(&self, dir: &Path, name: &str) -> Result<PathBuf, ExtractError> {
+    pub(super) fn check_inside(&self, dir: &Path, name: &str) -> Result<PathBuf, ExtractError> {
         let canonical = dir.canonicalize().map_err(|error| io_error(dir, &error))?;
         if canonical.starts_with(&self.canonical) {
             Ok(canonical)
@@ -221,7 +221,7 @@ impl Root {
     }
 
     /// Creates the parent of `path` and returns its canonical form, inside the root.
-    fn prepare_parent(&self, path: &Path, name: &str) -> Result<PathBuf, ExtractError> {
+    pub(super) fn prepare_parent(&self, path: &Path, name: &str) -> Result<PathBuf, ExtractError> {
         let parent = path
             .parent()
             .ok_or_else(|| ExtractError::UnsafeEntry(name.to_owned()))?;
@@ -245,7 +245,7 @@ impl Root {
     }
 
     /// Removes a file or link occupying `path` so nothing is written through it.
-    fn clear(path: &Path) -> Result<(), ExtractError> {
+    pub(super) fn clear(path: &Path) -> Result<(), ExtractError> {
         match fs::symlink_metadata(path) {
             Ok(metadata) if metadata.is_dir() => Err(ExtractError::Io(format!(
                 "{} is a directory",
