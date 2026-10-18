@@ -17,7 +17,8 @@ const DEFAULT_BACKOFF: Duration = Duration::from_millis(500);
 const MAX_RETRY_AFTER_SECS: u64 = 60;
 
 /// Sends the launcher's User-Agent and retries network errors, HTTP 5xx and
-/// 429 up to three attempts with exponential backoff.
+/// 429 up to three attempts with exponential backoff (waiting `Retry-After`
+/// on 429), for GETs and JSON POSTs alike.
 #[derive(Debug, Clone)]
 pub struct ReqwestHttpClient {
     client: reqwest::Client,
@@ -52,12 +53,43 @@ impl ReqwestHttpClient {
         &self.client
     }
 
-    async fn attempt(&self, url: &str) -> Attempt {
+    /// Sends a GET, or a JSON POST when `json` is set, with retries.
+    async fn send_with_retries(
+        &self,
+        url: &str,
+        json: Option<&[u8]>,
+    ) -> Result<Vec<u8>, HttpError> {
+        let mut backoff = self.initial_backoff;
+        let mut attempt = 1;
+        loop {
+            match self.attempt(url, json).await {
+                Attempt::Done(result) => return result,
+                Attempt::Retry(error, _) if attempt >= MAX_ATTEMPTS => return Err(error),
+                Attempt::Retry(error, retry_after) => {
+                    tracing::debug!(url, attempt, %error, "retrying HTTP request");
+                    tokio::time::sleep(retry_after.unwrap_or(backoff)).await;
+                    backoff = backoff.saturating_mul(2);
+                    attempt += 1;
+                }
+            }
+        }
+    }
+
+    async fn attempt(&self, url: &str, json: Option<&[u8]>) -> Attempt {
         let network = |error: reqwest::Error| HttpError::Network {
             url: url.to_owned(),
             reason: error.without_url().to_string(),
         };
-        let response = match self.client.get(url).send().await {
+        let request = match json {
+            None => self.client.get(url),
+            Some(body) => self
+                .client
+                .post(url)
+                .header(CONTENT_TYPE, "application/json")
+                .header(ACCEPT, "application/json")
+                .body(body.to_vec()),
+        };
+        let response = match request.send().await {
             Ok(response) => response,
             Err(error) => return Attempt::Retry(network(error), None),
         };
@@ -104,20 +136,11 @@ enum Attempt {
 
 impl HttpClient for ReqwestHttpClient {
     async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, HttpError> {
-        let mut backoff = self.initial_backoff;
-        let mut attempt = 1;
-        loop {
-            match self.attempt(url).await {
-                Attempt::Done(result) => return result,
-                Attempt::Retry(error, _) if attempt >= MAX_ATTEMPTS => return Err(error),
-                Attempt::Retry(error, retry_after) => {
-                    tracing::debug!(url, attempt, %error, "retrying HTTP request");
-                    tokio::time::sleep(retry_after.unwrap_or(backoff)).await;
-                    backoff = backoff.saturating_mul(2);
-                    attempt += 1;
-                }
-            }
-        }
+        self.send_with_retries(url, None).await
+    }
+
+    async fn post_json(&self, url: &str, body: Vec<u8>) -> Result<Vec<u8>, HttpError> {
+        self.send_with_retries(url, Some(&body)).await
     }
 }
 
@@ -310,6 +333,63 @@ mod tests {
             requests[0].headers.get("user-agent").map(String::as_str),
             Some("cinepol-launcher-tests/1.0")
         );
+    }
+
+    #[tokio::test]
+    async fn posts_json_with_the_user_agent_and_retries_server_errors() {
+        let server = TestServer::start(vec![(
+            "/version_files",
+            vec![Reply::status(502), Reply::ok(r#"{"a":1}"#)],
+        )])
+        .await;
+        let body = client()
+            .post_json(&server.url("/version_files"), br#"{"hashes":[]}"#.to_vec())
+            .await
+            .unwrap();
+        assert_eq!(body, br#"{"a":1}"#);
+        let requests = server.requests();
+        assert_eq!(requests.len(), 2);
+        for request in &requests {
+            assert_eq!(request.method, "POST");
+            assert_eq!(request.body, br#"{"hashes":[]}"#);
+            assert_eq!(
+                request.headers.get("content-type").map(String::as_str),
+                Some("application/json")
+            );
+            assert_eq!(
+                request.headers.get("user-agent").map(String::as_str),
+                Some("cinepol-launcher-tests/1.0")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn posts_honour_rate_limits_like_gets() {
+        let server = TestServer::start(vec![(
+            "/limited",
+            vec![Reply::status(429).with_header("Retry-After", "0")],
+        )])
+        .await;
+        let url = server.url("/limited");
+        assert_eq!(
+            client().post_json(&url, b"{}".to_vec()).await,
+            Err(HttpError::RateLimited {
+                url,
+                retry_after_secs: 0
+            })
+        );
+        assert_eq!(server.hits("/limited"), 3);
+    }
+
+    #[tokio::test]
+    async fn posts_fail_on_client_errors_without_retrying() {
+        let server = TestServer::start(vec![("/bad", vec![Reply::status(400)])]).await;
+        let url = server.url("/bad");
+        assert_eq!(
+            client().post_json(&url, b"{}".to_vec()).await,
+            Err(HttpError::Status { url, status: 400 })
+        );
+        assert_eq!(server.hits("/bad"), 1);
     }
 
     fn form(fields: &[(&str, &str)]) -> HttpBody {

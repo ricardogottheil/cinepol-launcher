@@ -480,33 +480,50 @@ impl ModpackSource for FakeModpackSource {
     }
 }
 
-/// Serves fixed bodies by URL; unknown URLs are 404. Records every request.
+/// Serves fixed bodies by URL, to GETs and POSTs alike; unknown URLs are
+/// 404. Records every requested URL, and the body of every POST.
 #[derive(Debug, Default)]
 pub struct FakeHttpClient {
     bodies: HashMap<String, Vec<u8>>,
     requests: Mutex<Vec<String>>,
+    posts: Mutex<Vec<(String, Vec<u8>)>>,
 }
 
 impl FakeHttpClient {
     pub fn with(bodies: impl IntoIterator<Item = (String, Vec<u8>)>) -> Self {
         Self {
             bodies: bodies.into_iter().collect(),
-            requests: Mutex::default(),
+            ..Self::default()
         }
     }
 
+    /// Every requested URL (GET or POST), in order.
     pub fn requests(&self) -> Vec<String> {
         self.requests.lock().unwrap().clone()
     }
-}
 
-impl HttpClient for FakeHttpClient {
-    async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, HttpError> {
+    /// Every POST as (URL, body), in order.
+    pub fn posts(&self) -> Vec<(String, Vec<u8>)> {
+        self.posts.lock().unwrap().clone()
+    }
+
+    fn serve(&self, url: &str) -> Result<Vec<u8>, HttpError> {
         self.requests.lock().unwrap().push(url.to_owned());
         self.bodies
             .get(url)
             .cloned()
             .ok_or_else(|| HttpError::NotFound(url.to_owned()))
+    }
+}
+
+impl HttpClient for FakeHttpClient {
+    async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, HttpError> {
+        self.serve(url)
+    }
+
+    async fn post_json(&self, url: &str, body: Vec<u8>) -> Result<Vec<u8>, HttpError> {
+        self.posts.lock().unwrap().push((url.to_owned(), body));
+        self.serve(url)
     }
 }
 

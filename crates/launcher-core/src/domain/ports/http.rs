@@ -21,6 +21,28 @@ pub enum HttpError {
 /// transient failures.
 pub trait HttpClient: Send + Sync {
     fn get_bytes(&self, url: &str) -> impl Future<Output = Result<Vec<u8>, HttpError>> + Send;
+
+    /// POSTs a JSON document (`application/json`) and returns the answer body,
+    /// with the same User-Agent, retries and rate-limit handling as
+    /// [`HttpClient::get_bytes`]. Because it may be retried, it is only for
+    /// idempotent queries (lookups such as Modrinth `version_files`), never
+    /// for exchanges that must happen once (see [`HttpRequester`]).
+    ///
+    /// The default refuses the request, for clients that only read.
+    fn post_json(
+        &self,
+        url: &str,
+        body: Vec<u8>,
+    ) -> impl Future<Output = Result<Vec<u8>, HttpError>> + Send {
+        drop(body);
+        let url = url.to_owned();
+        async move {
+            Err(HttpError::Network {
+                url,
+                reason: "this HTTP client does not send POST requests".into(),
+            })
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
