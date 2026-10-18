@@ -15,7 +15,8 @@ use crate::domain::instance::{
 use crate::domain::java::{JavaProbe, JavaProbeError, JavaVersion};
 use crate::domain::loader::{LoaderKind, LoaderMetadata, LoaderMetadataError, LoaderRelease};
 use crate::domain::modpack::{
-    ModpackPage, ModpackQuery, ModpackSource, ModpackSourceError, ModpackSourceKind, ModpackVersion,
+    ModpackPage, ModpackQuery, ModpackSource, ModpackSourceError, ModpackSourceKind,
+    ModpackSummary, ModpackVersion,
 };
 use crate::domain::ports::{
     Clock, Delay, DownloadError, DownloadRequest, DownloadSummary, Downloader, HttpClient,
@@ -26,12 +27,16 @@ use tokio_util::sync::CancellationToken;
 
 mod auth;
 mod launch;
+mod modpack;
 mod server;
 
 pub use auth::{FakeMicrosoftAuth, FakeSessions, sample_profile, tokens};
 pub use launch::{
     FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, InMemoryRunningGames,
     RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,
+};
+pub use modpack::{
+    FakeMrpackArchive, FakePackFiles, InMemoryPackManifestStore, WrittenPack, sha1_hex, sha512_hex,
 };
 pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySettingsRepository};
 
@@ -418,12 +423,14 @@ impl crate::domain::loader::LoaderInstaller for FakeLoaderInstaller {
     }
 }
 
-/// A modpack catalog with one fixed page and per-project versions.
+/// A modpack catalog with one fixed page, per-project versions and the
+/// files it knows by sha512.
 #[derive(Debug)]
 pub struct FakeModpackSource {
     pub kind: ModpackSourceKind,
     pub page: ModpackPage,
     pub versions: HashMap<String, Vec<ModpackVersion>>,
+    pub known: HashMap<String, Vec<String>>,
 }
 
 impl ModpackSource for FakeModpackSource {
@@ -446,11 +453,30 @@ impl ModpackSource for FakeModpackSource {
         })
     }
 
+    async fn project(&self, project: &str) -> Result<ModpackSummary, ModpackSourceError> {
+        self.page
+            .items
+            .iter()
+            .find(|item| item.project == project)
+            .cloned()
+            .ok_or_else(|| ModpackSourceError::NotFound(project.to_owned()))
+    }
+
     async fn versions(&self, project: &str) -> Result<Vec<ModpackVersion>, ModpackSourceError> {
         self.versions
             .get(project)
             .cloned()
             .ok_or_else(|| ModpackSourceError::NotFound(project.to_owned()))
+    }
+
+    async fn known_files(
+        &self,
+        sha512: &[String],
+    ) -> Result<HashMap<String, Vec<String>>, ModpackSourceError> {
+        Ok(sha512
+            .iter()
+            .filter_map(|hash| Some((hash.clone(), self.known.get(hash)?.clone())))
+            .collect())
     }
 }
 
@@ -745,7 +771,17 @@ mod tests {
                 total: Some(1),
             },
             versions: HashMap::new(),
+            known: HashMap::from([("ab".into(), vec!["https://cdn.modrinth.com/x.jar".into()])]),
         };
+        assert_eq!(source.project("1KVo5zza").await.unwrap(), summary);
+        assert_eq!(
+            source
+                .known_files(&["ab".into(), "cd".into()])
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
         let query = ModpackQuery {
             text: "fabulously".into(),
             ..Default::default()

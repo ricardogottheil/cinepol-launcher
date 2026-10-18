@@ -1,10 +1,16 @@
 //! Modpack sources (Modrinth, CurseForge, packwiz) and what they return.
 
+pub mod mrpack;
 mod ports;
+pub mod sync;
 
-pub use ports::{ModpackSource, ModpackSourceError};
+pub use ports::{
+    ModpackSource, ModpackSourceError, MrpackArchive, PackFileError, PackFiles, PackManifestStore,
+    StagedFile,
+};
 
 use crate::domain::instance::GameVersion;
+use crate::domain::integrity::Checksum;
 use crate::domain::loader::LoaderKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -66,8 +72,23 @@ pub struct ModpackPage {
 pub struct ModpackVersion {
     pub id: String,
     pub name: String,
+    /// The version label the author gave it (`14.1.1`).
+    pub version_number: String,
     pub game_versions: Vec<GameVersion>,
     pub loaders: Vec<LoaderKind>,
+    /// RFC 3339 publication time, when the catalog reports it.
+    pub published: Option<String>,
+    /// The pack archive to install, when the version has one this launcher reads.
+    pub pack_file: Option<ModpackFile>,
+}
+
+/// A downloadable pack archive and the hash it is verified against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModpackFile {
+    pub url: String,
+    pub filename: String,
+    pub size: u64,
+    pub checksum: Checksum,
 }
 
 #[cfg(test)]
