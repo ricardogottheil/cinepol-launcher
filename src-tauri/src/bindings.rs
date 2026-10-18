@@ -11,9 +11,9 @@ use ts_rs::{Config, TS};
 use crate::dto::{
     AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, CommunityLinksDto,
     ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto, InstallSummaryDto,
-    InstanceDto, InstanceOriginDto, LaunchOutcomeDto, LogLineDto, LogStreamDto, PremiumNameDto,
-    ProgressEvent, ProgressStageDto, ProgressUnitDto, ServerConfigDto, ServerStatusDto,
-    SettingsDto, SkinDto,
+    InstanceDto, InstanceOriginDto, LaunchOutcomeDto, LoaderReleaseDto, LogLineDto, LogStreamDto,
+    PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto, ServerConfigDto,
+    ServerStatusDto, SettingsDto, SkinDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -49,6 +49,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         SkinDto::decl(cfg),
         GameVersionDto::decl(cfg),
         GameVersionsDto::decl(cfg),
+        LoaderReleaseDto::decl(cfg),
         InstanceOriginDto::decl(cfg),
         InstanceDto::decl(cfg),
         InstallSummaryDto::decl(cfg),
@@ -135,8 +136,18 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             format!("Array<{}>", InstanceDto::name(cfg)),
         ),
         command(
+            "list_loader_versions",
+            vec![("loader", string()), ("gameVersion", string())],
+            format!("Array<{}>", LoaderReleaseDto::name(cfg)),
+        ),
+        command(
             "create_instance",
-            vec![("name", string()), ("gameVersion", string())],
+            vec![
+                ("name", string()),
+                ("gameVersion", string()),
+                ("loader", string()),
+                ("loaderVersion", "string | null".to_owned()),
+            ],
             InstanceDto::name(cfg),
         ),
         command(
@@ -262,6 +273,7 @@ mod tests {
             "get_account_skin",
             "set_active_account",
             "list_game_versions",
+            "list_loader_versions",
             "list_instances",
             "create_instance",
             "install_instance",

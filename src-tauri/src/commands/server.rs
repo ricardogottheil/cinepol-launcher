@@ -59,6 +59,7 @@ pub async fn play_on_cinepol(
         java: &state.java,
         paths: &state.paths,
         platform: &state.platform,
+        loaders: &state.loaders,
     };
     let launch = LaunchDeps {
         instances: &state.instances,

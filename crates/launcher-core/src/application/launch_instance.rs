@@ -1,5 +1,6 @@
 //! Starts an installed instance with an account and waits for the game to exit.
 
+use crate::domain::loader::{LoaderKind, profile_id};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -29,6 +30,8 @@ pub enum LaunchError {
     NoAccount,
     #[error(transparent)]
     Session(#[from] SessionError),
+    #[error("{0:?} instances cannot be launched by this launcher yet")]
+    UnsupportedLoader(LoaderKind),
     #[error(transparent)]
     Version(#[from] VersionSourceError),
     #[error("the instance is not installed: {0} is missing")]
@@ -131,10 +134,11 @@ where
         AccountKind::Offline => (OFFLINE_ACCESS_TOKEN.to_owned(), "legacy", "0".to_owned()),
     };
 
-    let spec = deps
-        .versions
-        .version(instance.game_version.as_str())
-        .await?;
+    // The installed loader profile (or the game version for vanilla), known
+    // without the network so installed instances launch offline.
+    let version_id = profile_id(&instance.loader, &instance.game_version)
+        .ok_or(LaunchError::UnsupportedLoader(instance.loader.kind()))?;
+    let spec = deps.versions.version(version_id.as_str()).await?;
     let plan = plan_libraries(&spec, deps.platform, &Features::new());
     let libraries_dir = deps.paths.libraries_dir();
     let assets_dir = deps.paths.assets_dir();
@@ -614,5 +618,61 @@ mod tests {
             &args[args.len() - 2..],
             ["--quickPlayMultiplayer", "mc.policarpiers.com"]
         );
+    }
+
+    async fn set_loader(world: &World, kind: crate::domain::loader::LoaderKind, version: &str) {
+        let id = InstanceId::parse("cinepol").unwrap();
+        let mut instance = world.instances.get(&id).await.unwrap();
+        instance.loader = LoaderSpec::new(
+            kind,
+            Some(crate::domain::loader::LoaderVersion::parse(version).unwrap()),
+        )
+        .unwrap();
+        world.instances.save(&instance).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_loader_instance_launches_its_cached_profile() {
+        let mut world = World::installed().await;
+        let mut profile = world.versions.versions["26.2"].clone();
+        profile.id = "fabric-loader-0.20.0-26.2".into();
+        profile.main_class = "net.fabricmc.loader.impl.launch.knot.KnotClient".into();
+        world
+            .versions
+            .versions
+            .insert("fabric-loader-0.20.0-26.2".into(), profile);
+        set_loader(&world, crate::domain::loader::LoaderKind::Fabric, "0.20.0").await;
+
+        launch_instance(
+            &request(),
+            &world.deps(),
+            RecordingLogSink::default(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+        let args = world.runner.specs()[0].command.args();
+        assert!(args.contains(&"net.fabricmc.loader.impl.launch.knot.KnotClient".to_owned()));
+        assert!(!args.contains(&"net.minecraft.client.main.Main".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn a_loader_this_launcher_cannot_install_is_refused() {
+        let world = World::installed().await;
+        set_loader(&world, crate::domain::loader::LoaderKind::Forge, "47.2.0").await;
+        assert_eq!(
+            launch_instance(
+                &request(),
+                &world.deps(),
+                RecordingLogSink::default(),
+                CancellationToken::new()
+            )
+            .await,
+            Err(LaunchError::UnsupportedLoader(
+                crate::domain::loader::LoaderKind::Forge
+            ))
+        );
+        assert!(world.runner.specs().is_empty());
     }
 }

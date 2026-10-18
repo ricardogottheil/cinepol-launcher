@@ -1,6 +1,7 @@
 //! Downloads everything an instance needs to launch: the version JSON, client
 //! jar, libraries, natives jars, logging config, assets and the Java runtime.
 
+use crate::domain::loader::{LoaderInstallError, LoaderInstaller};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
@@ -26,6 +27,12 @@ pub enum InstallError {
     Download(DownloadError),
     #[error(transparent)]
     Java(JavaRuntimeError),
+    #[error(transparent)]
+    Loader(#[from] LoaderInstallError),
+    /// The rule is to never launch with unverified libraries, so a library the
+    /// version declares without a checksum is not even downloaded.
+    #[error("{0} declares no checksum, so it cannot be verified")]
+    UnverifiedLibrary(String),
     #[error("the installation was cancelled")]
     Cancelled,
 }
@@ -59,13 +66,15 @@ pub struct InstallSummary {
 }
 
 /// Everything the installer talks to.
-pub struct InstallDeps<'a, I, V, D, J> {
+pub struct InstallDeps<'a, I, V, D, J, L> {
     pub instances: &'a I,
     pub versions: &'a V,
     pub downloader: &'a D,
     pub java: &'a J,
     pub paths: &'a LauncherPaths,
     pub platform: &'a Platform,
+    /// Installs the loader profile of Fabric and Quilt instances.
+    pub loaders: &'a L,
 }
 
 fn request(root: &std::path::Path, artifact: &Artifact) -> Option<DownloadRequest> {
@@ -79,9 +88,9 @@ fn request(root: &std::path::Path, artifact: &Artifact) -> Option<DownloadReques
 }
 
 /// Installing is idempotent: files that are already present and verified are reused.
-pub async fn install_instance<I, V, D, J, R>(
+pub async fn install_instance<I, V, D, J, L, R>(
     id: &InstanceId,
-    deps: &InstallDeps<'_, I, V, D, J>,
+    deps: &InstallDeps<'_, I, V, D, J, L>,
     reporter: &R,
     cancel: &CancellationToken,
 ) -> Result<InstallSummary, InstallError>
@@ -90,15 +99,18 @@ where
     V: VersionSource,
     D: Downloader,
     J: JavaRuntimeProvider,
+    L: LoaderInstaller,
     R: ProgressReporter,
 {
     let metadata = StagedReporter::new(reporter, ProgressStage::Metadata);
     metadata.report(ProgressUpdate::new(0, Some(2)));
     let instance = deps.instances.get(id).await?;
-    let spec = deps
-        .versions
-        .version(instance.game_version.as_str())
+    // Vanilla answers the game version; a loader stores its profile first.
+    let version_id = deps
+        .loaders
+        .install(&instance.loader, &instance.game_version)
         .await?;
+    let spec = deps.versions.version(version_id.as_str()).await?;
     let asset_index = match &spec.asset_index {
         Some(index) => Some(deps.versions.asset_index(index).await?),
         None => None,
@@ -125,6 +137,21 @@ where
             .iter()
             .filter_map(|logging| request(&assets_dir, &logging.file)),
     );
+    if let Some(unverified) = files.iter().find(|file| file.checksum.is_none()) {
+        let path = unverified
+            .destination
+            .strip_prefix(deps.paths.libraries_dir())
+            .or_else(|_| {
+                unverified
+                    .destination
+                    .strip_prefix(deps.paths.versions_dir())
+            })
+            .or_else(|_| unverified.destination.strip_prefix(&assets_dir))
+            .unwrap_or(&unverified.destination);
+        return Err(InstallError::UnverifiedLibrary(
+            path.to_string_lossy().replace('\\', "/"),
+        ));
+    }
     let files = deps
         .downloader
         .download_all(
@@ -182,9 +209,10 @@ mod tests {
     use crate::domain::java::{JavaRuntime, JavaSource, JavaVersion};
     use crate::domain::launch::{Arch, OsName, VersionManifest};
     use crate::domain::loader::LoaderSpec;
+    use crate::domain::loader::{LoaderInstallError, LoaderKind, LoaderVersion};
     use crate::testing::{
-        FakeDownloader, FakeJavaRuntimes, FakeVersionSource, InMemoryInstanceRepository,
-        RecordingReporter, sample_asset_index, sample_version_spec,
+        FakeDownloader, FakeJavaRuntimes, FakeLoaderInstaller, FakeVersionSource,
+        InMemoryInstanceRepository, RecordingReporter, sample_asset_index, sample_version_spec,
     };
 
     struct World {
@@ -194,6 +222,7 @@ mod tests {
         java: FakeJavaRuntimes,
         paths: LauncherPaths,
         platform: Platform,
+        loaders: FakeLoaderInstaller,
         dir: tempfile::TempDir,
     }
 
@@ -237,6 +266,7 @@ mod tests {
                 java,
                 paths,
                 platform: Platform::new(OsName::MacOs, Arch::Arm64),
+                loaders: FakeLoaderInstaller::default(),
                 dir,
             }
         }
@@ -249,6 +279,7 @@ mod tests {
             FakeVersionSource,
             FakeDownloader,
             FakeJavaRuntimes,
+            FakeLoaderInstaller,
         > {
             InstallDeps {
                 instances: &self.instances,
@@ -257,7 +288,26 @@ mod tests {
                 java: &self.java,
                 paths: &self.paths,
                 platform: &self.platform,
+                loaders: &self.loaders,
             }
+        }
+
+        /// Turns the instance into a Fabric one whose profile is served by id.
+        async fn with_fabric(mut self) -> Self {
+            let mut instance = self.instances.get(&id()).await.unwrap();
+            instance.loader = LoaderSpec::new(
+                LoaderKind::Fabric,
+                Some(LoaderVersion::parse("0.20.0").unwrap()),
+            )
+            .unwrap();
+            self.instances.save(&instance).await.unwrap();
+            let mut profile = sample_version_spec("26.2");
+            profile.id = "fabric-loader-0.20.0-26.2".into();
+            profile.main_class = "net.fabricmc.loader.impl.launch.knot.KnotClient".into();
+            self.versions
+                .versions
+                .insert("fabric-loader-0.20.0-26.2".into(), profile);
+            self
         }
     }
 
@@ -413,5 +463,67 @@ mod tests {
             .await,
             Err(InstallError::Version(VersionSourceError::UnknownVersion(_)))
         ));
+    }
+
+    #[tokio::test]
+    async fn installs_the_loader_profile_and_the_files_it_lists() {
+        let world = World::new().await.with_fabric().await;
+        install_instance(
+            &id(),
+            &world.deps(),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(world.loaders.installed(), ["fabric-loader-0.20.0-26.2"]);
+        assert!(!world.downloader.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_failed_loader_install_stops_before_any_download() {
+        let mut world = World::new().await.with_fabric().await;
+        world.loaders.failure = Some(LoaderInstallError::Network("offline".into()));
+        let result = install_instance(
+            &id(),
+            &world.deps(),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert_eq!(
+            result,
+            Err(InstallError::Loader(LoaderInstallError::Network(
+                "offline".into()
+            )))
+        );
+        assert!(world.downloader.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn refuses_a_library_without_a_checksum() {
+        let mut world = World::new().await;
+        let spec = world.versions.versions.get_mut("26.2").unwrap();
+        let library = spec
+            .libraries
+            .iter_mut()
+            .find_map(|library| library.artifact.as_mut())
+            .unwrap();
+        library.checksum = None;
+        let path = library.path.as_str().to_owned();
+
+        let result = install_instance(
+            &id(),
+            &world.deps(),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await;
+
+        assert_eq!(result, Err(InstallError::UnverifiedLibrary(path)));
+        assert!(
+            world.downloader.requests().is_empty(),
+            "nothing unverified is fetched"
+        );
     }
 }

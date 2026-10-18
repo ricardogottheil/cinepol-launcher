@@ -15,7 +15,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -48,6 +48,8 @@ export type GameVersionDto = { id: string,
 kind: string, releaseTime: string, };
 
 export type GameVersionsDto = { latestRelease: string, versions: Array<GameVersionDto>, };
+
+export type LoaderReleaseDto = { version: string, stable: boolean, };
 
 export type InstanceOriginDto = "custom" | "cinepolServer" | "modpack";
 
@@ -94,7 +96,8 @@ export interface Commands {
   set_active_account: { args: { accountId: string }; result: null };
   list_game_versions: { args: { includeSnapshots: boolean }; result: GameVersionsDto };
   list_instances: { args: Record<string, never>; result: Array<InstanceDto> };
-  create_instance: { args: { name: string; gameVersion: string }; result: InstanceDto };
+  list_loader_versions: { args: { loader: string; gameVersion: string }; result: Array<LoaderReleaseDto> };
+  create_instance: { args: { name: string; gameVersion: string; loader: string; loaderVersion: string | null }; result: InstanceDto };
   install_instance: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: InstallSummaryDto };
   launch_instance: { args: { instanceId: string; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
   kill_instance: { args: { instanceId: string }; result: boolean };

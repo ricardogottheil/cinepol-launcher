@@ -19,6 +19,7 @@ use crate::domain::java::JavaRuntimeProvider;
 use crate::domain::launch::{
     GameProcessRunner, LogSink, NativesExtractor, RunningGames, VersionSource,
 };
+use crate::domain::loader::LoaderInstaller;
 use crate::domain::ports::{
     Clock, Downloader, FileSystem, ProgressReporter, ProgressStage, ProgressUpdate,
 };
@@ -50,11 +51,11 @@ pub struct CinepolSession {
 /// session never moves or reinstalls an instance that is already running, and
 /// stopping the instance from elsewhere stops this session.
 #[allow(clippy::too_many_arguments)]
-pub async fn play_on_cinepol<I, A, V, D, J, N, P, C, F, Q, S, G, R, L>(
+pub async fn play_on_cinepol<I, A, V, D, J, O, N, P, C, F, Q, S, G, R, L>(
     config: &ServerConfig,
     servers: &S,
     games: &G,
-    install: &InstallDeps<'_, I, V, D, J>,
+    install: &InstallDeps<'_, I, V, D, J, O>,
     launch: &LaunchDeps<'_, I, A, V, J, N, P, C, F, Q>,
     reporter: &R,
     logs: L,
@@ -67,6 +68,7 @@ where
     V: VersionSource,
     D: Downloader,
     J: JavaRuntimeProvider,
+    O: LoaderInstaller,
     N: NativesExtractor,
     P: GameProcessRunner,
     C: Clock,
@@ -227,6 +229,7 @@ mod tests {
                 java: &self.java,
                 paths: &self.paths,
                 platform: &self.platform,
+                loaders: &crate::testing::FakeLoaderInstaller::default(),
             };
             let launch = LaunchDeps {
                 instances: &self.instances,

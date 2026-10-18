@@ -53,6 +53,7 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::accounts::get_account_skin,
             commands::accounts::set_active_account,
             commands::versions::list_game_versions,
+            commands::versions::list_loader_versions,
             commands::instances::list_instances,
             commands::instances::create_instance,
             commands::instances::install_instance,

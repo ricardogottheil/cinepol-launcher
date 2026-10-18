@@ -6,6 +6,7 @@ use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::launch_instance::LaunchError;
+use launcher_core::application::list_loader_versions::ListLoaderVersionsError;
 use launcher_core::application::login_microsoft::LoginError;
 use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
@@ -15,6 +16,7 @@ use launcher_core::domain::account::AuthError;
 use launcher_core::domain::instance::InstanceRepositoryError;
 use launcher_core::domain::java::JavaRuntimeError;
 use launcher_core::domain::launch::VersionSourceError;
+use launcher_core::domain::loader::{LoaderInstallError, LoaderMetadataError};
 use launcher_core::domain::ports::DownloadError;
 use serde::Serialize;
 use ts_rs::TS;
@@ -45,6 +47,11 @@ pub enum ErrorCode {
     KeychainUnavailable,
     /// This build has no `MSA_CLIENT_ID`, so it cannot sign in with Microsoft.
     MicrosoftNotConfigured,
+    /// The loader (or that loader version) does not exist for the game version,
+    /// or this launcher cannot install it yet.
+    LoaderUnavailable,
+    /// A file declares no checksum, so it is never downloaded or launched.
+    UnverifiedFile,
     Internal,
 }
 
@@ -158,6 +165,32 @@ fn java_code(error: &JavaRuntimeError) -> ErrorCode {
     }
 }
 
+/// The code a loader install failure is reported with.
+fn loader_code(error: &LoaderInstallError) -> ErrorCode {
+    match error {
+        LoaderInstallError::UnsupportedGameVersion(..)
+        | LoaderInstallError::UnknownLoaderVersion(..)
+        | LoaderInstallError::UnsupportedLoader(_) => ErrorCode::LoaderUnavailable,
+        LoaderInstallError::Network(_) => ErrorCode::Network,
+        LoaderInstallError::Invalid(_) | LoaderInstallError::Storage(_) => ErrorCode::Internal,
+    }
+}
+
+impl From<ListLoaderVersionsError> for AppError {
+    fn from(error: ListLoaderVersionsError) -> Self {
+        let code = match &error {
+            ListLoaderVersionsError::InvalidGameVersion(_) => ErrorCode::InvalidInput,
+            ListLoaderVersionsError::Metadata(LoaderMetadataError::UnsupportedGameVersion(..)) => {
+                ErrorCode::LoaderUnavailable
+            }
+            ListLoaderVersionsError::Metadata(LoaderMetadataError::Network(_)) => {
+                ErrorCode::Network
+            }
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
 impl From<InstallError> for AppError {
     fn from(error: InstallError) -> Self {
         let code = match &error {
@@ -169,6 +202,8 @@ impl From<InstallError> for AppError {
             InstallError::Download(DownloadError::Io { .. }) => ErrorCode::Internal,
             InstallError::Download(_) => ErrorCode::Network,
             InstallError::Java(java) => java_code(java),
+            InstallError::Loader(loader) => loader_code(loader),
+            InstallError::UnverifiedLibrary(_) => ErrorCode::UnverifiedFile,
             InstallError::Cancelled => ErrorCode::Cancelled,
         };
         Self::new(code, error.to_string())
@@ -205,6 +240,7 @@ impl From<LaunchError> for AppError {
             LaunchError::Instance(InstanceRepositoryError::NotFound(_)) => ErrorCode::NotFound,
             LaunchError::NoAccount => ErrorCode::NoAccount,
             LaunchError::Session(session) => session_code(session),
+            LaunchError::UnsupportedLoader(_) => ErrorCode::LoaderUnavailable,
             LaunchError::Version(VersionSourceError::Network(_)) => ErrorCode::Network,
             LaunchError::NotInstalled(_) => ErrorCode::NotInstalled,
             LaunchError::Java(java) => java_code(java),

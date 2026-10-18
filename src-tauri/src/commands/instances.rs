@@ -6,7 +6,7 @@ use launcher_core::application::launch_instance::{
 use launcher_core::application::list_instances::list_instances as list;
 use launcher_core::application::prepare_cinepol_instance::cinepol_server_entry;
 use launcher_core::domain::instance::InstanceOrigin;
-use launcher_core::domain::loader::LoaderSpec;
+use launcher_core::domain::loader::{LoaderKind, LoaderSpec, LoaderVersion};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
@@ -27,18 +27,21 @@ pub async fn list_instances(state: State<'_, AppState>) -> Result<Vec<InstanceDt
         .collect())
 }
 
-/// Creates a vanilla instance with CINEPOL first in its server list;
-/// loaders arrive in Milestones 8 and 9.
+/// Creates an instance with CINEPOL first in its server list. `loader` is
+/// `vanilla`, `fabric` or `quilt`; the last two need a `loader_version`.
 #[tauri::command]
 pub async fn create_instance(
     state: State<'_, AppState>,
     name: String,
     game_version: String,
+    loader: String,
+    loader_version: Option<String>,
 ) -> Result<InstanceDto, AppError> {
+    let loader = parse_loader(&loader, loader_version.as_deref())?;
     let request = NewInstance {
         name: &name,
         game_version: &game_version,
-        loader: LoaderSpec::vanilla(),
+        loader,
         origin: InstanceOrigin::Custom,
         seed_server: Some(cinepol_server_entry(&state.current_config())),
     };
@@ -73,6 +76,7 @@ pub async fn install_instance(
         java: &state.java,
         paths: &state.paths,
         platform: &state.platform,
+        loaders: &state.loaders,
     };
     let result = install(&id, &deps, &ChannelReporter::new(on_progress), &token).await;
     state.operations.finish(&operation_id);
@@ -127,4 +131,21 @@ pub async fn launch_instance(
 pub fn kill_instance(state: State<'_, AppState>, instance_id: String) -> Result<bool, AppError> {
     let id = parse_instance_id(&instance_id)?;
     Ok(state.games.cancel(id.as_str()))
+}
+
+/// Validates a loader choice from the UI; Forge and NeoForge arrive later.
+fn parse_loader(kind: &str, version: Option<&str>) -> Result<LoaderSpec, AppError> {
+    let kind = LoaderKind::from_id(kind)
+        .filter(|kind| {
+            matches!(
+                kind,
+                LoaderKind::Vanilla | LoaderKind::Fabric | LoaderKind::Quilt
+            )
+        })
+        .ok_or_else(|| AppError::invalid_input(format!("unsupported loader {kind:?}")))?;
+    let version = version
+        .map(|raw| LoaderVersion::parse(raw.trim()))
+        .transpose()
+        .map_err(|error| AppError::invalid_input(error.to_string()))?;
+    LoaderSpec::new(kind, version).map_err(|error| AppError::invalid_input(error.to_string()))
 }

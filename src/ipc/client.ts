@@ -15,6 +15,7 @@ import type {
   InstallSummaryDto,
   InstanceDto,
   LaunchOutcomeDto,
+  LoaderReleaseDto,
   LogLineDto,
   PremiumNameDto,
   ProgressEvent,
@@ -42,6 +43,7 @@ export type {
   InstallSummaryDto,
   InstanceDto,
   LaunchOutcomeDto,
+  LoaderReleaseDto,
   LogLineDto,
   PremiumNameDto,
   ProgressEvent,
@@ -74,6 +76,8 @@ const BACKEND_CODES = {
   app_not_approved: true,
   keychain_unavailable: true,
   microsoft_not_configured: true,
+  loader_unavailable: true,
+  unverified_file: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -230,8 +234,27 @@ export function listInstances(): Promise<InstanceDto[]> {
   return call("list_instances");
 }
 
-export function createInstance(name: string, gameVersion: string): Promise<InstanceDto> {
-  return call("create_instance", { name, gameVersion });
+/** Loaders an instance can be created with in this version of the launcher. */
+export type InstanceLoader = "vanilla" | "fabric" | "quilt";
+
+export interface NewInstanceRequest {
+  name: string;
+  gameVersion: string;
+  loader: InstanceLoader;
+  /** Required for Fabric and Quilt, `null` for vanilla. */
+  loaderVersion: string | null;
+}
+
+export function createInstance(request: NewInstanceRequest): Promise<InstanceDto> {
+  return call("create_instance", { ...request });
+}
+
+/** A loader's releases for a game version, newest first. */
+export function listLoaderVersions(
+  loader: Exclude<InstanceLoader, "vanilla">,
+  gameVersion: string,
+): Promise<LoaderReleaseDto[]> {
+  return call("list_loader_versions", { loader, gameVersion });
 }
 
 export function installInstance(

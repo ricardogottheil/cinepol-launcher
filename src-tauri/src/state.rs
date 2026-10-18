@@ -18,6 +18,7 @@ use launcher_core::infrastructure::fs::{
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
 use launcher_core::infrastructure::keychain::KeyringSecretStore;
+use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadata};
 use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
 use launcher_core::infrastructure::msa::MsaClient;
 use launcher_core::infrastructure::nbt::NbtServerListStore;
@@ -85,6 +86,10 @@ pub struct AppState {
     pub msa: Option<MsaClient<ReqwestHttpClient>>,
     /// Account tokens, in the OS keychain only.
     pub secrets: KeyringSecretStore,
+    /// Fabric and Quilt profiles, stored next to the vanilla version JSONs.
+    pub loaders: LoaderInstallers<ReqwestHttpClient>,
+    pub fabric_releases: MetaLoaderMetadata<ReqwestHttpClient>,
+    pub quilt_releases: MetaLoaderMetadata<ReqwestHttpClient>,
     pub config_source: HttpServerConfigSource<ReqwestHttpClient>,
     pub settings: JsonSettingsRepository,
     pub bundled_config: ServerConfig,
@@ -143,6 +148,9 @@ impl AppState {
             premium_names: MojangPremiumNames::new(http.clone()),
             msa: msa_client_id().map(|client_id| MsaClient::new(http.clone(), client_id)),
             secrets: KeyringSecretStore::new(KEYCHAIN_SERVICE),
+            loaders: LoaderInstallers::new(http.clone(), paths.clone()),
+            fabric_releases: MetaLoaderMetadata::fabric(http.clone()),
+            quilt_releases: MetaLoaderMetadata::quilt(http.clone()),
             current_config: RwLock::new(bundled_config.clone()),
             bundled_config,
             java: ManagedJavaRuntimes::new(

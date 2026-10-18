@@ -10,6 +10,7 @@ use launcher_core::domain::account::{Account, AccountKind};
 use launcher_core::domain::account::{DeviceCode, SkinVariant};
 use launcher_core::domain::instance::{Instance, InstanceOrigin};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
+use launcher_core::domain::loader::LoaderRelease;
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
 use serde::Serialize;
 use ts_rs::TS;
@@ -218,6 +219,23 @@ impl From<&VersionSummary> for GameVersionDto {
 pub struct GameVersionsDto {
     pub latest_release: String,
     pub versions: Vec<GameVersionDto>,
+}
+
+/// One loader release offered for a game version.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct LoaderReleaseDto {
+    pub version: String,
+    pub stable: bool,
+}
+
+impl From<&LoaderRelease> for LoaderReleaseDto {
+    fn from(release: &LoaderRelease) -> Self {
+        Self {
+            version: release.version.as_str().to_owned(),
+            stable: release.stable,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]

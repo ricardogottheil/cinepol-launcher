@@ -14,6 +14,7 @@ pub mod launch_instance;
 pub mod list_accounts;
 pub mod list_game_versions;
 pub mod list_instances;
+pub mod list_loader_versions;
 pub mod load_server_config;
 pub mod login_microsoft;
 pub mod play_on_cinepol;
