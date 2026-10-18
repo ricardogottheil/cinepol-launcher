@@ -539,4 +539,72 @@ mod tests {
         assert_eq!(result, Err(UpdateModpackError::Cancelled));
         assert_eq!(world.downloader.requests().len(), downloads);
     }
+
+    /// Lets the pack download through, then writes one file of the next batch and fails.
+    struct InterruptedDownloader<'a> {
+        inner: &'a crate::testing::FakeDownloader,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::domain::ports::Downloader for InterruptedDownloader<'_> {
+        async fn download_all<R: crate::domain::ports::ProgressReporter>(
+            &self,
+            requests: Vec<crate::domain::ports::DownloadRequest>,
+            reporter: &R,
+            cancel: &CancellationToken,
+        ) -> Result<crate::domain::ports::DownloadSummary, crate::domain::ports::DownloadError>
+        {
+            if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                return self.inner.download_all(requests, reporter, cancel).await;
+            }
+            let first = requests.into_iter().take(1).collect();
+            self.inner.download_all(first, reporter, cancel).await?;
+            Err(crate::domain::ports::DownloadError::Http {
+                url: "https://cdn.modrinth.com/next".into(),
+                reason: "connection reset".into(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn an_interrupted_download_leaves_the_game_folder_untouched() {
+        let world = world();
+        install_catalog(&world, "v1").await;
+        let id = InstanceId::parse(ID).unwrap();
+        let before = world.manifests.manifests.lock().unwrap()[&id].clone();
+        let downloader = InterruptedDownloader {
+            inner: &world.downloader,
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        };
+
+        let result = update_modpack(
+            &id,
+            newest(),
+            &deps(&world, &downloader),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await;
+
+        assert!(matches!(result, Err(UpdateModpackError::Pack(_))));
+        for path in ["mods/sodium.jar", "config/sodium.json"] {
+            assert_eq!(
+                world.read_game_file(ID, path).unwrap(),
+                content("v1", path),
+                "{path}"
+            );
+        }
+        assert_eq!(world.read_game_file(ID, "mods/new.jar"), None);
+        assert_eq!(world.manifests.manifests.lock().unwrap()[&id], before);
+        assert_eq!(
+            world
+                .instances
+                .get(&id)
+                .await
+                .unwrap()
+                .game_version
+                .as_str(),
+            "26.2"
+        );
+    }
 }

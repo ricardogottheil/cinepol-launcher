@@ -170,7 +170,12 @@ where
         return Err(PackSyncError::Cancelled);
     }
     deps.fs.create_dir_all(staging).await?;
-    let staged = deps.archive.extract_overrides(archive, staging).await?;
+    let overrides_dir = staging.join("overrides");
+    let downloads_dir = staging.join("downloads");
+    let staged = deps
+        .archive
+        .extract_overrides(archive, &overrides_dir)
+        .await?;
 
     // Overrides come last: one at the same path as an index file replaces it.
     let mut sources: BTreeMap<&RelativePath, Source<'_>> = BTreeMap::new();
@@ -203,12 +208,17 @@ where
         return Err(PackSyncError::Cancelled);
     }
 
+    // Everything is downloaded into staging first: an interrupted download
+    // leaves the game folder as it was, and only local moves follow.
     let mut downloads = Vec::new();
-    let mut placements = Vec::new();
+    let mut placements: Vec<(PathBuf, &RelativePath)> = Vec::new();
     for path in &plan.write {
         match sources.get(path) {
-            Some(Source::Index(file)) => downloads.push(download_request(file, &game_dir)?),
-            Some(Source::Override(file)) => placements.push(*file),
+            Some(Source::Index(file)) => {
+                downloads.push(download_request(file, &downloads_dir)?);
+                placements.push((path.under(&downloads_dir), path));
+            }
+            Some(Source::Override(file)) => placements.push((file.staged.clone(), path)),
             // `plan_sync` only writes incoming paths, which all have a source.
             None => {}
         }
@@ -223,10 +233,8 @@ where
     if cancel.is_cancelled() {
         return Err(PackSyncError::Cancelled);
     }
-    for file in placements {
-        deps.files
-            .place(&file.staged, &file.path.under(&game_dir))
-            .await?;
+    for (from, path) in placements {
+        deps.files.place(&from, &path.under(&game_dir)).await?;
     }
     for path in &plan.remove {
         deps.files.remove_file(&path.under(&game_dir)).await?;

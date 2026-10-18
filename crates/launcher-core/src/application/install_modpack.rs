@@ -321,13 +321,22 @@ mod tests {
             .iter()
             .map(|request| request.destination.clone())
             .collect();
-        assert_eq!(
-            downloaded,
-            [
-                world.game_file(ID, "mods/sodium.jar"),
-                world.game_file(ID, "mods/zoomify.jar"),
-            ]
-        );
+        // They land in the launcher's temp folder first, then move into the game folder.
+        assert_eq!(downloaded.len(), 2);
+        for (destination, path) in downloaded
+            .iter()
+            .zip(["mods/sodium.jar", "mods/zoomify.jar"])
+        {
+            assert!(
+                destination.starts_with(world.paths.temp_dir()),
+                "{destination:?}"
+            );
+            assert!(destination.ends_with(path), "{destination:?}");
+            assert_eq!(
+                world.read_game_file(ID, path).unwrap(),
+                url("v1", path).into_bytes()
+            );
+        }
         let sodium = url("v1", "mods/sodium.jar");
         assert_eq!(requests[0].url, sodium);
         assert_eq!(
