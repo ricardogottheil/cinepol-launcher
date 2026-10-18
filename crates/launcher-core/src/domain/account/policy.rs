@@ -39,7 +39,10 @@ mod tests {
     fn premium(name: &str) -> Account {
         Account {
             id: AccountId::new_random(),
-            kind: AccountKind::Microsoft,
+            kind: AccountKind::Microsoft(crate::domain::account::MicrosoftAccount {
+                xuid: "2535".into(),
+                skin: None,
+            }),
             username: Username::parse(name).unwrap(),
             profile_uuid: Uuid::new_v4(),
         }

@@ -9,10 +9,12 @@ use uuid::Uuid;
 
 use super::write_atomic;
 use crate::domain::account::{
-    Account, AccountId, AccountKind, AccountRepository, AccountRepositoryError, Username,
+    Account, AccountId, AccountKind, AccountRepository, AccountRepositoryError, MicrosoftAccount,
+    Skin, SkinUrl, SkinVariant, Username,
 };
 
-const SCHEMA_VERSION: u32 = 1;
+/// 2 added the Microsoft fields (`xuid`, `skin`); version 1 files still load.
+const SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -32,19 +34,39 @@ struct AccountRecord {
     kind: String,
     username: String,
     profile_uuid: Uuid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    xuid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    skin: Option<SkinRecord>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SkinRecord {
+    url: String,
+    slim: bool,
 }
 
 impl From<&Account> for AccountRecord {
     fn from(account: &Account) -> Self {
+        let (kind, xuid, skin) = match &account.kind {
+            AccountKind::Microsoft(microsoft) => (
+                "microsoft",
+                Some(microsoft.xuid.clone()),
+                microsoft.skin.as_ref().map(|skin| SkinRecord {
+                    url: skin.url.as_str().to_owned(),
+                    slim: skin.variant == SkinVariant::Slim,
+                }),
+            ),
+            AccountKind::Offline => ("offline", None, None),
+        };
         Self {
             id: account.id.as_uuid(),
-            kind: match account.kind {
-                AccountKind::Microsoft => "microsoft",
-                AccountKind::Offline => "offline",
-            }
-            .to_owned(),
+            kind: kind.to_owned(),
             username: account.username.to_string(),
             profile_uuid: account.profile_uuid,
+            xuid,
+            skin,
         }
     }
 }
@@ -52,7 +74,22 @@ impl From<&Account> for AccountRecord {
 impl AccountRecord {
     fn into_account(self) -> Option<Account> {
         let kind = match self.kind.as_str() {
-            "microsoft" => AccountKind::Microsoft,
+            // A Microsoft account without its xuid predates sign-in support:
+            // drop it rather than launch with an incomplete identity.
+            "microsoft" => AccountKind::Microsoft(MicrosoftAccount {
+                xuid: self.xuid?,
+                // An unusable skin link only loses the preview.
+                skin: self.skin.and_then(|skin| {
+                    Some(Skin {
+                        url: SkinUrl::parse(&skin.url).ok()?,
+                        variant: if skin.slim {
+                            SkinVariant::Slim
+                        } else {
+                            SkinVariant::Classic
+                        },
+                    })
+                }),
+            }),
             "offline" => AccountKind::Offline,
             _ => return None,
         };
@@ -175,6 +212,7 @@ impl AccountRepository for JsonAccountRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::account::{Skin, SkinUrl, SkinVariant};
 
     #[tokio::test]
     async fn round_trips_accounts_and_the_active_selection() {
@@ -201,6 +239,45 @@ mod tests {
             "removing the active account clears the selection"
         );
         assert_eq!(reopened.list().await.unwrap(), vec![steve]);
+    }
+
+    #[tokio::test]
+    async fn round_trips_microsoft_accounts_and_reads_version_1_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("accounts.json");
+        let profile = crate::domain::account::MinecraftProfile {
+            id: Uuid::from_u128(7),
+            name: Username::parse("Polispol1").unwrap(),
+            skin: Some(Skin {
+                url: SkinUrl::parse("http://textures.minecraft.net/texture/abc123").unwrap(),
+                variant: SkinVariant::Slim,
+            }),
+        };
+        let premium = Account::microsoft(AccountId::new_random(), &profile, "2535428");
+        let repo = JsonAccountRepository::new(&file);
+        repo.save(&premium).await.unwrap();
+        assert_eq!(
+            JsonAccountRepository::new(&file).list().await.unwrap(),
+            [premium]
+        );
+
+        let offline_id = Uuid::from_u128(1);
+        let version_1 = format!(
+            r#"{{"schemaVersion":1,"active":null,"accounts":[
+                {{"id":"{offline_id}","kind":"offline","username":"Steve","profileUuid":"{}"}},
+                {{"id":"{}","kind":"microsoft","username":"Old","profileUuid":"{}"}}]}}"#,
+            Uuid::from_u128(2),
+            Uuid::from_u128(3),
+            Uuid::from_u128(4)
+        );
+        std::fs::write(&file, version_1).unwrap();
+        let loaded = JsonAccountRepository::new(&file).list().await.unwrap();
+        assert_eq!(
+            loaded.len(),
+            1,
+            "a Microsoft entry without its xuid is dropped"
+        );
+        assert_eq!(loaded[0].id.as_uuid(), offline_id);
     }
 
     #[tokio::test]

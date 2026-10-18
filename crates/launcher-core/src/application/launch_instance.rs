@@ -6,7 +6,7 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
-use crate::domain::account::{AccountId, AccountKind, AccountRepository, AccountRepositoryError};
+use crate::domain::account::{AccountId, AccountRepository, AccountRepositoryError};
 use crate::domain::instance::{
     InstanceId, InstanceRepository, InstanceRepositoryError, JavaSelection,
 };
@@ -117,7 +117,7 @@ where
         .into_iter()
         .find(|account| account.id == account_id)
         .ok_or(LaunchError::NoAccount)?;
-    if account.kind == AccountKind::Microsoft {
+    if account.is_premium() {
         return Err(LaunchError::PremiumSessionUnavailable);
     }
 
@@ -251,7 +251,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::domain::account::{Account, Username};
+    use crate::domain::account::{Account, AccountKind, Username};
     use crate::domain::instance::{GameVersion, Instance, InstanceName, InstanceOrigin};
     use crate::domain::java::{JavaRuntime, JavaSource, JavaVersion};
     use crate::domain::launch::{Arch, LogStream, OsName, VersionManifest};
@@ -461,7 +461,10 @@ mod tests {
 
         let mut premium = world.account.clone();
         premium.id = AccountId::new_random();
-        premium.kind = AccountKind::Microsoft;
+        premium.kind = AccountKind::Microsoft(crate::domain::account::MicrosoftAccount {
+            xuid: "2535".into(),
+            skin: None,
+        });
         world.accounts.save(&premium).await.unwrap();
         let with_premium = LaunchRequest {
             account: Some(premium.id),

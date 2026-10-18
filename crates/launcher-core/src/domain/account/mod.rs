@@ -2,11 +2,17 @@
 //!
 //! Tokens never live in these types; they go to the `SecretStore` port.
 
+mod microsoft;
 mod offline_uuid;
 mod policy;
 mod ports;
 mod username;
 
+pub use microsoft::{
+    AuthError, DeviceCode, DevicePoll, MicrosoftAccount, MicrosoftAuth, MinecraftLogin,
+    MinecraftProfile, MinecraftToken, MsaTokens, Skin, SkinUrl, SkinUrlError, SkinVariant,
+    StoredMinecraftToken, minecraft_token_key, refresh_token_key,
+};
 pub use offline_uuid::offline_uuid;
 pub use policy::{OfflinePolicy, OfflinePolicyError};
 pub use ports::{AccountRepository, AccountRepositoryError, PremiumNameLookupError, PremiumNames};
@@ -36,7 +42,7 @@ impl AccountId {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccountKind {
     /// Signed in with a Microsoft account that owns Minecraft.
-    Microsoft,
+    Microsoft(MicrosoftAccount),
     /// Username-only profile with a vanilla offline UUID.
     Offline,
 }
@@ -63,7 +69,20 @@ impl Account {
         }
     }
 
+    /// A signed-in Microsoft account; its UUID and name come from the profile.
+    pub fn microsoft(id: AccountId, profile: &MinecraftProfile, xuid: impl Into<String>) -> Self {
+        Self {
+            id,
+            kind: AccountKind::Microsoft(MicrosoftAccount {
+                xuid: xuid.into(),
+                skin: profile.skin.clone(),
+            }),
+            username: profile.name.clone(),
+            profile_uuid: profile.id,
+        }
+    }
+
     pub fn is_premium(&self) -> bool {
-        self.kind == AccountKind::Microsoft
+        matches!(self.kind, AccountKind::Microsoft(_))
     }
 }

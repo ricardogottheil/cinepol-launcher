@@ -24,8 +24,11 @@ use crate::domain::ports::{
 use crate::domain::server_list::{ServerList, ServerListStore, ServerListStoreError};
 use tokio_util::sync::CancellationToken;
 
+mod auth;
 mod launch;
 mod server;
+
+pub use auth::{FakeMicrosoftAuth, sample_profile, tokens};
 pub use launch::{
     FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, InMemoryRunningGames,
     RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,
@@ -479,6 +482,52 @@ impl crate::domain::account::PremiumNames for FakePremiumNames {
             ));
         }
         Ok(self.premium.contains(&name.as_str().to_ascii_lowercase()))
+    }
+}
+
+/// Answers scripted responses in order per URL and records every request.
+#[derive(Debug, Default)]
+pub struct FakeHttpRequester {
+    replies: Mutex<HashMap<String, std::collections::VecDeque<crate::domain::ports::HttpResponse>>>,
+    requests: Mutex<Vec<crate::domain::ports::HttpRequest>>,
+}
+
+impl FakeHttpRequester {
+    /// Queues an answer for `url`; several answers are given in order.
+    pub fn reply(self, url: &str, status: u16, body: impl Into<Vec<u8>>) -> Self {
+        self.replies
+            .lock()
+            .unwrap()
+            .entry(url.to_owned())
+            .or_default()
+            .push_back(crate::domain::ports::HttpResponse {
+                status,
+                body: body.into(),
+            });
+        self
+    }
+
+    pub fn requests(&self) -> Vec<crate::domain::ports::HttpRequest> {
+        self.requests.lock().unwrap().clone()
+    }
+}
+
+impl crate::domain::ports::HttpRequester for FakeHttpRequester {
+    async fn send(
+        &self,
+        request: crate::domain::ports::HttpRequest,
+    ) -> Result<crate::domain::ports::HttpResponse, HttpError> {
+        let url = request.url.clone();
+        self.requests.lock().unwrap().push(request);
+        self.replies
+            .lock()
+            .unwrap()
+            .get_mut(&url)
+            .and_then(std::collections::VecDeque::pop_front)
+            .ok_or(HttpError::Network {
+                url,
+                reason: "no scripted reply".into(),
+            })
     }
 }
 

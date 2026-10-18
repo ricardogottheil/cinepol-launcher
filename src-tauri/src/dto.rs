@@ -124,7 +124,7 @@ impl From<&Account> for AccountDto {
         Self {
             id: account.id.as_uuid().to_string(),
             kind: match account.kind {
-                AccountKind::Microsoft => AccountKindDto::Microsoft,
+                AccountKind::Microsoft(_) => AccountKindDto::Microsoft,
                 AccountKind::Offline => AccountKindDto::Offline,
             },
             username: account.username.to_string(),
