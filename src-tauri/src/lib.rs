@@ -33,6 +33,7 @@ pub fn run() -> Result<(), tauri::Error> {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().data_dir()?.join(DATA_DIR_NAME);
             let version = app.package_info().version.to_string();

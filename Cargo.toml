@@ -34,6 +34,8 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 tempfile = "3.27.0"
 fastnbt = "2.6.3"
 tauri-plugin-opener = "2.7.2"
+# Pinned: native file pickers for .mrpack import and export, opened from Rust only.
+tauri-plugin-dialog = "=2.8.0"
 hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "system-config"] }
 base64 = "0.22.1"
 # `v1` selects the native stores: macOS Keychain, Windows Credential Manager, Linux Secret Service.
