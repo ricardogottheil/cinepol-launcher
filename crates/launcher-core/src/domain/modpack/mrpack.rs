@@ -169,7 +169,8 @@ impl MrpackIndex {
         let mut files = Vec::with_capacity(raw.files.len());
         for file in raw.files {
             let file = validate_file(file)?;
-            if !seen.insert(file.path.clone()) {
+            // Folders on macOS and Windows ignore case: `A.jar` and `a.jar` are one file.
+            if !seen.insert(file.path.as_str().to_lowercase()) {
                 return Err(MrpackError::DuplicatePath(file.path.to_string()));
             }
             files.push(file);
@@ -460,6 +461,15 @@ mod tests {
         assert_eq!(
             MrpackIndex::validate(fabric_index(vec![file("mods/a.jar"), file("mods/a.jar")])),
             Err(MrpackError::DuplicatePath("mods/a.jar".into()))
+        );
+    }
+
+    #[test]
+    fn rejects_paths_that_only_differ_in_case() {
+        // macOS and Windows folders ignore case, so both would be one file.
+        assert_eq!(
+            MrpackIndex::validate(fabric_index(vec![file("mods/A.jar"), file("Mods/a.jar")])),
+            Err(MrpackError::DuplicatePath("Mods/a.jar".into()))
         );
     }
 

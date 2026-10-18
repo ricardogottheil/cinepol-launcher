@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::domain::integrity::Checksum;
 use crate::domain::launch::RelativePath;
 
-use super::mrpack::{EnvSupport, MrpackFile, is_exportable};
+use super::mrpack::{EnvSupport, MrpackFile, is_allowed_download, is_exportable};
 
 /// The files a pack installed into an instance, by path, with their sha1 (lowercase hex).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -110,16 +110,21 @@ pub struct ExportPlan {
 pub fn plan_export(local: &[LocalFile], known: &HashMap<String, Vec<String>>) -> ExportPlan {
     let mut plan = ExportPlan::default();
     for file in local.iter().filter(|file| is_exportable(&file.path)) {
-        match known
+        // Only hosts an import accepts, or the exported pack would not install.
+        let urls: Vec<String> = known
             .get(file.sha512.value())
-            .filter(|urls| !urls.is_empty())
-        {
+            .into_iter()
+            .flatten()
+            .filter(|url| is_allowed_download(url))
+            .cloned()
+            .collect();
+        match (!urls.is_empty()).then_some(urls) {
             Some(urls) => plan.files.push(MrpackFile {
                 path: file.path.clone(),
                 sha1: file.sha1.clone(),
                 sha512: file.sha512.clone(),
                 size: file.size,
-                downloads: urls.clone(),
+                downloads: urls,
                 client: EnvSupport::Required,
                 server: EnvSupport::Required,
             }),
@@ -262,6 +267,30 @@ mod tests {
                 .unwrap(),
             size: 3,
         }
+    }
+
+    #[test]
+    fn exports_catalog_files_on_disallowed_hosts_as_overrides() {
+        let known = HashMap::from([
+            (
+                "a".repeat(128),
+                vec!["https://evil.example/a.jar".to_owned()],
+            ),
+            (
+                "b".repeat(128),
+                vec![
+                    "https://evil.example/b.jar".to_owned(),
+                    "https://cdn.modrinth.com/b.jar".to_owned(),
+                ],
+            ),
+        ]);
+        let plan = plan_export(
+            &[local("mods/a.jar", 'a'), local("mods/b.jar", 'b')],
+            &known,
+        );
+        assert_eq!(paths(&plan.overrides), ["mods/a.jar"]);
+        assert_eq!(plan.files.len(), 1);
+        assert_eq!(plan.files[0].downloads, ["https://cdn.modrinth.com/b.jar"]);
     }
 
     #[test]
