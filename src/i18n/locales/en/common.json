@@ -57,7 +57,8 @@
     },
     "session": {
       "playing": "Playing"
-    }
+    },
+    "signInAgain": "Sign in again"
   },
   "placeholder": {
     "notAvailable": "This section is not available yet."
@@ -141,7 +142,24 @@
     "usernameLabel": "Username",
     "create": "Add account",
     "loading": "Loading accounts",
-    "premiumNameWarning": "This name belongs to a premium account; the server will ask you to sign in with Microsoft."
+    "premiumNameWarning": "This name belongs to a premium account; the server will ask you to sign in with Microsoft.",
+    "microsoftTitle": "Microsoft account",
+    "microsoftHint": "Sign in with the Microsoft account that owns Minecraft: Java Edition.",
+    "microsoftSignIn": "Sign in with Microsoft",
+    "codeLabel": "Code",
+    "codeInstructions": "Open {{uri}} in your browser and type this code.",
+    "openLink": "Open the page",
+    "copyCode": "Copy code",
+    "waiting": "Waiting for approval",
+    "cancelSignIn": "Cancel",
+    "microsoftUnavailable": "This build of the launcher has no Microsoft sign-in.",
+    "remove": "Remove",
+    "confirmRemove": "Confirm",
+    "keep": "Keep",
+    "offlineRequiresPremium": "Add a Microsoft account first to create profiles without premium.",
+    "skinTitle": "Skin",
+    "skinLabel": "Skin preview of the active account",
+    "skinOffline": "Accounts without premium use the game's default skin."
   },
   "instances": {
     "title": "Instances",

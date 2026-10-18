@@ -101,7 +101,14 @@ function QuickPlay({ recommended }: { recommended: string }) {
       )}
       <p role="status" className="m-0 text-[0.875rem]">
         {error ? (
-          <span className="text-stale">{t(`errors.${error}`)}</span>
+          <>
+            <span className="text-stale">{t(`errors.${error}`)}</span>
+            {error === "session_expired" ? (
+              <Link to="/accounts" className="ml-3 text-silk underline">
+                {t("home.signInAgain")}
+              </Link>
+            ) : null}
+          </>
         ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
           <span className="text-stale">
             {t("instances.exited", { code: lastExit.exitCode ?? "-" })}

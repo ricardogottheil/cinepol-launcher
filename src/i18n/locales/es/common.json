@@ -57,7 +57,8 @@
     },
     "session": {
       "playing": "Jugando"
-    }
+    },
+    "signInAgain": "Volver a iniciar sesión"
   },
   "placeholder": {
     "notAvailable": "Esta sección todavía no está disponible."
@@ -141,7 +142,24 @@
     "usernameLabel": "Nombre de usuario",
     "create": "Añadir cuenta",
     "loading": "Cargando cuentas",
-    "premiumNameWarning": "Este nombre es de una cuenta premium; el servidor te pedirá iniciar sesión con Microsoft."
+    "premiumNameWarning": "Este nombre es de una cuenta premium; el servidor te pedirá iniciar sesión con Microsoft.",
+    "microsoftTitle": "Cuenta de Microsoft",
+    "microsoftHint": "Inicia sesión con la cuenta de Microsoft que tiene Minecraft: Java Edition.",
+    "microsoftSignIn": "Iniciar sesión con Microsoft",
+    "codeLabel": "Código",
+    "codeInstructions": "Abre {{uri}} en tu navegador y escribe este código.",
+    "openLink": "Abrir la página",
+    "copyCode": "Copiar código",
+    "waiting": "Esperando la aprobación",
+    "cancelSignIn": "Cancelar",
+    "microsoftUnavailable": "Esta versión del launcher no incluye inicio de sesión con Microsoft.",
+    "remove": "Quitar",
+    "confirmRemove": "Confirmar",
+    "keep": "Mantener",
+    "offlineRequiresPremium": "Añade primero una cuenta de Microsoft para crear perfiles sin premium.",
+    "skinTitle": "Aspecto",
+    "skinLabel": "Vista previa del aspecto de la cuenta activa",
+    "skinOffline": "Las cuentas sin premium usan el aspecto por defecto del juego."
   },
   "instances": {
     "title": "Instancias",

@@ -3,10 +3,12 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   AccountDto,
+  AccountPolicyDto,
   AccountsDto,
   AppError,
   AppInfo,
   Commands,
+  DeviceCodeDto,
   ErrorCode,
   Events,
   GameVersionsDto,
@@ -21,6 +23,7 @@ import type {
   ServerConfigDto,
   ServerStatusDto,
   SettingsDto,
+  SkinDto,
 } from "./bindings";
 
 /**
@@ -30,8 +33,10 @@ import type {
 
 export type {
   AccountDto,
+  AccountPolicyDto,
   AccountsDto,
   AppInfo,
+  DeviceCodeDto,
   ErrorCode,
   GameVersionsDto,
   InstallSummaryDto,
@@ -45,6 +50,7 @@ export type {
   ServerConfigDto,
   ServerStatusDto,
   SettingsDto,
+  SkinDto,
 };
 
 /** Backend error codes plus the one the client raises on its own. */
@@ -178,6 +184,33 @@ export function listAccounts(): Promise<AccountsDto> {
 
 export function createOfflineAccount(username: string): Promise<AccountDto> {
   return call("create_offline_account", { username });
+}
+
+/** What the Accounts screen may offer in this build. */
+export function getAccountPolicy(): Promise<AccountPolicyDto> {
+  return call("get_account_policy");
+}
+
+/**
+ * Signs in with Microsoft. `onCode` receives the code the player types at the
+ * shown address; cancel the returned operation to stop waiting.
+ */
+export function loginMicrosoft(
+  onCode: (code: DeviceCodeDto) => void,
+): RunningOperation<AccountDto> {
+  return startOperation("login_microsoft", (operationId) =>
+    call("login_microsoft", { operationId, onCode: channel(onCode) }),
+  );
+}
+
+/** Removes an account and its stored tokens. */
+export function removeAccount(accountId: string): Promise<null> {
+  return call("remove_account", { accountId });
+}
+
+/** The account's skin as a data URL, or `null` when it has none. */
+export function getAccountSkin(accountId: string): Promise<SkinDto | null> {
+  return call("get_account_skin", { accountId });
 }
 
 /** Whether a premium account owns the name (`unknown` when the lookup failed). */

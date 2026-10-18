@@ -208,4 +208,23 @@ describe("HomePage", () => {
     const account = await screen.findByText("CinepolTest7319");
     expect(account.closest("dl")).toBe(screen.getByText(serverConfig.server.address).closest("dl"));
   });
+
+  it("asks to sign in again when the Microsoft session expired", async () => {
+    useActivityStore.setState({
+      byInstance: {
+        [CINEPOL_SESSION]: {
+          activity: { kind: "idle" },
+          logs: [],
+          error: "session_expired",
+          lastExit: null,
+        },
+      },
+    });
+    renderHome();
+    expect(await screen.findByText(esCommon.errors.session_expired)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: esCommon.home.signInAgain })).toHaveAttribute(
+      "href",
+      "/accounts",
+    );
+  });
 });
