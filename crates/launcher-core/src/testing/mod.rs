@@ -359,6 +359,37 @@ impl LoaderMetadata for FakeLoaderMetadata {
     }
 }
 
+/// Installs loader profiles by answering their deterministic id, or fails
+/// every install with `failure`; records each install.
+#[derive(Debug, Default)]
+pub struct FakeLoaderInstaller {
+    pub failure: Option<crate::domain::loader::LoaderInstallError>,
+    installed: Mutex<Vec<String>>,
+}
+
+impl FakeLoaderInstaller {
+    /// Profile ids installed so far, in order.
+    pub fn installed(&self) -> Vec<String> {
+        self.installed.lock().unwrap().clone()
+    }
+}
+
+impl crate::domain::loader::LoaderInstaller for FakeLoaderInstaller {
+    async fn install(
+        &self,
+        loader: &crate::domain::loader::LoaderSpec,
+        game: &GameVersion,
+    ) -> Result<crate::domain::launch::VersionId, crate::domain::loader::LoaderInstallError> {
+        if let Some(failure) = &self.failure {
+            return Err(failure.clone());
+        }
+        let id = crate::domain::loader::profile_id(loader, game)
+            .ok_or(crate::domain::loader::LoaderInstallError::UnsupportedLoader(loader.kind()))?;
+        self.installed.lock().unwrap().push(id.as_str().to_owned());
+        Ok(id)
+    }
+}
+
 /// A modpack catalog with one fixed page and per-project versions.
 #[derive(Debug)]
 pub struct FakeModpackSource {

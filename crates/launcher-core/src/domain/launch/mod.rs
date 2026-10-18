@@ -10,6 +10,7 @@ mod platform;
 mod ports;
 mod rules;
 mod version;
+mod version_id;
 
 pub use artifact::{Artifact, ArtifactError, MavenCoordinate, RelativePath};
 pub use assets::{AssetIndex, AssetObject};
@@ -26,3 +27,4 @@ pub use version::{
     ArgumentToken, AssetIndexRef, LegacyNatives, Library, LoggingConfig, VersionKind,
     VersionManifest, VersionSpec, VersionSummary,
 };
+pub use version_id::{VersionId, VersionIdError};

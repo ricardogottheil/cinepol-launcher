@@ -5,11 +5,10 @@ use std::path::Path;
 
 use super::cache::{read_if_present, sha1_hex, write_atomic};
 use super::json::{self, ManifestEntry};
-use crate::domain::instance::GameVersion;
 use crate::domain::integrity::{Checksum, HashAlgorithm};
 use crate::domain::launch::{
-    AssetIndex, AssetIndexRef, LauncherPaths, VersionManifest, VersionSource, VersionSourceError,
-    VersionSpec,
+    AssetIndex, AssetIndexRef, LauncherPaths, VersionId, VersionManifest, VersionSource,
+    VersionSourceError, VersionSpec,
 };
 use crate::domain::ports::{HttpClient, HttpError};
 
@@ -93,7 +92,7 @@ impl<H: HttpClient> MojangVersionSource<H> {
         id: &str,
         manifest: &mut Option<ManifestLookup>,
     ) -> Result<VersionSpec, VersionSourceError> {
-        GameVersion::parse(id)
+        VersionId::parse(id)
             .map_err(|_| VersionSourceError::Invalid(format!("unsafe version id {id:?}")))?;
         let cache = self
             .paths

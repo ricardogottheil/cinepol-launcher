@@ -2,7 +2,9 @@
 
 mod ports;
 
-pub use ports::{LoaderMetadata, LoaderMetadataError};
+pub use ports::{
+    LoaderInstallError, LoaderInstaller, LoaderMetadata, LoaderMetadataError, profile_id,
+};
 
 use std::fmt;
 
