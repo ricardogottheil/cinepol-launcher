@@ -25,10 +25,13 @@ export const useSignInStore = create<SignInState>((set, get) => ({
   signIn: { kind: "idle", error: null },
   start: (onSignedIn) => {
     if (get().signIn.kind !== "idle") return;
-    const operation = loginMicrosoft((code) =>
-      set({ signIn: { kind: "waiting", code, cancel: operation.cancel } }),
-    );
-    set({ signIn: { kind: "starting", cancel: operation.cancel } });
+    // The code may arrive before `loginMicrosoft` returns, so the callback
+    // cancels through this handle instead of the not-yet-assigned operation.
+    const handle = { cancel: async () => false };
+    const cancel = () => handle.cancel();
+    set({ signIn: { kind: "starting", cancel } });
+    const operation = loginMicrosoft((code) => set({ signIn: { kind: "waiting", code, cancel } }));
+    handle.cancel = operation.cancel;
     operation.done.then(
       () => {
         set({ signIn: { kind: "idle", error: null } });
