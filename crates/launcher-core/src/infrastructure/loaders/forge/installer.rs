@@ -103,7 +103,13 @@ impl Target {
             installer_url: format!("{}/{relative}", flavor.repository),
             marker: version_json.with_file_name(MARKER),
             version_json,
-            work_dir: paths.temp_dir().join("loaders").join(id.as_str()),
+            // Unique per run: two instances on the same loader version may
+            // install at the same time.
+            work_dir: paths.temp_dir().join("loaders").join(format!(
+                "{}-{}",
+                id.as_str(),
+                uuid::Uuid::new_v4().simple()
+            )),
             id,
         })
     }
@@ -167,13 +173,14 @@ pub(in crate::infrastructure::loaders) async fn finish<P: ProcessorRunner, R: Pr
 
 // ------------------------------------------------------------ the installer
 
-/// Answers that mean the version does not exist on the maven.
+/// Answers that mean the version does not exist on the maven. Other client
+/// errors (403, 429...) are transient and handled like a network failure.
 fn is_missing(error: &HttpError) -> bool {
     matches!(
         error,
         HttpError::NotFound(_)
             | HttpError::Status {
-                status: 400..=499,
+                status: 404 | 410,
                 ..
             }
     )
@@ -413,7 +420,7 @@ async fn run_processors<P: ProcessorRunner, R: ProgressReporter>(
     let planned = plan_processors(&profile.processors, &profile.data, &processor_environment)
         .map_err(invalid)?;
 
-    let fingerprint = fingerprint(&planned);
+    let fingerprint = fingerprint(&planned, &target.work_dir);
     let marker_matches = tokio::fs::read_to_string(&target.marker)
         .await
         .is_ok_and(|stored| stored.trim() == fingerprint);
@@ -536,7 +543,9 @@ async fn remove_file(path: &Path) -> Result<(), LoaderInstallError> {
 }
 
 /// A sha1 over every planned command, so a changed plan runs again.
-fn fingerprint(planned: &[PlannedProcessor]) -> String {
+/// The scratch directory is unique per run, so it is left out: the same
+/// plan in another run gives the same fingerprint.
+fn fingerprint(planned: &[PlannedProcessor], scratch: &Path) -> String {
     fn feed(hasher: &mut Sha1, tag: &str, value: &str) {
         hasher.update(tag.as_bytes());
         hasher.update(b"\0");
@@ -550,8 +559,9 @@ fn fingerprint(planned: &[PlannedProcessor]) -> String {
         for entry in &processor.classpath {
             feed(&mut hasher, "classpath", &text(entry));
         }
+        let scratch = text(scratch);
         for arg in &processor.args {
-            feed(&mut hasher, "arg", arg);
+            feed(&mut hasher, "arg", &arg.replace(&scratch, "<scratch>"));
         }
         for output in &processor.outputs {
             feed(&mut hasher, "output", &text(&output.path));
@@ -584,4 +594,39 @@ async fn file_sha1(path: &Path) -> io::Result<String> {
     })
     .await
     .map_err(io::Error::other)?
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+    use crate::domain::loader::LoaderVersion;
+
+    #[test]
+    fn only_a_404_or_410_means_the_version_does_not_exist() {
+        let status = |status| HttpError::Status {
+            url: "https://maven.example.test/x".into(),
+            status,
+        };
+        assert!(is_missing(&HttpError::NotFound("x".into())));
+        assert!(is_missing(&status(404)));
+        assert!(is_missing(&status(410)));
+        for transient in [400, 401, 403, 408, 425, 429] {
+            assert!(!is_missing(&status(transient)), "HTTP {transient}");
+        }
+    }
+
+    #[test]
+    fn every_install_gets_its_own_scratch_directory() {
+        let paths = LauncherPaths::new("/data");
+        let loader = LoaderSpec::new(
+            LoaderKind::Forge,
+            Some(LoaderVersion::parse("65.1.0").unwrap()),
+        )
+        .unwrap();
+        let game = GameVersion::parse("26.2").unwrap();
+        let first = Target::new(&paths, &super::super::FORGE, &loader, &game).unwrap();
+        let second = Target::new(&paths, &super::super::FORGE, &loader, &game).unwrap();
+        assert_ne!(first.work_dir, second.work_dir);
+        assert!(first.work_dir.starts_with(paths.temp_dir().join("loaders")));
+    }
 }
