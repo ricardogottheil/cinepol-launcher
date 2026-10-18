@@ -1,15 +1,22 @@
 //! Installs the latest stable Fabric and Quilt profiles for 26.2 from the real
-//! meta APIs and checks that every cached library declares a sha1.
+//! meta APIs and checks that every cached library declares a sha1. Installs
+//! the recommended Forge and the latest stable NeoForge for 26.2 from their
+//! real installers and checks that every tool carries a sha1 (the processors
+//! are not run here).
 //!
 //! Opt-in only: `cargo test -p cinepol-launcher-core --features network-tests --test loaders_network`
 #![cfg(feature = "network-tests")]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use launcher_core::domain::instance::GameVersion;
+use launcher_core::domain::integrity::HashAlgorithm;
 use launcher_core::domain::launch::LauncherPaths;
 use launcher_core::domain::loader::{LoaderInstaller, LoaderMetadata, LoaderSpec};
 use launcher_core::infrastructure::http::ReqwestHttpClient;
-use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadata};
+use launcher_core::infrastructure::loaders::{
+    ForgeLoaderMetadata, LoaderInstallers, MetaLoaderMetadata,
+};
+use launcher_core::infrastructure::process::TokioProcessorRunner;
 use serde_json::Value;
 
 const USER_AGENT: &str =
@@ -17,6 +24,10 @@ const USER_AGENT: &str =
 
 fn http() -> ReqwestHttpClient {
     ReqwestHttpClient::new(USER_AGENT).unwrap()
+}
+
+fn installers(paths: &LauncherPaths) -> LoaderInstallers<ReqwestHttpClient> {
+    LoaderInstallers::new(http(), paths.clone(), TokioProcessorRunner)
 }
 
 async fn install_latest_stable(metadata: impl LoaderMetadata, paths: &LauncherPaths) {
@@ -28,11 +39,7 @@ async fn install_latest_stable(metadata: impl LoaderMetadata, paths: &LauncherPa
         .unwrap_or(&releases[0]);
     let loader = LoaderSpec::new(metadata.kind(), Some(release.version.clone())).unwrap();
 
-    let id = LoaderInstallers::new(http(), paths.clone())
-        .install(&loader, &game)
-        .await
-        .unwrap()
-        .id;
+    let id = installers(paths).install(&loader, &game).await.unwrap().id;
     let path = paths.version_json(id.as_str()).unwrap();
     let profile: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     let libraries = profile["libraries"].as_array().unwrap();
@@ -50,4 +57,35 @@ async fn installs_the_latest_stable_fabric_and_quilt_profiles_for_26_2() {
     let paths = LauncherPaths::new(dir.path());
     install_latest_stable(MetaLoaderMetadata::fabric(http()), &paths).await;
     install_latest_stable(MetaLoaderMetadata::quilt(http()), &paths).await;
+}
+
+/// Installs the newest stable release (Forge: the recommended one is the
+/// newest release flagged stable) and checks the profile and its tools.
+async fn install_installer_loader(metadata: ForgeLoaderMetadata<ReqwestHttpClient>) {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = LauncherPaths::new(dir.path());
+    let game = GameVersion::parse("26.2").unwrap();
+    let releases = metadata.releases(&game).await.unwrap();
+    let release = releases.iter().find(|release| release.stable).unwrap();
+    let loader = LoaderSpec::new(metadata.kind(), Some(release.version.clone())).unwrap();
+
+    let profile = installers(&paths).install(&loader, &game).await.unwrap();
+    assert!(!profile.tools.is_empty());
+    for tool in &profile.tools {
+        let checksum = tool.checksum.as_ref().expect("every tool has a checksum");
+        assert_eq!(checksum.algorithm(), HashAlgorithm::Sha1, "{}", tool.path);
+    }
+    let stored: Value = serde_json::from_slice(
+        &std::fs::read(paths.version_json(profile.id.as_str()).unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(stored["id"], profile.id.as_str());
+    assert_eq!(stored["inheritsFrom"], "26.2");
+    println!("{}: {} tools, all hashed", profile.id, profile.tools.len());
+}
+
+#[tokio::test]
+async fn installs_the_recommended_forge_and_the_latest_stable_neoforge_for_26_2() {
+    install_installer_loader(ForgeLoaderMetadata::forge(http())).await;
+    install_installer_loader(ForgeLoaderMetadata::neoforge(http())).await;
 }

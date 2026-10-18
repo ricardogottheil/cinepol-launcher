@@ -1,13 +1,17 @@
 //! Loader adapters. Fabric and Quilt resolve through their meta APIs, which
 //! list loader releases per game version and serve a version JSON (a
-//! "profile") that inherits from the vanilla version.
+//! "profile") that inherits from the vanilla version. Forge and NeoForge ship
+//! an installer jar whose processors patch the game (see [`forge`]).
 //!
 //! [`LoaderInstallers`] implements the `LoaderInstaller` port for every
 //! [`LoaderSpec`]: it stores the profile under `versions/<id>/<id>.json`,
-//! where `MojangVersionSource` reads it, after giving every library a sha1.
-//! [`MetaLoaderMetadata`] implements the `LoaderMetadata` port.
+//! where `MojangVersionSource` reads it, after giving every library a sha1,
+//! and runs the Forge and NeoForge processors in `finish`.
+//! [`MetaLoaderMetadata`] and [`ForgeLoaderMetadata`] implement the
+//! `LoaderMetadata` port.
 
 mod fabric;
+pub mod forge;
 mod meta;
 mod quilt;
 
@@ -15,6 +19,7 @@ mod quilt;
 mod tests;
 
 pub use fabric::FABRIC_META_URL;
+pub use forge::ForgeLoaderMetadata;
 pub use meta::MetaLoaderMetadata;
 pub use quilt::QUILT_META_URL;
 
@@ -24,24 +29,31 @@ use tokio_util::sync::CancellationToken;
 
 use crate::domain::loader::{
     LoaderEnvironment, LoaderInstallError, LoaderInstaller, LoaderKind, LoaderProfile, LoaderSpec,
-    profile_id,
+    ProcessorRunner, profile_id,
 };
 use crate::domain::ports::{HttpClient, ProgressReporter};
+use crate::infrastructure::process::TokioProcessorRunner;
 
 /// Installs any loader this launcher supports; vanilla needs no profile.
+/// `P` runs the Forge and NeoForge installer processors.
 #[derive(Debug)]
-pub struct LoaderInstallers<H> {
+pub struct LoaderInstallers<H, P = TokioProcessorRunner> {
     http: H,
     paths: LauncherPaths,
+    runner: P,
 }
 
-impl<H> LoaderInstallers<H> {
-    pub fn new(http: H, paths: LauncherPaths) -> Self {
-        Self { http, paths }
+impl<H, P> LoaderInstallers<H, P> {
+    pub fn new(http: H, paths: LauncherPaths, runner: P) -> Self {
+        Self {
+            http,
+            paths,
+            runner,
+        }
     }
 }
 
-impl<H: HttpClient> LoaderInstaller for LoaderInstallers<H> {
+impl<H: HttpClient, P: ProcessorRunner> LoaderInstaller for LoaderInstallers<H, P> {
     async fn install(
         &self,
         loader: &LoaderSpec,
@@ -51,8 +63,12 @@ impl<H: HttpClient> LoaderInstaller for LoaderInstallers<H> {
             LoaderKind::Vanilla => return Ok(profile(VersionId::from(game))),
             LoaderKind::Fabric => &fabric::API,
             LoaderKind::Quilt => &quilt::API,
-            kind @ (LoaderKind::Forge | LoaderKind::NeoForge) => {
-                return Err(LoaderInstallError::UnsupportedLoader(kind));
+            LoaderKind::Forge => {
+                return forge::install(&self.http, &self.paths, &forge::FORGE, loader, game).await;
+            }
+            LoaderKind::NeoForge => {
+                return forge::install(&self.http, &self.paths, &forge::NEOFORGE, loader, game)
+                    .await;
             }
         };
         let version = loader.version().ok_or_else(|| {
@@ -69,16 +85,32 @@ impl<H: HttpClient> LoaderInstaller for LoaderInstallers<H> {
         Ok(profile(id))
     }
 
-    /// Fabric and Quilt profiles are complete after `install`.
+    /// Forge and NeoForge run their installer processors; Fabric and Quilt
+    /// profiles are complete after `install`.
     async fn finish<R: ProgressReporter>(
         &self,
-        _loader: &LoaderSpec,
-        _game: &GameVersion,
-        _environment: LoaderEnvironment<'_>,
-        _reporter: &R,
-        _cancel: &CancellationToken,
+        loader: &LoaderSpec,
+        game: &GameVersion,
+        environment: LoaderEnvironment<'_>,
+        reporter: &R,
+        cancel: &CancellationToken,
     ) -> Result<(), LoaderInstallError> {
-        Ok(())
+        let flavor = match loader.kind() {
+            LoaderKind::Vanilla | LoaderKind::Fabric | LoaderKind::Quilt => return Ok(()),
+            LoaderKind::Forge => &forge::FORGE,
+            LoaderKind::NeoForge => &forge::NEOFORGE,
+        };
+        forge::finish(
+            &self.paths,
+            &self.runner,
+            flavor,
+            loader,
+            game,
+            environment,
+            reporter,
+            cancel,
+        )
+        .await
     }
 }
 

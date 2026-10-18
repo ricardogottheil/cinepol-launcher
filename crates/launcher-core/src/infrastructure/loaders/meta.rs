@@ -230,7 +230,13 @@ async fn fetch_profile<H: HttpClient>(
     }
 
     // Never cache a profile with an unhashed library.
-    for library in libraries(&profile)? {
+    every_library_hashed(&profile)?;
+    Ok(profile)
+}
+
+/// Fails unless every library of a profile declares a well-formed sha1.
+pub(super) fn every_library_hashed(profile: &Value) -> Result<(), LoaderInstallError> {
+    for library in libraries(profile)? {
         if !declares_sha1(library)? {
             return Err(LoaderInstallError::Invalid(format!(
                 "library {} has no sha1",
@@ -238,7 +244,7 @@ async fn fetch_profile<H: HttpClient>(
             )));
         }
     }
-    Ok(profile)
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -248,7 +254,8 @@ struct ProfileHeader {
     inherits_from: Option<String>,
 }
 
-fn check_header(
+/// Fails unless the profile is `id` and inherits from `game`.
+pub(super) fn check_header(
     profile: &Value,
     id: &VersionId,
     game: &GameVersion,

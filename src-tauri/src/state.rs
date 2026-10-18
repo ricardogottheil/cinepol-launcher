@@ -22,7 +22,7 @@ use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadat
 use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
 use launcher_core::infrastructure::msa::MsaClient;
 use launcher_core::infrastructure::nbt::NbtServerListStore;
-use launcher_core::infrastructure::process::TokioGameProcessRunner;
+use launcher_core::infrastructure::process::{TokioGameProcessRunner, TokioProcessorRunner};
 use launcher_core::infrastructure::server_ping::MinecraftServerPinger;
 use launcher_core::infrastructure::time::{SystemClock, TokioDelay};
 
@@ -148,7 +148,7 @@ impl AppState {
             premium_names: MojangPremiumNames::new(http.clone()),
             msa: msa_client_id().map(|client_id| MsaClient::new(http.clone(), client_id)),
             secrets: KeyringSecretStore::new(KEYCHAIN_SERVICE),
-            loaders: LoaderInstallers::new(http.clone(), paths.clone()),
+            loaders: LoaderInstallers::new(http.clone(), paths.clone(), TokioProcessorRunner),
             fabric_releases: MetaLoaderMetadata::fabric(http.clone()),
             quilt_releases: MetaLoaderMetadata::quilt(http.clone()),
             current_config: RwLock::new(bundled_config.clone()),

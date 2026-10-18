@@ -33,7 +33,7 @@ use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, Reqwe
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
 use launcher_core::infrastructure::loaders::{LoaderInstallers, MetaLoaderMetadata};
 use launcher_core::infrastructure::mojang::MojangVersionSource;
-use launcher_core::infrastructure::process::TokioGameProcessRunner;
+use launcher_core::infrastructure::process::{TokioGameProcessRunner, TokioProcessorRunner};
 use launcher_core::infrastructure::time::SystemClock;
 use tokio_util::sync::CancellationToken;
 
@@ -124,7 +124,7 @@ async fn installs_and_launches_vanilla_offline() {
     .expect("http client");
     let downloader = DownloadManager::new(http.inner().clone(), DownloadConfig::default());
     let versions = MojangVersionSource::new(http.clone(), paths.clone());
-    let loaders = LoaderInstallers::new(http.clone(), paths.clone());
+    let loaders = LoaderInstallers::new(http.clone(), paths.clone(), TokioProcessorRunner);
     let java = ManagedJavaRuntimes::new(
         http,
         downloader.clone(),

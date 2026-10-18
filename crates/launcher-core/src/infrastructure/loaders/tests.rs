@@ -125,8 +125,8 @@ fn quilt_online(sidecars: Vec<(String, Vec<u8>)>) -> FakeHttpClient {
     FakeHttpClient::with(bodies)
 }
 
-fn installers<H>(http: H, root: &Path) -> LoaderInstallers<H> {
-    LoaderInstallers::new(http, LauncherPaths::new(root))
+fn installers<H>(http: H, root: &Path) -> LoaderInstallers<H, TokioProcessorRunner> {
+    LoaderInstallers::new(http, LauncherPaths::new(root), TokioProcessorRunner)
 }
 
 fn cached_path(root: &Path, id: &str) -> PathBuf {
@@ -508,7 +508,7 @@ async fn offline_installs_keep_a_valid_cached_profile() {
 }
 
 #[tokio::test]
-async fn vanilla_needs_no_profile_and_forge_is_not_supported_yet() {
+async fn vanilla_needs_no_profile_and_unknown_forge_versions_are_reported() {
     let dir = tempfile::tempdir().unwrap();
     let installer = installers(FakeHttpClient::default(), dir.path());
     assert_eq!(
@@ -520,16 +520,44 @@ async fn vanilla_needs_no_profile_and_forge_is_not_supported_yet() {
             .as_str(),
         "26.2"
     );
+    assert!(installer.http.requests().is_empty());
     for (kind, version) in [
         (LoaderKind::Forge, "47.2.0"),
         (LoaderKind::NeoForge, "21.1.77"),
     ] {
         assert_eq!(
             installer.install(&spec(kind, version), &game()).await,
-            Err(LoaderInstallError::UnsupportedLoader(kind))
+            Err(LoaderInstallError::UnknownLoaderVersion(
+                kind,
+                version.into(),
+                "26.2".into()
+            ))
         );
     }
-    assert!(installer.http.requests().is_empty());
+    assert!(files_under(dir.path()).is_empty());
+}
+
+#[tokio::test]
+async fn finish_does_nothing_for_vanilla_fabric_and_quilt() {
+    let dir = tempfile::tempdir().unwrap();
+    let installer = installers(Offline, dir.path());
+    let java = dir.path().join("java");
+    let client_jar = dir.path().join("26.2.jar");
+    for loader in [LoaderSpec::vanilla(), fabric(), quilt()] {
+        installer
+            .finish(
+                &loader,
+                &game(),
+                LoaderEnvironment {
+                    java: &java,
+                    client_jar: &client_jar,
+                },
+                &crate::testing::RecordingReporter::default(),
+                &CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+    }
     assert!(files_under(dir.path()).is_empty());
 }
 
