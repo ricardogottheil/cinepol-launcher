@@ -8,6 +8,9 @@
 //!   `[group:artifact:version[:classifier][@ext]]` (a library path),
 //!   `'literal'`, or `/path/in/the/installer` (a file extracted beforehand).
 //! - `[coords]` as a whole argument: the library path.
+//!
+//! A processor without declared outputs is still expected to produce the file
+//! after its `--output` argument (checked for presence, not for a hash).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -95,16 +98,20 @@ pub fn plan_processors(
             let jar = library_path(env, &processor.jar);
             let mut classpath = vec![jar.clone()];
             classpath.extend(processor.classpath.iter().map(|c| library_path(env, c)));
-            let args = processor
+            let args: Vec<String> = processor
                 .args
                 .iter()
                 .map(|arg| resolver.argument(arg))
                 .collect::<Result<_, _>>()?;
-            let outputs = processor
-                .outputs
-                .iter()
-                .map(|(path, sha1)| resolver.output(path, sha1))
-                .collect::<Result<_, _>>()?;
+            let outputs = if processor.outputs.is_empty() {
+                implied_outputs(&args, env)
+            } else {
+                processor
+                    .outputs
+                    .iter()
+                    .map(|(path, sha1)| resolver.output(path, sha1))
+                    .collect::<Result<_, _>>()?
+            };
             Ok(PlannedProcessor {
                 jar,
                 classpath,
@@ -202,6 +209,22 @@ impl Resolver<'_> {
         };
         Ok(PlannedOutput { path, sha1 })
     }
+}
+
+/// A processor that declares no outputs (NeoForge) still names one with
+/// `--output`: it must exist afterwards, so a deleted file is rebuilt.
+fn implied_outputs(args: &[String], env: &ProcessorEnvironment) -> Vec<PlannedOutput> {
+    args.windows(2)
+        .filter(|pair| pair[0] == "--output")
+        .map(|pair| PathBuf::from(&pair[1]))
+        .filter(|path| {
+            path.starts_with(&env.root)
+                && !path
+                    .components()
+                    .any(|part| matches!(part, std::path::Component::ParentDir))
+        })
+        .map(|path| PlannedOutput { path, sha1: None })
+        .collect()
 }
 
 fn library_path(env: &ProcessorEnvironment, coordinate: &MavenCoordinate) -> PathBuf {
@@ -381,6 +404,39 @@ mod tests {
         assert!(
             planned[0].outputs.is_empty(),
             "NeoForge declares no output hashes"
+        );
+    }
+
+    #[test]
+    fn an_undeclared_output_after_dash_dash_output_is_still_checked_for_presence() {
+        // NeoForge 26.2.0.93 declares no outputs; its patched client is `--output`.
+        let processors = vec![ProcessorSpec {
+            jar: coordinate("net.neoforged.installertools:installertools:4.0.17:fatjar"),
+            classpath: vec![],
+            args: vec![
+                "--task".into(),
+                "PROCESS_MINECRAFT_JAR".into(),
+                "--input".into(),
+                "{MINECRAFT_JAR}".into(),
+                "--output".into(),
+                "{PATCHED}".into(),
+            ],
+            outputs: vec![],
+            sides: None,
+        }];
+        let data = BTreeMap::from([(
+            "PATCHED".to_owned(),
+            "[net.neoforged:minecraft-client-patched:26.2.0.93]".to_owned(),
+        )]);
+        let planned = plan_processors(&processors, &data, &env()).unwrap();
+        assert_eq!(
+            planned[0].outputs,
+            [PlannedOutput {
+                path: PathBuf::from(
+                    "/data/libraries/net/neoforged/minecraft-client-patched/26.2.0.93/minecraft-client-patched-26.2.0.93.jar"
+                ),
+                sha1: None,
+            }]
         );
     }
 

@@ -159,6 +159,8 @@ struct FakeRunner {
     writes: Vec<(PathBuf, Vec<u8>)>,
     wait_for_cancel: bool,
     failure: Option<String>,
+    /// Produces nothing, like a tool that exits 0 without writing its output.
+    silent: bool,
 }
 
 impl FakeRunner {
@@ -191,6 +193,16 @@ impl ProcessorRunner for FakeRunner {
                 output: output.clone(),
             });
         }
+        if self.silent {
+            return Ok(());
+        }
+        // Like the real tools: the file after `--output` is produced...
+        if let Some(pair) = command.args.windows(2).find(|pair| pair[0] == "--output") {
+            let path = PathBuf::from(&pair[1]);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, b"produced").unwrap();
+        }
+        // ...unless the test scripts other contents for it.
         for (path, body) in &self.writes {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(path, body).unwrap();
@@ -866,8 +878,12 @@ async fn a_wrong_output_is_a_mismatch_and_is_removed() {
 #[tokio::test]
 async fn a_missing_output_or_a_failed_tool_is_a_processor_failure() {
     let installed = installed(&forge(), FORGE_INSTALLER_URL, &forge_installer()).await;
+    let silent = FakeRunner {
+        silent: true,
+        ..FakeRunner::default()
+    };
     assert!(matches!(
-        finish(&installed, &forge(), &FakeRunner::default()).await,
+        finish(&installed, &forge(), &silent).await,
         Err(LoaderInstallError::ProcessorFailed(_))
     ));
     let failing = FakeRunner {
@@ -955,6 +971,15 @@ async fn neoforge_finish_runs_its_processor_once_per_plan() {
         .await
         .unwrap();
     assert_eq!(runner.commands().len(), 2);
+
+    // A deleted patched jar is rebuilt even though the plan did not change.
+    let patched = libraries(root).join(
+        "net/neoforged/minecraft-client-patched/26.2.0.93/minecraft-client-patched-26.2.0.93.jar",
+    );
+    std::fs::remove_file(&patched).unwrap();
+    finish(&installed, &neoforge(), &runner).await.unwrap();
+    assert_eq!(runner.commands().len(), 3);
+    assert!(patched.is_file());
 }
 
 #[tokio::test]

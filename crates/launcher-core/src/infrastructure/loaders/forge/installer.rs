@@ -16,7 +16,8 @@
 //! `finish` re-verifies the stored installer, extracts it again, plans the
 //! client processors and runs the ones whose work is not done yet: a
 //! processor is skipped when its declared outputs all exist and match, and
-//! processors without declared outputs are skipped when the marker
+//! processors without hashed outputs are skipped when their outputs exist and
+//! the marker
 //! `versions/<id>/.processors-done` holds the fingerprint of the same plan.
 //! Once one processor runs, every later one runs too. Each run is followed by
 //! the verification of every output with a declared sha1.
@@ -423,12 +424,10 @@ async fn run_processors<P: ProcessorRunner, R: ProgressReporter>(
         if cancel.is_cancelled() {
             return Err(LoaderInstallError::Cancelled);
         }
-        let done = !ran
-            && if processor.outputs.is_empty() {
-                marker_matches
-            } else {
-                outputs_verified(processor).await
-            };
+        // Hashed outputs prove themselves. Without a hash (NeoForge), the
+        // file must exist and the plan must be the one that produced it.
+        let hashed = processor.outputs.iter().any(|output| output.sha1.is_some());
+        let done = !ran && (hashed || marker_matches) && outputs_verified(processor).await;
         if !done {
             if !ran {
                 remove_file(&target.marker).await?;
