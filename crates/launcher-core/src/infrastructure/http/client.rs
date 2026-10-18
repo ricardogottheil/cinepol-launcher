@@ -1,11 +1,14 @@
-//! `HttpClient` over reqwest, with retries for transient failures.
+//! `HttpClient` over reqwest, with retries for transient failures, and the
+//! single-shot `HttpRequester` used by the sign-in exchanges.
 
 use std::time::Duration;
 
 use reqwest::StatusCode;
-use reqwest::header::RETRY_AFTER;
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderValue, RETRY_AFTER};
 
-use crate::domain::ports::{HttpClient, HttpError};
+use crate::domain::ports::{
+    HttpBody, HttpClient, HttpError, HttpMethod, HttpRequest, HttpRequester, HttpResponse, Secret,
+};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
@@ -118,6 +121,100 @@ impl HttpClient for ReqwestHttpClient {
     }
 }
 
+/// Sign-in answers are small JSON documents; anything larger is refused.
+const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
+
+/// Sent once, never retried. Request bodies and bearer tokens are never
+/// logged, and error messages carry the URL without its query string.
+impl HttpRequester for ReqwestHttpClient {
+    async fn send(&self, request: HttpRequest) -> Result<HttpResponse, HttpError> {
+        let HttpRequest {
+            method,
+            url,
+            body,
+            bearer,
+        } = request;
+        let shown_url = without_query(&url).to_owned();
+        let network = |reason: String| HttpError::Network {
+            url: shown_url.clone(),
+            reason,
+        };
+        let mut builder = match method {
+            HttpMethod::Get => self.client.get(&url),
+            HttpMethod::Post => self.client.post(&url),
+        };
+        if let Some(token) = bearer {
+            let mut value = HeaderValue::from_str(&format!("Bearer {}", token.expose()))
+                .map_err(|_| network("the bearer token is not a valid header value".into()))?;
+            value.set_sensitive(true);
+            builder = builder.header(AUTHORIZATION, value);
+        }
+        builder = match body {
+            None => builder,
+            Some(HttpBody::Form(fields)) => builder
+                .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(encode_form(&fields)),
+            Some(HttpBody::Json(document)) => builder
+                .header(CONTENT_TYPE, "application/json")
+                .header(ACCEPT, "application/json")
+                .body(document.expose().to_owned()),
+        };
+        let mut response = builder
+            .send()
+            .await
+            .map_err(|error| network(error.without_url().to_string()))?;
+        let status = response.status().as_u16();
+        let mut body = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|error| network(error.without_url().to_string()))?
+        {
+            if body.len() + chunk.len() > MAX_RESPONSE_BYTES {
+                return Err(network(format!(
+                    "the answer is larger than {MAX_RESPONSE_BYTES} bytes"
+                )));
+            }
+            body.extend_from_slice(&chunk);
+        }
+        Ok(HttpResponse { status, body })
+    }
+}
+
+fn without_query(url: &str) -> &str {
+    url.split(['?', '#']).next().unwrap_or(url)
+}
+
+/// `application/x-www-form-urlencoded`: unreserved bytes stay, a space
+/// becomes `+`, everything else is percent-encoded.
+fn encode_form(fields: &[(String, Secret)]) -> String {
+    fields
+        .iter()
+        .map(|(name, value)| {
+            format!(
+                "{}={}",
+                encode_component(name),
+                encode_component(value.expose())
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("&")
+}
+
+fn encode_component(raw: &str) -> String {
+    let mut encoded = String::with_capacity(raw.len());
+    for byte in raw.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'*' => {
+                encoded.push(char::from(byte));
+            }
+            b' ' => encoded.push('+'),
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
+}
+
 /// `Retry-After` in seconds, capped at 60 s. HTTP dates are ignored.
 fn parse_retry_after(value: Option<&str>) -> Option<u64> {
     value?
@@ -213,6 +310,128 @@ mod tests {
             requests[0].headers.get("user-agent").map(String::as_str),
             Some("cinepol-launcher-tests/1.0")
         );
+    }
+
+    fn form(fields: &[(&str, &str)]) -> HttpBody {
+        HttpBody::Form(
+            fields
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), Secret::new(*value)))
+                .collect(),
+        )
+    }
+
+    #[tokio::test]
+    async fn posts_an_urlencoded_form_once_and_returns_an_error_status_with_its_body() {
+        let server = TestServer::start(vec![(
+            "/token",
+            vec![Reply::status(400).with_body(r#"{"error":"authorization_pending"}"#)],
+        )])
+        .await;
+        let response = client()
+            .send(HttpRequest::post(
+                server.url("/token"),
+                form(&[("grant_type", "urn:ietf:params"), ("scope", "a b&c=d")]),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status, 400);
+        assert_eq!(response.body, br#"{"error":"authorization_pending"}"#);
+        let requests = server.requests();
+        assert_eq!(requests.len(), 1, "never retried");
+        assert_eq!(requests[0].method, "POST");
+        assert_eq!(
+            requests[0].headers.get("content-type").map(String::as_str),
+            Some("application/x-www-form-urlencoded")
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&requests[0].body),
+            "grant_type=urn%3Aietf%3Aparams&scope=a+b%26c%3Dd"
+        );
+        assert_eq!(
+            requests[0].headers.get("user-agent").map(String::as_str),
+            Some("cinepol-launcher-tests/1.0")
+        );
+    }
+
+    #[tokio::test]
+    async fn server_errors_are_returned_without_retrying() {
+        let server = TestServer::start(vec![("/down", vec![Reply::status(503)])]).await;
+        let response = client()
+            .send(HttpRequest::get(server.url("/down")))
+            .await
+            .unwrap();
+        assert_eq!(response.status, 503);
+        assert_eq!(server.hits("/down"), 1);
+    }
+
+    #[tokio::test]
+    async fn posts_json_with_its_headers() {
+        let server = TestServer::start(vec![("/xsts", vec![Reply::ok(r#"{"Token":"t"}"#)])]).await;
+        let response = client()
+            .send(HttpRequest::post(
+                server.url("/xsts"),
+                HttpBody::Json(Secret::new(r#"{"TokenType":"JWT"}"#)),
+            ))
+            .await
+            .unwrap();
+        assert!(response.is_success());
+        assert_eq!(response.body, br#"{"Token":"t"}"#);
+        let request = &server.requests()[0];
+        assert_eq!(request.body, br#"{"TokenType":"JWT"}"#);
+        assert_eq!(
+            request.headers.get("content-type").map(String::as_str),
+            Some("application/json")
+        );
+        assert_eq!(
+            request.headers.get("accept").map(String::as_str),
+            Some("application/json")
+        );
+    }
+
+    #[tokio::test]
+    async fn sends_the_bearer_in_the_authorization_header() {
+        let server = TestServer::start(vec![("/profile", vec![Reply::ok("{}")])]).await;
+        client()
+            .send(HttpRequest::get(server.url("/profile")).with_bearer(&Secret::new("mc-token")))
+            .await
+            .unwrap();
+        let request = &server.requests()[0];
+        assert_eq!(request.method, "GET");
+        assert_eq!(
+            request.headers.get("authorization").map(String::as_str),
+            Some("Bearer mc-token")
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_bodies_over_one_mebibyte() {
+        let big = vec![b'a'; MAX_RESPONSE_BYTES + 1];
+        let server = TestServer::start(vec![("/big", vec![Reply::ok(big)])]).await;
+        let result = client().send(HttpRequest::get(server.url("/big"))).await;
+        assert!(
+            matches!(result, Err(HttpError::Network { .. })),
+            "{result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn transport_failures_are_network_errors_without_the_query() {
+        // Nothing listens on a port that was bound and released again.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let result = client()
+            .send(HttpRequest::get(format!(
+                "http://{addr}/x?code=secret-code"
+            )))
+            .await;
+        match result {
+            Err(error @ HttpError::Network { .. }) => {
+                assert!(!error.to_string().contains("secret-code"), "{error}");
+            }
+            other => panic!("expected a network error, got {other:?}"),
+        }
     }
 
     #[test]

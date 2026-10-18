@@ -7,7 +7,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 
 #[derive(Debug, Clone)]
@@ -38,6 +38,11 @@ impl Reply {
         }
     }
 
+    pub fn with_body(mut self, body: impl Into<Vec<u8>>) -> Self {
+        self.body = body.into();
+        self
+    }
+
     pub fn with_header(mut self, name: &str, value: &str) -> Self {
         self.headers.push((name.to_owned(), value.to_owned()));
         self
@@ -53,9 +58,13 @@ impl Reply {
 
 #[derive(Debug, Clone)]
 pub struct RecordedRequest {
+    /// `GET`, `POST`...
+    pub method: String,
     pub path: String,
     /// Header names are lowercase.
     pub headers: HashMap<String, String>,
+    /// The body, read up to its `Content-Length`.
+    pub body: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -108,11 +117,9 @@ async fn handle(socket: TcpStream, state: Arc<Mutex<State>>) {
     if reader.read_line(&mut request_line).await.unwrap_or(0) == 0 {
         return;
     }
-    let path = request_line
-        .split_whitespace()
-        .nth(1)
-        .unwrap_or("/")
-        .to_owned();
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next().unwrap_or("GET").to_owned();
+    let path = parts.next().unwrap_or("/").to_owned();
     let mut headers = HashMap::new();
     loop {
         let mut line = String::new();
@@ -127,11 +134,21 @@ async fn handle(socket: TcpStream, state: Arc<Mutex<State>>) {
             headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_owned());
         }
     }
+    let length = headers
+        .get("content-length")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0);
+    let mut body = vec![0; length];
+    if reader.read_exact(&mut body).await.is_err() {
+        return;
+    }
     let reply = {
         let mut state = state.lock().unwrap();
         state.requests.push(RecordedRequest {
+            method,
             path: path.clone(),
             headers,
+            body,
         });
         match state.routes.get_mut(&path) {
             Some(queue) if queue.len() > 1 => queue.pop_front().unwrap(),
