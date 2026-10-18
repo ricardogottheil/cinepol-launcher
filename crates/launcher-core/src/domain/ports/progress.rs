@@ -5,6 +5,8 @@ pub enum ProgressStage {
     Libraries,
     Assets,
     Java,
+    /// Loader installer processors (Forge, NeoForge).
+    Loader,
     Natives,
     Launching,
 }

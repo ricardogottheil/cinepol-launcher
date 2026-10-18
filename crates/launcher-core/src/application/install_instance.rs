@@ -1,7 +1,7 @@
 //! Downloads everything an instance needs to launch: the version JSON, client
 //! jar, libraries, natives jars, logging config, assets and the Java runtime.
 
-use crate::domain::loader::{LoaderInstallError, LoaderInstaller};
+use crate::domain::loader::{LoaderEnvironment, LoaderInstallError, LoaderInstaller};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
@@ -28,7 +28,7 @@ pub enum InstallError {
     #[error(transparent)]
     Java(JavaRuntimeError),
     #[error(transparent)]
-    Loader(#[from] LoaderInstallError),
+    Loader(LoaderInstallError),
     /// The rule is to never launch with unverified libraries, so a library the
     /// version declares without a checksum is not even downloaded.
     #[error("{0} declares no checksum, so it cannot be verified")]
@@ -43,6 +43,16 @@ impl From<DownloadError> for InstallError {
             Self::Cancelled
         } else {
             Self::Download(error)
+        }
+    }
+}
+
+impl From<LoaderInstallError> for InstallError {
+    fn from(error: LoaderInstallError) -> Self {
+        if error == LoaderInstallError::Cancelled {
+            Self::Cancelled
+        } else {
+            Self::Loader(error)
         }
     }
 }
@@ -106,11 +116,11 @@ where
     metadata.report(ProgressUpdate::new(0, Some(2)));
     let instance = deps.instances.get(id).await?;
     // Vanilla answers the game version; a loader stores its profile first.
-    let version_id = deps
+    let profile = deps
         .loaders
         .install(&instance.loader, &instance.game_version)
         .await?;
-    let spec = deps.versions.version(version_id.as_str()).await?;
+    let spec = deps.versions.version(profile.id.as_str()).await?;
     let asset_index = match &spec.asset_index {
         Some(index) => Some(deps.versions.asset_index(index).await?),
         None => None,
@@ -136,6 +146,13 @@ where
         spec.logging
             .iter()
             .filter_map(|logging| request(&assets_dir, &logging.file)),
+    );
+    // The loader's installer tools follow the same rules as the game's files.
+    files.extend(
+        profile
+            .tools
+            .iter()
+            .filter_map(|tool| request(&libraries_dir, tool)),
     );
     if let Some(unverified) = files.iter().find(|file| file.checksum.is_none()) {
         let path = unverified
@@ -175,7 +192,7 @@ where
         )
         .await?;
 
-    let java_major = match instance.settings.java {
+    let (java_major, java) = match &instance.settings.java {
         JavaSelection::Managed => {
             let requirement = spec.java.clone().unwrap_or_else(JavaRequirement::legacy);
             let runtime = deps
@@ -187,10 +204,34 @@ where
                     cancel,
                 )
                 .await?;
-            Some(runtime.version.major)
+            (Some(runtime.version.major), runtime.executable)
         }
-        JavaSelection::Custom(_) => None,
+        JavaSelection::Custom(path) => (None, path.clone()),
     };
+
+    // Last: Forge and NeoForge processors need the game jar, tools and Java.
+    let client_jar = spec
+        .client_jar
+        .as_ref()
+        .map(|jar| jar.path.under(&deps.paths.versions_dir()))
+        .ok_or_else(|| {
+            InstallError::Loader(LoaderInstallError::Invalid(format!(
+                "{} declares no client jar",
+                profile.id
+            )))
+        })?;
+    deps.loaders
+        .finish(
+            &instance.loader,
+            &instance.game_version,
+            LoaderEnvironment {
+                java: &java,
+                client_jar: &client_jar,
+            },
+            &StagedReporter::new(reporter, ProgressStage::Loader),
+            cancel,
+        )
+        .await?;
 
     Ok(InstallSummary {
         files,
@@ -524,6 +565,89 @@ mod tests {
         assert!(
             world.downloader.requests().is_empty(),
             "nothing unverified is fetched"
+        );
+    }
+
+    fn tool(path: &str, checksum: bool) -> Artifact {
+        Artifact {
+            path: crate::domain::launch::RelativePath::parse(path).unwrap(),
+            url: format!("https://maven.example.test/{path}"),
+            checksum: checksum.then(|| {
+                crate::domain::integrity::Checksum::parse(
+                    crate::domain::integrity::HashAlgorithm::Sha1,
+                    "0746b1dc6d93abb4b84f3f924009591b6c85eb80",
+                )
+                .unwrap()
+            }),
+            size: Some(10),
+        }
+    }
+
+    #[tokio::test]
+    async fn downloads_the_loader_tools_and_finishes_with_java_and_the_client_jar() {
+        let mut world = World::new().await.with_fabric().await;
+        world.loaders.tools = vec![tool(
+            "net/minecraftforge/binarypatcher/1.3.4/binarypatcher-1.3.4.jar",
+            true,
+        )];
+        install_instance(
+            &id(),
+            &world.deps(),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            world
+                .downloader
+                .requests()
+                .iter()
+                .any(|request| request.url.ends_with("binarypatcher-1.3.4.jar"))
+        );
+        assert_eq!(
+            world.loaders.finished(),
+            [(
+                PathBuf::from("/runtimes/java"),
+                world.paths.versions_dir().join("26.2/26.2.jar")
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_an_unhashed_tool_and_reports_a_failed_finish() {
+        let mut world = World::new().await.with_fabric().await;
+        world.loaders.tools = vec![tool("org/example/tool/1/tool-1.jar", false)];
+        assert_eq!(
+            install_instance(
+                &id(),
+                &world.deps(),
+                &RecordingReporter::default(),
+                &CancellationToken::new()
+            )
+            .await,
+            Err(InstallError::UnverifiedLibrary(
+                "org/example/tool/1/tool-1.jar".into()
+            ))
+        );
+        assert!(world.loaders.finished().is_empty());
+
+        world.loaders.tools.clear();
+        world.loaders.finish_failure = Some(LoaderInstallError::OutputMismatch(
+            "forge-client.jar".into(),
+        ));
+        assert_eq!(
+            install_instance(
+                &id(),
+                &world.deps(),
+                &RecordingReporter::default(),
+                &CancellationToken::new()
+            )
+            .await,
+            Err(InstallError::Loader(LoaderInstallError::OutputMismatch(
+                "forge-client.jar".into()
+            )))
         );
     }
 }

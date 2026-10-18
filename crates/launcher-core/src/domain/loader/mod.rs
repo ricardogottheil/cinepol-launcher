@@ -1,9 +1,15 @@
 //! Mod loaders and their versions.
 
 mod ports;
+mod processors;
 
 pub use ports::{
-    LoaderInstallError, LoaderInstaller, LoaderMetadata, LoaderMetadataError, profile_id,
+    LoaderEnvironment, LoaderInstallError, LoaderInstaller, LoaderMetadata, LoaderMetadataError,
+    LoaderProfile, ProcessorCommand, ProcessorRunError, ProcessorRunner, profile_id,
+};
+pub use processors::{
+    CLIENT_SIDE, PlannedOutput, PlannedProcessor, ProcessorEnvironment, ProcessorPlanError,
+    ProcessorSpec, plan_processors,
 };
 
 use std::fmt;

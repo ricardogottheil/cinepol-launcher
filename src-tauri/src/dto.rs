@@ -30,6 +30,7 @@ pub enum ProgressStageDto {
     Libraries,
     Assets,
     Java,
+    Loader,
     Natives,
     Launching,
 }
@@ -41,6 +42,7 @@ impl From<ProgressStage> for ProgressStageDto {
             ProgressStage::Libraries => Self::Libraries,
             ProgressStage::Assets => Self::Assets,
             ProgressStage::Java => Self::Java,
+            ProgressStage::Loader => Self::Loader,
             ProgressStage::Natives => Self::Natives,
             ProgressStage::Launching => Self::Launching,
         }

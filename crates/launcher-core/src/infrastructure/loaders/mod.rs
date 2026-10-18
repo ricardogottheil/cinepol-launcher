@@ -20,10 +20,13 @@ pub use quilt::QUILT_META_URL;
 
 use crate::domain::instance::GameVersion;
 use crate::domain::launch::{LauncherPaths, VersionId};
+use tokio_util::sync::CancellationToken;
+
 use crate::domain::loader::{
-    LoaderInstallError, LoaderInstaller, LoaderKind, LoaderSpec, profile_id,
+    LoaderEnvironment, LoaderInstallError, LoaderInstaller, LoaderKind, LoaderProfile, LoaderSpec,
+    profile_id,
 };
-use crate::domain::ports::HttpClient;
+use crate::domain::ports::{HttpClient, ProgressReporter};
 
 /// Installs any loader this launcher supports; vanilla needs no profile.
 #[derive(Debug)]
@@ -43,9 +46,9 @@ impl<H: HttpClient> LoaderInstaller for LoaderInstallers<H> {
         &self,
         loader: &LoaderSpec,
         game: &GameVersion,
-    ) -> Result<VersionId, LoaderInstallError> {
+    ) -> Result<LoaderProfile, LoaderInstallError> {
         let api = match loader.kind() {
-            LoaderKind::Vanilla => return Ok(VersionId::from(game)),
+            LoaderKind::Vanilla => return Ok(profile(VersionId::from(game))),
             LoaderKind::Fabric => &fabric::API,
             LoaderKind::Quilt => &quilt::API,
             kind @ (LoaderKind::Forge | LoaderKind::NeoForge) => {
@@ -63,6 +66,26 @@ impl<H: HttpClient> LoaderInstaller for LoaderInstallers<H> {
             ))
         })?;
         meta::install_profile(&self.http, &self.paths, api, version, game, &id).await?;
-        Ok(id)
+        Ok(profile(id))
+    }
+
+    /// Fabric and Quilt profiles are complete after `install`.
+    async fn finish<R: ProgressReporter>(
+        &self,
+        _loader: &LoaderSpec,
+        _game: &GameVersion,
+        _environment: LoaderEnvironment<'_>,
+        _reporter: &R,
+        _cancel: &CancellationToken,
+    ) -> Result<(), LoaderInstallError> {
+        Ok(())
+    }
+}
+
+/// A profile that needs no installer tools.
+fn profile(id: VersionId) -> LoaderProfile {
+    LoaderProfile {
+        id,
+        tools: Vec::new(),
     }
 }

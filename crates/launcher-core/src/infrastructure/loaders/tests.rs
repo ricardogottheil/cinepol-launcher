@@ -310,7 +310,8 @@ async fn fabric_install_fills_only_the_missing_sha1() {
     let http = fabric_online(FABRIC_PROFILE);
     let installer = installers(http, dir.path());
     let id = installer.install(&fabric(), &game()).await.unwrap();
-    assert_eq!(id.as_str(), FABRIC_ID);
+    assert_eq!(id.id.as_str(), FABRIC_ID);
+    assert!(id.tools.is_empty(), "Fabric needs no installer tools");
     assert_eq!(
         installer.http.requests(),
         [FABRIC_PROFILE_URL, FABRIC_LOADER_SIDECAR_URL]
@@ -331,7 +332,7 @@ async fn quilt_install_fills_every_sha1_from_the_sidecars() {
     let sidecars = quilt_sidecars();
     let installer = installers(quilt_online(sidecars.clone()), dir.path());
     let id = installer.install(&quilt(), &game()).await.unwrap();
-    assert_eq!(id.as_str(), QUILT_ID);
+    assert_eq!(id.id.as_str(), QUILT_ID);
     assert_eq!(installer.http.requests().len(), 13);
 
     let cached = read_json(&cached_path(dir.path(), QUILT_ID));
@@ -493,7 +494,7 @@ async fn offline_installs_keep_a_valid_cached_profile() {
         .install(&quilt(), &game())
         .await
         .unwrap();
-    assert_eq!(id.as_str(), QUILT_ID);
+    assert_eq!(id.id.as_str(), QUILT_ID);
     assert_eq!(std::fs::read(&path).unwrap(), before);
 
     // A cached profile with unhashed libraries is not launchable.
@@ -515,6 +516,7 @@ async fn vanilla_needs_no_profile_and_forge_is_not_supported_yet() {
             .install(&LoaderSpec::vanilla(), &game())
             .await
             .unwrap()
+            .id
             .as_str(),
         "26.2"
     );

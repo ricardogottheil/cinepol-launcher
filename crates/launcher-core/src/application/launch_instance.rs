@@ -658,7 +658,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_loader_this_launcher_cannot_install_is_refused() {
+    async fn a_loader_instance_that_was_never_installed_reports_its_missing_profile() {
         let world = World::installed().await;
         set_loader(&world, crate::domain::loader::LoaderKind::Forge, "47.2.0").await;
         assert_eq!(
@@ -669,9 +669,9 @@ mod tests {
                 CancellationToken::new()
             )
             .await,
-            Err(LaunchError::UnsupportedLoader(
-                crate::domain::loader::LoaderKind::Forge
-            ))
+            Err(LaunchError::Version(VersionSourceError::UnknownVersion(
+                "26.2-forge-47.2.0".into()
+            )))
         );
         assert!(world.runner.specs().is_empty());
     }

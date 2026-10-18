@@ -130,7 +130,8 @@
     "assets": "Downloading assets",
     "java": "Preparing Java",
     "natives": "Preparing natives",
-    "launching": "Starting the game"
+    "launching": "Starting the game",
+    "loader": "Installing the loader"
   },
   "accounts": {
     "title": "Accounts",

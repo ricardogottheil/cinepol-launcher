@@ -172,7 +172,11 @@ fn loader_code(error: &LoaderInstallError) -> ErrorCode {
         | LoaderInstallError::UnknownLoaderVersion(..)
         | LoaderInstallError::UnsupportedLoader(_) => ErrorCode::LoaderUnavailable,
         LoaderInstallError::Network(_) => ErrorCode::Network,
-        LoaderInstallError::Invalid(_) | LoaderInstallError::Storage(_) => ErrorCode::Internal,
+        LoaderInstallError::Invalid(_)
+        | LoaderInstallError::Storage(_)
+        | LoaderInstallError::ProcessorFailed(_)
+        | LoaderInstallError::OutputMismatch(_) => ErrorCode::Internal,
+        LoaderInstallError::Cancelled => ErrorCode::Cancelled,
     }
 }
 

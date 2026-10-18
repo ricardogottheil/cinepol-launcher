@@ -31,7 +31,8 @@ async fn install_latest_stable(metadata: impl LoaderMetadata, paths: &LauncherPa
     let id = LoaderInstallers::new(http(), paths.clone())
         .install(&loader, &game)
         .await
-        .unwrap();
+        .unwrap()
+        .id;
     let path = paths.version_json(id.as_str()).unwrap();
     let profile: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     let libraries = profile["libraries"].as_array().unwrap();
