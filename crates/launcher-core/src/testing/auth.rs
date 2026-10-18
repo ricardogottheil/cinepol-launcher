@@ -129,3 +129,36 @@ impl MicrosoftAuth for FakeMicrosoftAuth {
         self.skin.clone()
     }
 }
+
+/// Answers a fixed game token, or an expired session when there is none;
+/// records which accounts asked.
+#[derive(Debug, Default)]
+pub struct FakeSessions {
+    pub token: Option<&'static str>,
+    asked: Mutex<Vec<crate::domain::account::AccountId>>,
+}
+
+impl FakeSessions {
+    pub fn with_token(token: &'static str) -> Self {
+        Self {
+            token: Some(token),
+            ..Self::default()
+        }
+    }
+
+    pub fn asked(&self) -> Vec<crate::domain::account::AccountId> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+impl crate::application::refresh_session::PremiumSessions for FakeSessions {
+    async fn session_token(
+        &self,
+        account: &crate::domain::account::Account,
+    ) -> Result<Secret, crate::application::refresh_session::SessionError> {
+        self.asked.lock().unwrap().push(account.id);
+        self.token
+            .map(Secret::new)
+            .ok_or(crate::application::refresh_session::SessionError::Expired)
+    }
+}

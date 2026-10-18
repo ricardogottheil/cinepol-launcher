@@ -5,8 +5,10 @@ use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::launch_instance::LaunchError;
+use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
 use launcher_core::domain::account::AccountRepositoryError;
+use launcher_core::domain::account::AuthError;
 use launcher_core::domain::instance::InstanceRepositoryError;
 use launcher_core::domain::java::JavaRuntimeError;
 use launcher_core::domain::launch::VersionSourceError;
@@ -28,6 +30,16 @@ pub enum ErrorCode {
     JavaUnavailable,
     AlreadyRunning,
     ServerUnreachable,
+    /// The Microsoft session expired or was revoked: sign in again.
+    SessionExpired,
+    /// Microsoft or Xbox refused the sign-in (no Xbox profile, child account, region).
+    SignInRefused,
+    /// The account does not own Minecraft: Java Edition, or has no profile yet.
+    NotEntitled,
+    /// The launcher's Azure app is not approved for Minecraft Services yet.
+    AppNotApproved,
+    /// The OS keychain is missing or refused access.
+    KeychainUnavailable,
     Internal,
 }
 
@@ -150,12 +162,36 @@ impl From<InstallError> for AppError {
     }
 }
 
+/// The code a Microsoft session failure is reported with.
+pub fn session_code(error: &SessionError) -> ErrorCode {
+    match error {
+        SessionError::Expired => ErrorCode::SessionExpired,
+        SessionError::Auth(auth) => auth_code(auth),
+        SessionError::Keychain(_) => ErrorCode::KeychainUnavailable,
+    }
+}
+
+/// The code a Microsoft sign-in failure is reported with.
+pub fn auth_code(error: &AuthError) -> ErrorCode {
+    match error {
+        AuthError::SessionExpired | AuthError::CodeExpired => ErrorCode::SessionExpired,
+        AuthError::Declined
+        | AuthError::NoXboxAccount
+        | AuthError::XboxUnavailableInCountry
+        | AuthError::ChildAccount => ErrorCode::SignInRefused,
+        AuthError::NotEntitled | AuthError::NoProfile => ErrorCode::NotEntitled,
+        AuthError::AppNotApproved => ErrorCode::AppNotApproved,
+        AuthError::Network(_) => ErrorCode::Network,
+        AuthError::Unexpected(_) => ErrorCode::Internal,
+    }
+}
+
 impl From<LaunchError> for AppError {
     fn from(error: LaunchError) -> Self {
         let code = match &error {
             LaunchError::Instance(InstanceRepositoryError::NotFound(_)) => ErrorCode::NotFound,
             LaunchError::NoAccount => ErrorCode::NoAccount,
-            LaunchError::PremiumSessionUnavailable => ErrorCode::PremiumRequired,
+            LaunchError::Session(session) => session_code(session),
             LaunchError::Version(VersionSourceError::Network(_)) => ErrorCode::Network,
             LaunchError::NotInstalled(_) => ErrorCode::NotInstalled,
             LaunchError::Java(java) => java_code(java),

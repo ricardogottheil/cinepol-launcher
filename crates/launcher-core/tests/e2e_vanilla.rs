@@ -190,6 +190,7 @@ async fn installs_and_launches_vanilla_offline() {
         fs: &TokioFileSystem,
         paths: &paths,
         platform: &platform,
+        sessions: &launcher_core::application::refresh_session::NoPremiumSessions,
         launcher_name: "cinepol-launcher",
         launcher_version: "e2e",
     };

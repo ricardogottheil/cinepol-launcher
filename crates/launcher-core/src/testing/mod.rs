@@ -28,7 +28,7 @@ mod auth;
 mod launch;
 mod server;
 
-pub use auth::{FakeMicrosoftAuth, sample_profile, tokens};
+pub use auth::{FakeMicrosoftAuth, FakeSessions, sample_profile, tokens};
 pub use launch::{
     FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, InMemoryRunningGames,
     RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,

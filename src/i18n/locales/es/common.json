@@ -113,7 +113,12 @@
     "already_running": "Ya está en marcha",
     "internal": "Algo ha fallado. Los detalles están en el registro",
     "ipc_unavailable": "Solo disponible en la app de escritorio",
-    "server_unreachable": "El servidor no responde"
+    "server_unreachable": "El servidor no responde",
+    "session_expired": "Tu sesión de Microsoft caducó. Vuelve a iniciar sesión",
+    "sign_in_refused": "Microsoft no permitió este inicio de sesión. Revisa la cuenta en xbox.com",
+    "not_entitled": "Esta cuenta no tiene Minecraft: Java Edition",
+    "app_not_approved": "El inicio de sesión con Microsoft todavía no está habilitado para este launcher",
+    "keychain_unavailable": "El llavero del sistema no está disponible para guardar la sesión"
   },
   "stages": {
     "metadata": "Leyendo la versión",

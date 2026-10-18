@@ -113,7 +113,12 @@
     "already_running": "It is already running",
     "internal": "Something went wrong. The details are in the log",
     "ipc_unavailable": "Only available in the desktop app",
-    "server_unreachable": "The server is not answering"
+    "server_unreachable": "The server is not answering",
+    "session_expired": "Your Microsoft session expired. Sign in again",
+    "sign_in_refused": "Microsoft did not allow this sign-in. Check the account on xbox.com",
+    "not_entitled": "This account does not own Minecraft: Java Edition",
+    "app_not_approved": "Microsoft sign-in is not enabled for this launcher yet",
+    "keychain_unavailable": "The system keychain is not available to store the session"
   },
   "stages": {
     "metadata": "Reading the version",

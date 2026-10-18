@@ -270,6 +270,12 @@ pub fn sample_version_spec(id: &str) -> VersionSpec {
         game_arguments: vec![
             ArgumentToken::Plain("--username".into()),
             ArgumentToken::Plain("${auth_player_name}".into()),
+            ArgumentToken::Plain("--uuid".into()),
+            ArgumentToken::Plain("${auth_uuid}".into()),
+            ArgumentToken::Plain("--accessToken".into()),
+            ArgumentToken::Plain("${auth_access_token}".into()),
+            ArgumentToken::Plain("--xuid".into()),
+            ArgumentToken::Plain("${auth_xuid}".into()),
             ArgumentToken::Conditional {
                 rules: vec![crate::domain::launch::Rule {
                     action: crate::domain::launch::RuleAction::Allow,

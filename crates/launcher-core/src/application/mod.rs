@@ -16,6 +16,7 @@ pub mod list_instances;
 pub mod load_server_config;
 pub mod play_on_cinepol;
 pub mod prepare_cinepol_instance;
+pub mod refresh_session;
 pub mod run_progress_demo;
 pub mod select_account;
 pub mod update_settings;

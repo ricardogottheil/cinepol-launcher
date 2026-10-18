@@ -6,7 +6,8 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
-use crate::domain::account::{AccountId, AccountRepository, AccountRepositoryError};
+use crate::application::refresh_session::{PremiumSessions, SessionError};
+use crate::domain::account::{AccountId, AccountKind, AccountRepository, AccountRepositoryError};
 use crate::domain::instance::{
     InstanceId, InstanceRepository, InstanceRepositoryError, JavaSelection,
 };
@@ -26,8 +27,8 @@ pub enum LaunchError {
     Accounts(#[from] AccountRepositoryError),
     #[error("no account to play with; add one first")]
     NoAccount,
-    #[error("Microsoft sign-in is not available yet")]
-    PremiumSessionUnavailable,
+    #[error(transparent)]
+    Session(#[from] SessionError),
     #[error(transparent)]
     Version(#[from] VersionSourceError),
     #[error("the instance is not installed: {0} is missing")]
@@ -58,7 +59,7 @@ pub struct LaunchOutcome {
 }
 
 /// Everything the launcher talks to.
-pub struct LaunchDeps<'a, I, A, V, J, N, P, C, F> {
+pub struct LaunchDeps<'a, I, A, V, J, N, P, C, F, Q> {
     pub instances: &'a I,
     pub accounts: &'a A,
     pub versions: &'a V,
@@ -69,6 +70,8 @@ pub struct LaunchDeps<'a, I, A, V, J, N, P, C, F> {
     pub fs: &'a F,
     pub paths: &'a LauncherPaths,
     pub platform: &'a Platform,
+    /// Game tokens of premium accounts, refreshed silently when needed.
+    pub sessions: &'a Q,
     pub launcher_name: &'a str,
     pub launcher_version: &'a str,
 }
@@ -83,9 +86,9 @@ impl ProgressReporter for NoProgress {
 const OFFLINE_ACCESS_TOKEN: &str = "0";
 
 #[allow(clippy::too_many_lines)]
-pub async fn launch_instance<I, A, V, J, N, P, C, F, S>(
+pub async fn launch_instance<I, A, V, J, N, P, C, F, Q, S>(
     request: &LaunchRequest,
-    deps: &LaunchDeps<'_, I, A, V, J, N, P, C, F>,
+    deps: &LaunchDeps<'_, I, A, V, J, N, P, C, F, Q>,
     logs: S,
     kill: CancellationToken,
 ) -> Result<LaunchOutcome, LaunchError>
@@ -98,6 +101,7 @@ where
     P: GameProcessRunner,
     C: Clock,
     F: FileSystem,
+    Q: PremiumSessions,
     S: LogSink,
 {
     let instance = deps.instances.get(&request.instance).await?;
@@ -117,9 +121,15 @@ where
         .into_iter()
         .find(|account| account.id == account_id)
         .ok_or(LaunchError::NoAccount)?;
-    if account.is_premium() {
-        return Err(LaunchError::PremiumSessionUnavailable);
-    }
+    // Before any file work: an expired session should ask for a new sign-in
+    // right away, not after preparing the game.
+    let (access_token, user_type, xuid) = match &account.kind {
+        AccountKind::Microsoft(microsoft) => {
+            let token = deps.sessions.session_token(&account).await?;
+            (token.expose().to_owned(), "msa", microsoft.xuid.clone())
+        }
+        AccountKind::Offline => (OFFLINE_ACCESS_TOKEN.to_owned(), "legacy", "0".to_owned()),
+    };
 
     let spec = deps
         .versions
@@ -191,9 +201,9 @@ where
         identity: LaunchIdentity {
             player_name: account.username.to_string(),
             uuid: account.profile_uuid,
-            access_token: OFFLINE_ACCESS_TOKEN.to_owned(),
-            user_type: "legacy",
-            xuid: "0".to_owned(),
+            access_token,
+            user_type,
+            xuid,
         },
         game_dir: game_dir.clone(),
         assets_root: assets_dir,
@@ -251,15 +261,15 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::domain::account::{Account, AccountKind, Username};
+    use crate::domain::account::{Account, Username};
     use crate::domain::instance::{GameVersion, Instance, InstanceName, InstanceOrigin};
     use crate::domain::java::{JavaRuntime, JavaSource, JavaVersion};
     use crate::domain::launch::{Arch, LogStream, OsName, VersionManifest};
     use crate::domain::loader::LoaderSpec;
     use crate::testing::{
-        FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, FixedClock,
-        InMemoryAccountRepository, InMemoryInstanceRepository, RecordingLogSink,
-        RecordingNativesExtractor, sample_asset_index, sample_version_spec,
+        FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeSessions, FakeVersionSource,
+        FixedClock, InMemoryAccountRepository, InMemoryInstanceRepository, RecordingLogSink,
+        RecordingNativesExtractor, sample_asset_index, sample_profile, sample_version_spec,
     };
 
     struct World {
@@ -274,6 +284,7 @@ mod tests {
         paths: LauncherPaths,
         platform: Platform,
         account: Account,
+        sessions: FakeSessions,
     }
 
     type Deps<'a> = LaunchDeps<
@@ -286,6 +297,7 @@ mod tests {
         FakeGameProcess,
         FixedClock,
         FakeFileSystem,
+        FakeSessions,
     >;
 
     impl World {
@@ -350,6 +362,7 @@ mod tests {
                 paths,
                 platform: Platform::new(OsName::Linux, Arch::X86_64),
                 account,
+                sessions: FakeSessions::default(),
             }
         }
 
@@ -365,6 +378,7 @@ mod tests {
                 fs: &self.fs,
                 paths: &self.paths,
                 platform: &self.platform,
+                sessions: &self.sessions,
                 launcher_name: "cinepol-launcher",
                 launcher_version: "0.1.0",
             }
@@ -445,7 +459,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn requires_an_account_and_rejects_premium_until_sign_in_exists() {
+    async fn requires_an_account_and_a_valid_premium_session() {
         let world = World::installed().await;
         world.accounts.set_active(None).await.unwrap();
         assert_eq!(
@@ -478,7 +492,45 @@ mod tests {
                 CancellationToken::new()
             )
             .await,
-            Err(LaunchError::PremiumSessionUnavailable)
+            Err(LaunchError::Session(SessionError::Expired)),
+            "an expired session asks for a new sign-in instead of launching"
+        );
+        assert!(world.runner.specs().is_empty());
+        assert_eq!(world.sessions.asked(), [premium.id]);
+    }
+
+    #[tokio::test]
+    async fn a_premium_account_launches_with_its_session_token_and_xuid() {
+        let mut world = World::installed().await;
+        world.sessions = FakeSessions::with_token("minecraft-token");
+        let premium = Account::microsoft(AccountId::new_random(), &sample_profile(), "2535428");
+        world.accounts.save(&premium).await.unwrap();
+        world.accounts.set_active(Some(premium.id)).await.unwrap();
+
+        launch_instance(
+            &request(),
+            &world.deps(),
+            RecordingLogSink::default(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+        let args = world.runner.specs()[0].command.args();
+        let after = |flag: &str| {
+            let at = args.iter().position(|arg| arg == flag).unwrap();
+            args[at + 1].clone()
+        };
+        assert_eq!(after("--accessToken"), "minecraft-token");
+        assert_eq!(after("--username"), "Polispol1");
+        assert_eq!(after("--uuid"), premium.profile_uuid.simple().to_string());
+        assert_eq!(after("--xuid"), "2535428");
+        assert!(
+            !world.runner.specs()[0]
+                .command
+                .redacted_args()
+                .iter()
+                .any(|arg| arg.contains("minecraft-token"))
         );
     }
 
@@ -512,6 +564,7 @@ mod tests {
             fs: &world.fs,
             paths: &world.paths,
             platform: &world.platform,
+            sessions: &world.sessions,
             launcher_name: "cinepol-launcher",
             launcher_version: "0.1.0",
         };

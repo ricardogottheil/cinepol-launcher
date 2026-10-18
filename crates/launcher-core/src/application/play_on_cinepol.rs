@@ -12,6 +12,7 @@ use crate::application::launch_instance::{
 use crate::application::prepare_cinepol_instance::{
     find_cinepol_instance, prepare_cinepol_instance,
 };
+use crate::application::refresh_session::PremiumSessions;
 use crate::domain::account::AccountRepository;
 use crate::domain::instance::{Instance, InstanceId, InstanceRepository};
 use crate::domain::java::JavaRuntimeProvider;
@@ -49,12 +50,12 @@ pub struct CinepolSession {
 /// session never moves or reinstalls an instance that is already running, and
 /// stopping the instance from elsewhere stops this session.
 #[allow(clippy::too_many_arguments)]
-pub async fn play_on_cinepol<I, A, V, D, J, N, P, C, F, S, G, R, L>(
+pub async fn play_on_cinepol<I, A, V, D, J, N, P, C, F, Q, S, G, R, L>(
     config: &ServerConfig,
     servers: &S,
     games: &G,
     install: &InstallDeps<'_, I, V, D, J>,
-    launch: &LaunchDeps<'_, I, A, V, J, N, P, C, F>,
+    launch: &LaunchDeps<'_, I, A, V, J, N, P, C, F, Q>,
     reporter: &R,
     logs: L,
     cancel: &CancellationToken,
@@ -70,6 +71,7 @@ where
     P: GameProcessRunner,
     C: Clock,
     F: FileSystem,
+    Q: PremiumSessions,
     S: ServerListStore,
     G: RunningGames,
     R: ProgressReporter,
@@ -237,6 +239,7 @@ mod tests {
                 fs: &self.fs,
                 paths: &self.paths,
                 platform: &self.platform,
+                sessions: &crate::application::refresh_session::NoPremiumSessions,
                 launcher_name: "cinepol-launcher",
                 launcher_version: "0.1.0",
             };

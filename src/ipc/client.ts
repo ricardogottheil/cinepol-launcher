@@ -62,6 +62,11 @@ const BACKEND_CODES = {
   java_unavailable: true,
   already_running: true,
   server_unreachable: true,
+  session_expired: true,
+  sign_in_refused: true,
+  not_entitled: true,
+  app_not_approved: true,
+  keychain_unavailable: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
