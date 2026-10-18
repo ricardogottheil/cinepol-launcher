@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { TextField } from "../../components/ui/TextField";
 import { type AccountDto, toIpcError } from "../../ipc/client";
-import { useAccounts, useCreateOfflineAccount, useSetActiveAccount } from "./useAccounts";
+import {
+  useAccounts,
+  useCheckPremiumName,
+  useCreateOfflineAccount,
+  useSetActiveAccount,
+} from "./useAccounts";
 
 function AccountRow({ account, active }: { account: AccountDto; active: boolean }) {
   const { t } = useTranslation();
@@ -31,11 +36,20 @@ function OfflineAccountForm() {
   const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const create = useCreateOfflineAccount();
+  const checkName = useCheckPremiumName();
   const error = create.error ? t(`errors.${toIpcError(create.error).code}`) : undefined;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    create.mutate(username.trim(), { onSuccess: () => setUsername("") });
+    const name = username.trim();
+    checkName.reset();
+    create.mutate(name, {
+      onSuccess: () => {
+        setUsername("");
+        // Never blocks: the profile exists already; a failed lookup warns nothing.
+        checkName.mutate(name);
+      },
+    });
   }
 
   return (
@@ -61,6 +75,9 @@ function OfflineAccountForm() {
           {t("accounts.create")}
         </Button>
       </div>
+      <p role="status" className="m-0 max-w-[640px] text-[0.875rem] text-stale">
+        {checkName.data === "premium" ? t("accounts.premiumNameWarning") : null}
+      </p>
     </form>
   );
 }

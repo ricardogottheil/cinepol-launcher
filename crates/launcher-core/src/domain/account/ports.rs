@@ -2,7 +2,7 @@ use std::future::Future;
 
 use thiserror::Error;
 
-use super::{Account, AccountId};
+use super::{Account, AccountId, Username};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum AccountRepositoryError {
@@ -28,4 +28,19 @@ pub trait AccountRepository: Send + Sync {
         &self,
         id: Option<AccountId>,
     ) -> impl Future<Output = Result<(), AccountRepositoryError>> + Send;
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum PremiumNameLookupError {
+    #[error("the profile lookup failed: {0}")]
+    Unavailable(String),
+}
+
+/// Whether a name belongs to a premium (Microsoft) account. Servers that also
+/// accept offline players usually demand premium sign-in for those names.
+pub trait PremiumNames: Send + Sync {
+    fn is_premium(
+        &self,
+        name: &Username,
+    ) -> impl Future<Output = Result<bool, PremiumNameLookupError>> + Send;
 }

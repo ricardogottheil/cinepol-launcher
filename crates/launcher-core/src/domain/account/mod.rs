@@ -9,7 +9,7 @@ mod username;
 
 pub use offline_uuid::offline_uuid;
 pub use policy::{OfflinePolicy, OfflinePolicyError};
-pub use ports::{AccountRepository, AccountRepositoryError};
+pub use ports::{AccountRepository, AccountRepositoryError, PremiumNameLookupError, PremiumNames};
 pub use username::{Username, UsernameError};
 
 use uuid::Uuid;

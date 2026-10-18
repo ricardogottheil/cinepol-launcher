@@ -3,6 +3,7 @@
 //! Use cases depend only on `domain` (entities and ports). They never import
 //! `infrastructure` (enforced by `tests/architecture.rs`).
 
+pub mod check_premium_name;
 pub mod check_server_status;
 pub mod create_instance;
 pub mod create_offline_profile;

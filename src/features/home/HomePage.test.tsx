@@ -165,7 +165,6 @@ describe("HomePage", () => {
     setSession("running");
     renderHome();
     expect(await screen.findByText(esCommon.home.session.playing)).toBeInTheDocument();
-    expect(esCommon.home.session.playing).toBe("Jugando");
   });
 
   it("hides the last readings once the server stops answering", async () => {

@@ -134,7 +134,8 @@
     "offlineHint": "De 3 a 16 letras, números o guiones bajos. El servidor acepta jugadores sin cuenta premium.",
     "usernameLabel": "Nombre de usuario",
     "create": "Añadir cuenta",
-    "loading": "Cargando cuentas"
+    "loading": "Cargando cuentas",
+    "premiumNameWarning": "Este nombre es de una cuenta premium; el servidor te pedirá iniciar sesión con Microsoft."
   },
   "instances": {
     "title": "Instancias",

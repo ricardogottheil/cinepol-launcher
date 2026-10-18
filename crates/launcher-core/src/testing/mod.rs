@@ -439,6 +439,49 @@ impl Downloader for FakeDownloader {
     }
 }
 
+/// Answers premium-name lookups from a fixed set, or fails every lookup.
+#[derive(Debug, Default)]
+pub struct FakePremiumNames {
+    premium: Vec<String>,
+    unavailable: bool,
+    asked: Mutex<Vec<String>>,
+}
+
+impl FakePremiumNames {
+    pub fn with<const N: usize>(names: [&str; N]) -> Self {
+        Self {
+            premium: names.iter().map(|name| name.to_ascii_lowercase()).collect(),
+            ..Self::default()
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self {
+            unavailable: true,
+            ..Self::default()
+        }
+    }
+
+    pub fn asked(&self) -> Vec<String> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+impl crate::domain::account::PremiumNames for FakePremiumNames {
+    async fn is_premium(
+        &self,
+        name: &crate::domain::account::Username,
+    ) -> Result<bool, crate::domain::account::PremiumNameLookupError> {
+        self.asked.lock().unwrap().push(name.as_str().to_owned());
+        if self.unavailable {
+            return Err(crate::domain::account::PremiumNameLookupError::Unavailable(
+                "offline".into(),
+            ));
+        }
+        Ok(self.premium.contains(&name.as_str().to_ascii_lowercase()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

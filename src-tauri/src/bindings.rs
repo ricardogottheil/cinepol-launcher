@@ -11,8 +11,8 @@ use ts_rs::{Config, TS};
 use crate::dto::{
     AccountDto, AccountKindDto, AccountsDto, AppInfo, CommunityLinksDto, ConfigOriginDto,
     GameVersionDto, GameVersionsDto, InstallSummaryDto, InstanceDto, InstanceOriginDto,
-    LaunchOutcomeDto, LogLineDto, LogStreamDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
-    ServerConfigDto, ServerStatusDto, SettingsDto,
+    LaunchOutcomeDto, LogLineDto, LogStreamDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
+    ProgressUnitDto, ServerConfigDto, ServerStatusDto, SettingsDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -42,6 +42,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         AccountKindDto::decl(cfg),
         AccountDto::decl(cfg),
         AccountsDto::decl(cfg),
+        PremiumNameDto::decl(cfg),
         GameVersionDto::decl(cfg),
         GameVersionsDto::decl(cfg),
         InstanceOriginDto::decl(cfg),
@@ -89,6 +90,11 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             "create_offline_account",
             vec![("username", string())],
             AccountDto::name(cfg),
+        ),
+        command(
+            "check_premium_name",
+            vec![("username", string())],
+            PremiumNameDto::name(cfg),
         ),
         command(
             "set_active_account",
@@ -226,6 +232,7 @@ mod tests {
             "cancel_operation",
             "list_accounts",
             "create_offline_account",
+            "check_premium_name",
             "set_active_account",
             "list_game_versions",
             "list_instances",

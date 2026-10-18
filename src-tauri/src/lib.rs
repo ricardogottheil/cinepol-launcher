@@ -43,6 +43,7 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::demo::cancel_operation,
             commands::accounts::list_accounts,
             commands::accounts::create_offline_account,
+            commands::accounts::check_premium_name,
             commands::accounts::set_active_account,
             commands::versions::list_game_versions,
             commands::instances::list_instances,

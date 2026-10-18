@@ -2,6 +2,7 @@
 //!
 //! Every DTO exported to TypeScript is registered in `crate::bindings`.
 
+use launcher_core::application::check_premium_name::PremiumNameCheck;
 use launcher_core::application::install_instance::InstallSummary;
 use launcher_core::application::launch_instance::LaunchOutcome;
 use launcher_core::domain::account::{Account, AccountKind};
@@ -79,6 +80,25 @@ impl From<ProgressUpdate> for ProgressEvent {
             total: update.total,
             stage: update.stage.map(Into::into),
             unit: update.unit.into(),
+        }
+    }
+}
+
+/// Whether a premium account owns an offline profile's name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum PremiumNameDto {
+    Premium,
+    Free,
+    Unknown,
+}
+
+impl From<PremiumNameCheck> for PremiumNameDto {
+    fn from(check: PremiumNameCheck) -> Self {
+        match check {
+            PremiumNameCheck::Premium => Self::Premium,
+            PremiumNameCheck::Free => Self::Free,
+            PremiumNameCheck::Unknown => Self::Unknown,
         }
     }
 }

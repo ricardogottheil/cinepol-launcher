@@ -134,7 +134,8 @@
     "offlineHint": "3 to 16 letters, numbers or underscores. The server accepts players without a premium account.",
     "usernameLabel": "Username",
     "create": "Add account",
-    "loading": "Loading accounts"
+    "loading": "Loading accounts",
+    "premiumNameWarning": "This name belongs to a premium account; the server will ask you to sign in with Microsoft."
   },
   "instances": {
     "title": "Instances",

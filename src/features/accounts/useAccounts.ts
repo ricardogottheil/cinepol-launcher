@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createOfflineAccount, listAccounts, setActiveAccount } from "../../ipc/client";
+import {
+  checkPremiumName,
+  createOfflineAccount,
+  listAccounts,
+  setActiveAccount,
+} from "../../ipc/client";
 
 export const accountsKey = ["accounts"] as const;
 
@@ -21,4 +26,9 @@ export function useSetActiveAccount() {
     mutationFn: (accountId: string) => setActiveAccount(accountId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: accountsKey }),
   });
+}
+
+/** Asks whether a premium account owns a name (`unknown` when the lookup failed). */
+export function useCheckPremiumName() {
+  return useMutation({ mutationFn: (username: string) => checkPremiumName(username) });
 }

@@ -25,6 +25,8 @@ export type AccountDto = { id: string, kind: AccountKindDto, username: string, p
 
 export type AccountsDto = { accounts: Array<AccountDto>, activeId: string | null, };
 
+export type PremiumNameDto = "premium" | "free" | "unknown";
+
 export type GameVersionDto = { id: string, 
 /**
  * `release`, `snapshot`, `old_beta` or `old_alpha`.
@@ -70,6 +72,7 @@ export interface Commands {
   cancel_operation: { args: { operationId: string }; result: boolean };
   list_accounts: { args: Record<string, never>; result: AccountsDto };
   create_offline_account: { args: { username: string }; result: AccountDto };
+  check_premium_name: { args: { username: string }; result: PremiumNameDto };
   set_active_account: { args: { accountId: string }; result: null };
   list_game_versions: { args: { includeSnapshots: boolean }; result: GameVersionsDto };
   list_instances: { args: Record<string, never>; result: Array<InstanceDto> };

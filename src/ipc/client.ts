@@ -14,6 +14,7 @@ import type {
   InstanceDto,
   LaunchOutcomeDto,
   LogLineDto,
+  PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
   ProgressUnitDto,
@@ -37,6 +38,7 @@ export type {
   InstanceDto,
   LaunchOutcomeDto,
   LogLineDto,
+  PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
   ProgressUnitDto,
@@ -170,6 +172,11 @@ export function listAccounts(): Promise<AccountsDto> {
 
 export function createOfflineAccount(username: string): Promise<AccountDto> {
   return call("create_offline_account", { username });
+}
+
+/** Whether a premium account owns the name (`unknown` when the lookup failed). */
+export function checkPremiumName(username: string): Promise<PremiumNameDto> {
+  return call("check_premium_name", { username });
 }
 
 export async function setActiveAccount(accountId: string): Promise<void> {

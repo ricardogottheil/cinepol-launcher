@@ -13,7 +13,7 @@ use launcher_core::infrastructure::fs::{
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
-use launcher_core::infrastructure::mojang::MojangVersionSource;
+use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
 use launcher_core::infrastructure::nbt::NbtServerListStore;
 use launcher_core::infrastructure::process::TokioGameProcessRunner;
 use launcher_core::infrastructure::server_ping::MinecraftServerPinger;
@@ -60,6 +60,7 @@ pub struct AppState {
     pub fs: TokioFileSystem,
     pub servers: NbtServerListStore,
     pub pinger: MinecraftServerPinger,
+    pub premium_names: MojangPremiumNames<ReqwestHttpClient>,
     pub config_source: HttpServerConfigSource<ReqwestHttpClient>,
     pub settings: JsonSettingsRepository,
     pub bundled_config: ServerConfig,
@@ -110,6 +111,7 @@ impl AppState {
             settings: JsonSettingsRepository::new(paths.settings_file()),
             servers: NbtServerListStore::new(paths.clone()),
             pinger: MinecraftServerPinger::new(),
+            premium_names: MojangPremiumNames::new(http.clone()),
             current_config: RwLock::new(bundled_config.clone()),
             bundled_config,
             java: ManagedJavaRuntimes::new(

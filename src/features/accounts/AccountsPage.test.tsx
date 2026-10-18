@@ -9,6 +9,7 @@ const client = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   createOfflineAccount: vi.fn(),
   setActiveAccount: vi.fn(),
+  checkPremiumName: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -23,7 +24,15 @@ const labels = esCommon.accounts;
 beforeEach(() => {
   vi.clearAllMocks();
   client.listAccounts.mockResolvedValue({ accounts: [steve, alex], activeId: "1" });
+  client.checkPremiumName.mockResolvedValue("free");
 });
+
+async function createAccount(name: string) {
+  fireEvent.change(await screen.findByLabelText(labels.usernameLabel), {
+    target: { value: name },
+  });
+  fireEvent.click(screen.getByRole("button", { name: labels.create }));
+}
 
 describe("AccountsPage", () => {
   it("lists accounts and marks the active one", async () => {
@@ -56,5 +65,26 @@ describe("AccountsPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: labels.create }));
     expect(await screen.findByText(esCommon.errors.already_exists)).toBeInTheDocument();
+  });
+
+  it("warns, without blocking, when the new name belongs to a premium account", async () => {
+    client.createOfflineAccount.mockResolvedValue({ ...alex, id: "3", username: "polispol1" });
+    client.checkPremiumName.mockResolvedValue("premium");
+    renderWithQuery(<AccountsPage />);
+    await createAccount("polispol1");
+    await waitFor(() => expect(client.createOfflineAccount).toHaveBeenCalledWith("polispol1"));
+    expect(await screen.findByText(labels.premiumNameWarning)).toBeInTheDocument();
+    expect(client.checkPremiumName).toHaveBeenCalledWith("polispol1");
+  });
+
+  it("shows no warning for a free name or when the lookup is unavailable", async () => {
+    client.createOfflineAccount.mockResolvedValue({ ...alex, id: "3", username: "Pol" });
+    renderWithQuery(<AccountsPage />);
+    await createAccount("Pol");
+    await waitFor(() => expect(client.checkPremiumName).toHaveBeenCalledWith("Pol"));
+    client.checkPremiumName.mockResolvedValue("unknown");
+    await createAccount("Pol");
+    await waitFor(() => expect(client.checkPremiumName).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(labels.premiumNameWarning)).not.toBeInTheDocument();
   });
 });

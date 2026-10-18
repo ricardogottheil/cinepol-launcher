@@ -1,10 +1,11 @@
+use launcher_core::application::check_premium_name::check_premium_name as check;
 use launcher_core::application::create_offline_profile::create_offline_profile;
 use launcher_core::application::list_accounts::list_accounts as list;
 use launcher_core::application::select_account::{SelectAccountError, select_account};
 use tauri::State;
 
 use super::parse_account_id;
-use crate::dto::{AccountDto, AccountsDto};
+use crate::dto::{AccountDto, AccountsDto, PremiumNameDto};
 use crate::error::{AppError, ErrorCode};
 use crate::state::AppState;
 
@@ -24,6 +25,18 @@ pub async fn create_offline_account(
 ) -> Result<AccountDto, AppError> {
     let account = create_offline_profile(&username, state.offline_policy, &state.accounts).await?;
     Ok(AccountDto::from(&account))
+}
+
+/// Whether a premium account owns the name; `unknown` when the lookup failed.
+#[tauri::command]
+pub async fn check_premium_name(
+    state: State<'_, AppState>,
+    username: String,
+) -> Result<PremiumNameDto, AppError> {
+    let result = check(&username, &state.premium_names)
+        .await
+        .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))?;
+    Ok(PremiumNameDto::from(result))
 }
 
 #[tauri::command]
