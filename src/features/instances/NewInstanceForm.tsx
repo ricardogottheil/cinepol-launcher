@@ -102,6 +102,7 @@ export function NewInstanceForm() {
           onChange={(event) => {
             setSnapshots(event.target.checked);
             setPicked(null);
+            setPickedLoaderVersion(null);
           }}
           className="size-4 accent-silk"
         />

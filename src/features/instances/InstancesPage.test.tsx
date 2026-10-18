@@ -107,6 +107,37 @@ describe("InstancesPage", () => {
     );
   });
 
+  it("forgets the picked loader version when the snapshot toggle resets the game version", async () => {
+    client.listLoaderVersions.mockImplementation(async (_loader: string, game: string) =>
+      game === "1.21.11"
+        ? [
+            { version: "0.18.0", stable: true },
+            { version: "0.17.9", stable: true },
+          ]
+        : [{ version: "0.19.5", stable: true }],
+    );
+    client.createInstance.mockResolvedValue({ ...instance, id: "fab", name: "Fab" });
+    renderWithQuery(<InstancesPage />);
+    await screen.findByRole("option", { name: "1.21.11" });
+    fireEvent.change(screen.getByLabelText(labels.versionLabel), { target: { value: "1.21.11" } });
+    fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "fabric" } });
+    await screen.findByRole("option", { name: "0.17.9" });
+    fireEvent.change(screen.getByLabelText(labels.loaderVersionLabel), {
+      target: { value: "0.17.9" },
+    });
+
+    // Back to the latest release (26.2): the 1.21.11 loader pick must not stay.
+    fireEvent.click(screen.getByLabelText(labels.showSnapshots));
+    await screen.findByRole("option", { name: "0.19.5" });
+    fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "Fab" } });
+    fireEvent.click(screen.getByRole("button", { name: labels.create }));
+    await waitFor(() =>
+      expect(client.createInstance).toHaveBeenCalledWith(
+        expect.objectContaining({ gameVersion: "26.2", loaderVersion: "0.19.5" }),
+      ),
+    );
+  });
+
   it("explains a loader that does not support the chosen version", async () => {
     client.listLoaderVersions.mockRejectedValue(new IpcError("loader_unavailable", "400"));
     renderWithQuery(<InstancesPage />);
