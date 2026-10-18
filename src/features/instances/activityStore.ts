@@ -8,6 +8,7 @@ import {
   type LogLineDto,
   launchInstance,
   type ProgressStageDto,
+  type ProgressUnitDto,
   playOnCinepol,
   toIpcError,
 } from "../../ipc/client";
@@ -25,6 +26,8 @@ export type Activity =
       stage: ProgressStageDto | null;
       done: number;
       total: number | null;
+      /** What `done` and `total` count. */
+      unit: ProgressUnitDto;
       cancel: () => Promise<boolean>;
     }
   | {
@@ -73,12 +76,20 @@ export const useActivityStore = create<ActivityState>((set) => {
           stage: event.stage,
           done: event.done,
           total: event.total,
+          unit: event.unit,
           cancel: operation.cancel,
         },
       }),
     );
     update(instanceId, {
-      activity: { kind: "installing", stage: null, done: 0, total: null, cancel: operation.cancel },
+      activity: {
+        kind: "installing",
+        stage: null,
+        done: 0,
+        total: null,
+        unit: "steps",
+        cancel: operation.cancel,
+      },
       error: null,
     });
     try {
@@ -148,6 +159,7 @@ export const useActivityStore = create<ActivityState>((set) => {
                   stage: event.stage,
                   done: event.done,
                   total: event.total,
+                  unit: event.unit,
                   cancel: operation.cancel,
                 },
         }),
@@ -168,6 +180,7 @@ export const useActivityStore = create<ActivityState>((set) => {
         stage: "metadata",
         done: 0,
         total: null,
+        unit: "steps",
         cancel: operation.cancel,
       },
       logs: [],

@@ -1,5 +1,5 @@
 import { createMemoryHistory } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import enCommon from "../i18n/locales/en/common.json";
 import esCommon from "../i18n/locales/es/common.json";
@@ -8,6 +8,7 @@ import { createAppRouter } from "./router";
 
 const listAccounts = vi.hoisted(() => vi.fn(async () => ({ accounts: [], activeId: null })));
 const listInstances = vi.hoisted(() => vi.fn(async () => []));
+const openExternal = vi.hoisted(() => vi.fn(async (_url: string) => {}));
 const getAppInfo = vi.hoisted(() =>
   vi.fn(async () => ({ name: "Cinepol Launcher", version: "0.1.0" })),
 );
@@ -15,6 +16,7 @@ const getAppInfo = vi.hoisted(() =>
 vi.mock("../ipc/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../ipc/client")>()),
   getAppInfo,
+  openExternal,
   listAccounts,
   listInstances,
 }));
@@ -57,5 +59,17 @@ describe("App shell", () => {
     getAppInfo.mockResolvedValue({ name: "Cinepol Launcher", version: "0.1.0" });
     renderAt("/");
     expect(await screen.findByText("0.1.0")).toBeInTheDocument();
+  });
+
+  it("opens community links in the browser and says so when it cannot", async () => {
+    renderAt("/");
+    const twitch = await screen.findByRole("link", { name: esCommon.links.twitch });
+    fireEvent.click(twitch);
+    await waitFor(() => expect(openExternal).toHaveBeenCalledWith("https://twitch.tv/polispol1"));
+    expect(screen.queryByText(esCommon.links.openFailed)).not.toBeInTheDocument();
+
+    openExternal.mockRejectedValueOnce(new Error("denied"));
+    fireEvent.click(twitch);
+    expect(await screen.findByText(esCommon.links.openFailed)).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BrandGlyph, type BrandGlyphName } from "../../components/ui/BrandGlyph";
 import { bundledConfigDto, useServerConfig } from "../../features/server/useServer";
@@ -19,6 +20,7 @@ const itemClass =
 /** Section rail. Text only, like the website's section strip: no icons as decoration. */
 export function Sidebar() {
   const { t } = useTranslation();
+  const [linkFailed, setLinkFailed] = useState(false);
   const { links } = useServerConfig().data ?? bundledConfigDto();
   const appInfo = useAppInfo();
 
@@ -60,8 +62,21 @@ export function Sidebar() {
 
       <div className="mt-auto flex flex-col gap-1 border-t border-hairline px-gutter py-5">
         <p className="plate m-0 mb-2 text-engrave">{t("chrome.community")}</p>
-        <CommunityLink href={links.twitch} glyph="twitch" label={t("links.twitch")} />
-        <CommunityLink href={links.discord} glyph="discord" label={t("links.discord")} />
+        <CommunityLink
+          href={links.twitch}
+          glyph="twitch"
+          label={t("links.twitch")}
+          onResult={setLinkFailed}
+        />
+        <CommunityLink
+          href={links.discord}
+          glyph="discord"
+          label={t("links.discord")}
+          onResult={setLinkFailed}
+        />
+        <p role="status" className="m-0 text-[0.75rem] text-stale">
+          {linkFailed ? t("links.openFailed") : null}
+        </p>
         <p className="mt-4 mb-0 text-[0.75rem] leading-[1.45] text-engrave">
           {t("legal.disclaimer")}
         </p>
@@ -83,17 +98,23 @@ function CommunityLink({
   href,
   glyph,
   label,
+  onResult,
 }: {
   href: string;
   glyph: BrandGlyphName;
   label: string;
+  /** Called with `true` when the browser could not be opened. */
+  onResult: (failed: boolean) => void;
 }) {
   return (
     <a
       href={href}
       onClick={(event) => {
         event.preventDefault();
-        void openExternal(href);
+        openExternal(href).then(
+          () => onResult(false),
+          () => onResult(true),
+        );
       }}
       className="flex h-9 items-center gap-3 text-[0.875rem] text-silk-dim no-underline transition-colors duration-[160ms] ease-settle hover:text-silk"
     >

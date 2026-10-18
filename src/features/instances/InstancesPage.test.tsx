@@ -85,10 +85,11 @@ describe("InstancesPage", () => {
     );
     renderWithQuery(<InstancesPage />);
     fireEvent.click(await screen.findByRole("button", { name: labels.install }));
-    act(() => onProgress({ done: 40, total: 100, stage: "assets", unit: "bytes" }));
+    act(() => onProgress({ done: 43_515_908, total: 126_583_468, stage: "assets", unit: "bytes" }));
 
     expect(screen.getByText(esCommon.stages.assets)).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "40");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "43515908");
+    expect(screen.getByText("41.5 / 120.7 MB")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: labels.cancel }));
     expect(cancel).toHaveBeenCalledOnce();
     await act(async () => done.reject(new IpcError("cancelled", "cancelled")));

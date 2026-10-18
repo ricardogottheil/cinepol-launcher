@@ -4,12 +4,13 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import serverConfig from "../../../config/server-config.json";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
+import { CINEPOL_SESSION, useActivityStore } from "../instances/activityStore";
 import { HomePage } from "./HomePage";
 
 const client = vi.hoisted(() => ({
@@ -29,7 +30,34 @@ beforeEach(() => {
   client.listInstances.mockResolvedValue([]);
   client.getServerConfig.mockRejectedValue(new IpcError("internal", "no backend"));
   client.getServerStatus.mockRejectedValue(new IpcError("internal", "no backend"));
+  useActivityStore.setState({ byInstance: {} });
 });
+
+const liveStatus = {
+  onlinePlayers: 8,
+  maxPlayers: 100,
+  versionName: "Velocity",
+  protocol: 777,
+  motd: "Welcome to CINEPOL",
+  latencyMs: 42,
+};
+
+function setSession(kind: "installing" | "running") {
+  const cancel = vi.fn().mockResolvedValue(true);
+  useActivityStore.setState({
+    byInstance: {
+      [CINEPOL_SESSION]: {
+        activity:
+          kind === "running"
+            ? { kind, cancel }
+            : { kind, stage: "libraries", done: 0, total: null, unit: "bytes", cancel },
+        logs: [],
+        error: null,
+        lastExit: null,
+      },
+    },
+  });
+}
 
 function renderHome() {
   const rootRoute = createRootRoute({ component: HomePage });
@@ -131,5 +159,54 @@ describe("HomePage", () => {
     });
     renderHome();
     expect(await screen.findByText("play.example.test")).toBeInTheDocument();
+  });
+
+  it("labels a running session as playing", async () => {
+    setSession("running");
+    renderHome();
+    expect(await screen.findByText(esCommon.home.session.playing)).toBeInTheDocument();
+    expect(esCommon.home.session.playing).toBe("Jugando");
+  });
+
+  it("hides the last readings once the server stops answering", async () => {
+    client.getServerStatus.mockResolvedValue(liveStatus);
+    const { client: queries } = renderHome();
+    expect(await screen.findByText("8 / 100")).toBeInTheDocument();
+
+    client.getServerStatus.mockRejectedValue(new IpcError("server_unreachable", "timed out"));
+    await act(() => queries.refetchQueries());
+
+    expect(await screen.findByText(esCommon.home.status.offline)).toBeInTheDocument();
+    expect(screen.queryByText("8 / 100")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to CINEPOL")).not.toBeInTheDocument();
+  });
+
+  it("refreshes the instance list once a session has created the instance", async () => {
+    renderHome();
+    expect(await screen.findByText(esCommon.home.instances.empty)).toBeInTheDocument();
+    client.listInstances.mockResolvedValue([
+      {
+        id: "cinepol",
+        name: "CINEPOL",
+        gameVersion: "26.2",
+        loader: "vanilla",
+        loaderVersion: null,
+        origin: "cinepolServer",
+        playtimeSecs: 0,
+      },
+    ]);
+    act(() => setSession("installing"));
+    act(() => setSession("running"));
+    expect(await screen.findByRole("link", { name: "CINEPOL" })).toBeInTheDocument();
+  });
+
+  it("keeps the account in the same spec sheet as the server and version", async () => {
+    client.listAccounts.mockResolvedValue({
+      accounts: [{ id: "a", kind: "offline", username: "CinepolTest7319", profileUuid: "u" }],
+      activeId: "a",
+    });
+    renderHome();
+    const account = await screen.findByText("CinepolTest7319");
+    expect(account.closest("dl")).toBe(screen.getByText(serverConfig.server.address).closest("dl"));
   });
 });

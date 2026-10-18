@@ -23,7 +23,8 @@
   },
   "links": {
     "twitch": "polispol1 on Twitch",
-    "discord": "Community Discord"
+    "discord": "Community Discord",
+    "openFailed": "Could not open the link"
   },
   "home": {
     "title": "Play on {{server}}",
@@ -55,7 +56,7 @@
       "import": "Import modpack"
     },
     "session": {
-      "playing": "On the server"
+      "playing": "Playing"
     }
   },
   "placeholder": {
@@ -172,5 +173,8 @@
       "bundled": "In use: the copy bundled with the launcher"
     },
     "saved": "Saved"
+  },
+  "units": {
+    "megabytes": "MB"
   }
 }

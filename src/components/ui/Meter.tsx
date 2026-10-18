@@ -6,6 +6,10 @@ export interface MeterProps {
   value: number;
   /** `null` when the total is unknown: the track stays empty, the count still reads. */
   max: number | null;
+  /** Renders the count (default: zero-padded integers). */
+  format?: (value: number) => string;
+  /** Unit label after the count, such as "MB". */
+  unitLabel?: string;
   className?: string;
 }
 
@@ -13,7 +17,7 @@ export interface MeterProps {
  * Progress as an instrument reading: a hairline track filled in silk (never
  * signal) and the count as a tabular readout.
  */
-export function Meter({ label, value, max, className }: MeterProps) {
+export function Meter({ label, value, max, format, unitLabel, className }: MeterProps) {
   const ratio = max ? Math.min(1, Math.max(0, value / max)) : 0;
   const width = String(max === null ? 0 : max).length;
   return (
@@ -32,7 +36,10 @@ export function Meter({ label, value, max, className }: MeterProps) {
         />
       </div>
       <span data-readout className="readout-sm text-silk-dim">
-        {String(value).padStart(width, "0")} / {max ?? "—"}
+        {format
+          ? `${format(value)} / ${max === null ? "—" : format(max)}`
+          : `${String(value).padStart(width, "0")} / ${max ?? "—"}`}
+        {unitLabel ? ` ${unitLabel}` : null}
       </span>
     </div>
   );

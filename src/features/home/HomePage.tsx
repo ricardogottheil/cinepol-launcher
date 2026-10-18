@@ -1,8 +1,9 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import serverBanner from "../../assets/worlds/cinepol-recursos.webp";
 import { Button } from "../../components/ui/Button";
-import { Meter } from "../../components/ui/Meter";
 import { Readout } from "../../components/ui/Readout";
 import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
@@ -13,7 +14,8 @@ import { useAccounts } from "../accounts/useAccounts";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../instances/activityStore";
 import { splitPlaytime } from "../instances/formatPlaytime";
 import { LogPanel } from "../instances/LogPanel";
-import { useInstances } from "../instances/useInstances";
+import { ProgressMeter } from "../instances/ProgressMeter";
+import { instancesKey, useInstances } from "../instances/useInstances";
 import { bundledConfigDto, useServerConfig, useServerStatus } from "../server/useServer";
 
 const plateLink =
@@ -54,6 +56,18 @@ function QuickPlay({ recommended }: { recommended: string }) {
   const { t } = useTranslation();
   const { activity, logs, error, lastExit } = useInstanceActivity(CINEPOL_SESSION);
   const playCinepol = useActivityStore((state) => state.playCinepol);
+  const queryClient = useQueryClient();
+  const previousKind = useRef(activity.kind);
+
+  // The session creates the CINEPOL instance and updates its playtime: refresh
+  // the list once the game starts and once the session ends.
+  useEffect(() => {
+    const previous = previousKind.current;
+    previousKind.current = activity.kind;
+    if (previous !== activity.kind && activity.kind !== "installing") {
+      void queryClient.invalidateQueries({ queryKey: instancesKey });
+    }
+  }, [activity.kind, queryClient]);
 
   return (
     <div data-enter-control className="mt-8 flex flex-col gap-4">
@@ -76,7 +90,12 @@ function QuickPlay({ recommended }: { recommended: string }) {
             </Button>
           </div>
           {activity.kind === "installing" ? (
-            <Meter label={t("home.play")} value={activity.done} max={activity.total} />
+            <ProgressMeter
+              label={t("home.play")}
+              done={activity.done}
+              total={activity.total}
+              unit={activity.unit}
+            />
           ) : null}
         </div>
       )}
@@ -110,7 +129,8 @@ export function HomePage() {
         ? "offline"
         : "unavailable"
       : "online";
-  const live = statusQuery.data;
+  // After a failed refresh the last readings are stale: show none.
+  const live = statusQuery.isError ? undefined : statusQuery.data;
 
   return (
     <div className="@container mx-auto flex max-w-[1120px] flex-col px-gutter-lg">
@@ -131,10 +151,8 @@ export function HomePage() {
                   label: t("home.spec.version"),
                   value: t("home.recommended", { version: config.recommendedVersion }),
                 },
+                { label: t("home.spec.account"), value: accountName ?? t("home.noAccount") },
               ]}
-            />
-            <SpecSheet
-              rows={[{ label: t("home.spec.account"), value: accountName ?? t("home.noAccount") }]}
             />
           </div>
 

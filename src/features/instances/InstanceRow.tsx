@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
-import { Meter } from "../../components/ui/Meter";
 import { Readout } from "../../components/ui/Readout";
 import type { InstanceDto } from "../../ipc/client";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "./activityStore";
 import { splitPlaytime } from "./formatPlaytime";
 import { LogPanel } from "./LogPanel";
+import { ProgressMeter } from "./ProgressMeter";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const { t } = useTranslation();
@@ -58,7 +58,12 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           <span className="plate text-engrave">
             {activity.stage ? t(`stages.${activity.stage}`) : t("stages.metadata")}
           </span>
-          <Meter label={t("instances.install")} value={activity.done} max={activity.total} />
+          <ProgressMeter
+            label={t("instances.install")}
+            done={activity.done}
+            total={activity.total}
+            unit={activity.unit}
+          />
         </div>
       ) : null}
 
