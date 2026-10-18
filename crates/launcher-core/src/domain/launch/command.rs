@@ -101,15 +101,22 @@ impl LaunchCommand {
         args
     }
 
-    /// The arguments with the access token replaced, safe to log.
+    /// The arguments with the access token replaced, safe to log. A token
+    /// shorter than a real one (the offline placeholder "0") is only replaced
+    /// where it is the whole argument, so version strings keep their digits.
     pub fn redacted_args(&self) -> Vec<String> {
+        const MIN_EMBEDDED_TOKEN_LEN: usize = 8;
         self.args()
             .into_iter()
             .map(|arg| {
                 if self.secret.is_empty() {
                     arg
-                } else {
+                } else if arg == self.secret {
+                    "<redacted>".to_owned()
+                } else if self.secret.len() >= MIN_EMBEDDED_TOKEN_LEN {
                     arg.replace(&self.secret, "<redacted>")
+                } else {
+                    arg
                 }
             })
             .collect()
@@ -564,6 +571,31 @@ mod tests {
                 .any(|arg| arg.contains("secret-token"))
         );
         assert!(!format!("{:?}", context(Platform::current()).identity).contains("secret-token"));
+    }
+
+    #[test]
+    fn a_short_offline_token_only_redacts_whole_arguments() {
+        let mut ctx = context(Platform::new(OsName::Linux, Arch::X86_64));
+        ctx.identity.access_token = "0".into();
+        let command = build_launch_command(&spec_modern(), &ctx);
+        let redacted = command.redacted_args();
+        assert!(
+            redacted
+                .iter()
+                .any(|arg| arg.contains("1.21") || arg.contains("26.2")),
+            "version strings keep their zeros: {redacted:?}"
+        );
+        assert!(
+            !redacted
+                .iter()
+                .any(|arg| arg.contains("<redacted>") && arg != "<redacted>")
+        );
+        let token_at = command
+            .args()
+            .iter()
+            .position(|arg| arg == "--accessToken")
+            .unwrap();
+        assert_eq!(redacted[token_at + 1], "<redacted>");
     }
 
     #[test]
