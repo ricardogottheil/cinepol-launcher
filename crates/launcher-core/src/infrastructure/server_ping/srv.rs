@@ -22,10 +22,12 @@ pub trait SrvResolver: Send + Sync {
     -> impl Future<Output = Result<Vec<SrvRecord>, String>> + Send;
 }
 
-/// The operating system's DNS configuration, built on first use.
+/// The operating system's DNS configuration, built on first use. A failed
+/// build is not remembered, so the next lookup tries again (for example once
+/// the network is back).
 #[derive(Default)]
 pub struct SystemSrvResolver {
-    resolver: OnceCell<Option<TokioResolver>>,
+    resolver: OnceCell<TokioResolver>,
 }
 
 impl SystemSrvResolver {
@@ -38,15 +40,15 @@ impl SrvResolver for SystemSrvResolver {
     async fn lookup_srv(&self, name: &str) -> Result<Vec<SrvRecord>, String> {
         let resolver = self
             .resolver
-            .get_or_init(|| async {
+            .get_or_try_init(|| async {
                 TokioResolver::builder_tokio()
                     .and_then(|builder| builder.build())
-                    .map_err(|error| tracing::warn!(%error, "no system DNS resolver"))
-                    .ok()
+                    .map_err(|error| {
+                        tracing::warn!(%error, "no system DNS resolver");
+                        format!("no system DNS resolver: {error}")
+                    })
             })
-            .await
-            .as_ref()
-            .ok_or_else(|| "no system DNS resolver".to_owned())?;
+            .await?;
         let lookup = resolver
             .srv_lookup(name)
             .await

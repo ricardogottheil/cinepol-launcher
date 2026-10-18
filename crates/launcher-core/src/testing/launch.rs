@@ -132,11 +132,13 @@ impl LogSink for RecordingLogSink {
     }
 }
 
-/// Emits scripted output, then exits with `exit`; records every spec it ran.
+/// Emits scripted output, then exits with `exit` (or, when `until_killed`,
+/// keeps running until `kill` fires); records every spec it ran.
 #[derive(Debug)]
 pub struct FakeGameProcess {
     pub output: Vec<(LogStream, String)>,
     pub exit: GameExit,
+    pub until_killed: bool,
     specs: Mutex<Vec<ProcessSpec>>,
 }
 
@@ -148,7 +150,16 @@ impl FakeGameProcess {
                 code: Some(code),
                 killed_by_launcher: false,
             },
+            until_killed: false,
             specs: Mutex::default(),
+        }
+    }
+
+    /// A game that only exits when the launcher kills it.
+    pub fn running_until_killed() -> Self {
+        Self {
+            until_killed: true,
+            ..Self::exiting_with(0)
         }
     }
 
@@ -174,6 +185,9 @@ impl GameProcessRunner for FakeGameProcess {
         self.specs.lock().unwrap().push(spec);
         for (stream, line) in &self.output {
             logs.line(*stream, line.clone());
+        }
+        if self.until_killed {
+            kill.cancelled().await;
         }
         if kill.is_cancelled() {
             return Ok(GameExit {

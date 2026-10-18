@@ -1,7 +1,8 @@
 //! The Server List Ping exchange: handshake, status request, ping/pong.
 //! See https://minecraft.wiki/w/Java_Edition_protocol/Server_List_Ping.
 
-use std::net::IpAddr;
+use std::future::Future;
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -14,7 +15,10 @@ use super::status_json::parse_status;
 use crate::domain::server::{ServerStatus, ServerStatusError, ServerStatusProbe};
 use crate::domain::server_list::ServerAddress;
 
-/// The default limit for connecting and, separately, for the whole exchange.
+/// The default limit for one SRV lookup, one connect attempt and, separately,
+/// the whole exchange. Name resolution plus every connect attempt share twice
+/// this limit, so with the defaults a ping gives up after at most
+/// 5 s (SRV) + 10 s (resolve and connect) + 5 s (exchange).
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 const HANDSHAKE_ID: i32 = 0x00;
@@ -54,8 +58,9 @@ impl<R: SrvResolver> MinecraftServerPinger<R> {
         }
     }
 
-    /// Sets the connect timeout (SRV lookup and TCP connect each) and the
-    /// timeout of the whole status exchange.
+    /// Sets the connect timeout (the SRV lookup and each connect attempt; name
+    /// resolution plus all attempts share twice it) and the timeout of the
+    /// whole status exchange.
     pub fn with_timeouts(mut self, connect: Duration, exchange: Duration) -> Self {
         self.connect_timeout = connect;
         self.exchange_timeout = exchange;
@@ -88,13 +93,18 @@ impl<R: SrvResolver> MinecraftServerPinger<R> {
 impl<R: SrvResolver> ServerStatusProbe for MinecraftServerPinger<R> {
     async fn status(&self, address: &ServerAddress) -> Result<ServerStatus, ServerStatusError> {
         let (host, port) = self.connect_target(address).await;
-        let mut stream = timeout(
-            self.connect_timeout,
-            TcpStream::connect((host.as_str(), port)),
-        )
-        .await
-        .map_err(|_| unreachable_at(&host, port, "timed out connecting"))?
-        .map_err(|error| unreachable_at(&host, port, &error.to_string()))?;
+        let budget = self.connect_timeout * 2;
+        let started = Instant::now();
+        let addrs: Vec<SocketAddr> =
+            timeout(budget, tokio::net::lookup_host((host.as_str(), port)))
+                .await
+                .map_err(|_| unreachable_at(&host, port, "timed out resolving the host"))?
+                .map_err(|error| unreachable_at(&host, port, &error.to_string()))?
+                .collect();
+        let remaining = budget.saturating_sub(started.elapsed());
+        let mut stream = connect_first(&addrs, self.connect_timeout, remaining, TcpStream::connect)
+            .await
+            .map_err(|reason| unreachable_at(&host, port, &reason))?;
 
         let deadline = Instant::now() + self.exchange_timeout;
         let mut status = timeout_at(deadline, request_status(&mut stream, address.host(), port))
@@ -106,6 +116,36 @@ impl<R: SrvResolver> ServerStatusProbe for MinecraftServerPinger<R> {
             .flatten();
         Ok(status)
     }
+}
+
+/// Tries each address in order, each for at most `per_attempt` and all of them
+/// within `budget`, so one unresponsive address (often an IPv6 one without a
+/// route) does not hide the next.
+async fn connect_first<T, F, Fut>(
+    addrs: &[SocketAddr],
+    per_attempt: Duration,
+    budget: Duration,
+    mut connect: F,
+) -> Result<T, String>
+where
+    F: FnMut(SocketAddr) -> Fut,
+    Fut: Future<Output = std::io::Result<T>>,
+{
+    let deadline = Instant::now() + budget;
+    let mut last = "the host has no address".to_owned();
+    for &addr in addrs {
+        let now = Instant::now();
+        if now >= deadline {
+            last = "timed out connecting".to_owned();
+            break;
+        }
+        match timeout_at((now + per_attempt).min(deadline), connect(addr)).await {
+            Ok(Ok(stream)) => return Ok(stream),
+            Ok(Err(error)) => last = format!("{addr}: {error}"),
+            Err(_) => last = format!("{addr}: timed out connecting"),
+        }
+    }
+    Err(last)
 }
 
 /// Whether the player wrote a port (`ServerAddress` keeps it only then).
@@ -449,5 +489,53 @@ mod tests {
         assert_eq!(status.max_players, 100);
         let (_, host, _, _) = decode_handshake(&server.await.unwrap());
         assert_eq!(host, "::1");
+    }
+
+    #[tokio::test]
+    async fn a_hanging_address_does_not_use_up_the_whole_connect_budget() {
+        let addrs: Vec<SocketAddr> = vec![
+            "192.0.2.1:25565".parse().unwrap(),
+            "127.0.0.1:25565".parse().unwrap(),
+        ];
+        let attempts = Mutex::new(Vec::new());
+        let connected = connect_first(
+            &addrs,
+            Duration::from_millis(50),
+            Duration::from_millis(500),
+            |addr| {
+                attempts.lock().unwrap().push(addr);
+                async move {
+                    if addr.ip().is_loopback() {
+                        Ok(addr)
+                    } else {
+                        std::future::pending().await
+                    }
+                }
+            },
+        )
+        .await;
+        assert_eq!(connected.unwrap(), addrs[1]);
+        assert_eq!(*attempts.lock().unwrap(), addrs);
+    }
+
+    #[tokio::test]
+    async fn the_connect_budget_bounds_every_attempt_together() {
+        let addrs: Vec<SocketAddr> = (1..=10)
+            .map(|n| format!("192.0.2.{n}:25565").parse().unwrap())
+            .collect();
+        let started = Instant::now();
+        let result = connect_first(
+            &addrs,
+            Duration::from_millis(50),
+            Duration::from_millis(120),
+            |_| async { std::future::pending::<std::io::Result<SocketAddr>>().await },
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(
+            started.elapsed() < Duration::from_millis(400),
+            "{:?}",
+            started.elapsed()
+        );
     }
 }

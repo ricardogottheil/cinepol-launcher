@@ -316,4 +316,55 @@ mod tests {
             Err(ServerListStoreError::Io(_))
         ));
     }
+
+    #[tokio::test]
+    async fn saving_the_same_list_always_writes_the_same_bytes() {
+        let first = setup(Some(FIXTURE));
+        let list = first.store.load(&first.instance).await.unwrap();
+        let mut outputs = Vec::new();
+        for _ in 0..16 {
+            first.store.save(&first.instance, &list).await.unwrap();
+            outputs.push(std::fs::read(&first.file).unwrap());
+        }
+        assert!(
+            outputs.windows(2).all(|pair| pair[0] == pair[1]),
+            "the encoded bytes depend on hash-map order"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_entry_with_a_wrong_typed_field_is_kept_raw_instead_of_failing_the_file() {
+        let wrong = Value::Compound(HashMap::from([
+            ("name".to_owned(), Value::Int(7)),
+            ("ip".to_owned(), Value::String("mc.example.test".to_owned())),
+        ]));
+        let good = Value::Compound(HashMap::from([
+            ("name".to_owned(), Value::String("Good".to_owned())),
+            (
+                "ip".to_owned(),
+                Value::String("good.example.test".to_owned()),
+            ),
+        ]));
+        let root = Value::Compound(HashMap::from([(
+            "servers".to_owned(),
+            Value::List(vec![wrong.clone(), good]),
+        )]));
+        let s = setup(Some(&fastnbt::to_bytes(&root).unwrap()));
+
+        let mut list = s.store.load(&s.instance).await.unwrap();
+        assert_eq!(names(&list), ["Good"]);
+        list.seed_first(ServerEntry::new(
+            "CINEPOL",
+            ServerAddress::parse("mc.policarpiers.com").unwrap(),
+        ));
+        s.store.save(&s.instance, &list).await.unwrap();
+
+        let saved = decoded(&std::fs::read(&s.file).unwrap());
+        let entries = servers(&saved);
+        assert_eq!(entries.len(), 3);
+        assert!(
+            entries.contains(&compound(&wrong)),
+            "the odd entry survives untouched"
+        );
+    }
 }

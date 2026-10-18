@@ -13,10 +13,17 @@
 //!   be a domain `ServerEntry`. It is kept whole in `ServerList::preserved` with
 //!   kind [`RAW_ENTRY_KIND`] and its original index as the name, hidden from the
 //!   domain list, and written back at that index (clamped to the list length).
+//!   The same happens to an entry whose `name`, `icon`, `acceptTextures` or
+//!   `hidden` has an unexpected tag type, so one odd entry never makes the
+//!   whole file unreadable.
+//!
+//! Compounds are written with their keys in sorted order, so saving the same
+//! list always produces the same bytes.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use fastnbt::Value;
+use serde::Serialize;
 
 use crate::domain::server_list::{
     Preserved, PreservedField, ServerAddress, ServerEntry, ServerList, ServerListStoreError,
@@ -51,7 +58,7 @@ pub fn decode(bytes: &[u8]) -> Result<ServerList, ServerListStoreError> {
             let Value::Compound(fields) = item else {
                 return Err(corrupt("a `servers` item is not a compound"));
             };
-            match decode_entry(fields)? {
+            match decode_entry(fields) {
                 Ok(entry) => list.add(entry),
                 Err(fields) => raw_entries.push(PreservedField {
                     name: index.to_string(),
@@ -73,7 +80,7 @@ pub fn encode(list: &ServerList) -> Result<Vec<u8>, ServerListStoreError> {
         .map(encode_entry)
         .collect::<Result<_, _>>()?;
 
-    let mut root = HashMap::new();
+    let mut root = BTreeMap::new();
     let mut raw_entries = Vec::new();
     for field in &list.preserved.0 {
         if field.kind == RAW_ENTRY_KIND {
@@ -86,7 +93,7 @@ pub fn encode(list: &ServerList) -> Result<Vec<u8>, ServerListStoreError> {
                 decode_payload(field.payload.as_slice(), TAG_COMPOUND)?,
             ));
         } else {
-            root.insert(field.name.clone(), restore(field)?);
+            root.insert(field.name.clone(), Ordered::from(restore(field)?));
         }
     }
     raw_entries.sort_by_key(|(index, _)| *index);
@@ -94,54 +101,83 @@ pub fn encode(list: &ServerList) -> Result<Vec<u8>, ServerListStoreError> {
         servers.insert(index.min(servers.len()), entry);
     }
 
-    root.insert(SERVERS.to_owned(), Value::List(servers));
-    fastnbt::to_bytes(&Value::Compound(root))
-        .map_err(|error| corrupt(format!("cannot encode NBT: {error}")))
+    root.insert(
+        SERVERS.to_owned(),
+        Ordered::List(servers.into_iter().map(Ordered::from).collect()),
+    );
+    fastnbt::to_bytes(&root).map_err(|error| corrupt(format!("cannot encode NBT: {error}")))
 }
 
-/// `Ok` for a domain entry, `Err` with the untouched fields when the ip is unusable.
-fn decode_entry(
-    mut fields: HashMap<String, Value>,
-) -> Result<Result<ServerEntry, HashMap<String, Value>>, ServerListStoreError> {
+/// An NBT value whose compounds serialize with sorted keys (`fastnbt::Value`
+/// keeps them in a `HashMap`, whose order changes from run to run).
+#[derive(Serialize)]
+#[serde(untagged)]
+enum Ordered {
+    Compound(BTreeMap<String, Ordered>),
+    List(Vec<Ordered>),
+    Leaf(Value),
+}
+
+impl From<Value> for Ordered {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Compound(fields) => Ordered::Compound(
+                fields
+                    .into_iter()
+                    .map(|(name, value)| (name, Ordered::from(value)))
+                    .collect(),
+            ),
+            Value::List(items) => Ordered::List(items.into_iter().map(Ordered::from).collect()),
+            leaf => Ordered::Leaf(leaf),
+        }
+    }
+}
+
+/// `Ok` for a domain entry, `Err` with the untouched fields when the ip is
+/// unusable or a known field has an unexpected tag type.
+fn decode_entry(mut fields: HashMap<String, Value>) -> Result<ServerEntry, HashMap<String, Value>> {
     let address = match fields.get(IP) {
         Some(Value::String(ip)) => ServerAddress::parse(ip).ok(),
-        Some(_) => return Err(corrupt("a server `ip` is not a string")),
-        None => None,
+        _ => None,
     };
-    let Some(address) = address else {
-        tracing::warn!("keeping a server entry with an unusable address as raw data");
-        return Ok(Err(fields));
+    let well_typed = [NAME, ICON]
+        .iter()
+        .all(|key| matches!(fields.get(*key), None | Some(Value::String(_))))
+        && [ACCEPT_TEXTURES, HIDDEN]
+            .iter()
+            .all(|key| matches!(fields.get(*key), None | Some(Value::Byte(_))));
+    let Some(address) = address.filter(|_| well_typed) else {
+        tracing::warn!("keeping a server entry with an unusable address or field as raw data");
+        return Err(fields);
     };
     fields.remove(IP);
 
     let name = match fields.remove(NAME) {
         Some(Value::String(name)) => name,
-        Some(_) => return Err(corrupt("a server `name` is not a string")),
-        None => String::new(),
+        _ => String::new(),
     };
     let icon = match fields.remove(ICON) {
         Some(Value::String(icon)) => Some(icon),
-        Some(_) => return Err(corrupt("a server `icon` is not a string")),
-        None => None,
+        _ => None,
     };
     let accept_textures = match fields.remove(ACCEPT_TEXTURES) {
         Some(Value::Byte(flag)) => Some(flag != 0),
-        Some(_) => return Err(corrupt("a server `acceptTextures` is not a byte")),
-        None => None,
+        _ => None,
     };
     // `hidden` stays in the preserved fields so its presence survives a save.
-    let hidden = match fields.get(HIDDEN) {
-        Some(Value::Byte(flag)) => *flag != 0,
-        Some(_) => return Err(corrupt("a server `hidden` is not a byte")),
-        None => false,
-    };
+    let hidden = matches!(fields.get(HIDDEN), Some(Value::Byte(flag)) if *flag != 0);
 
     let mut entry = ServerEntry::new(name, address);
     entry.icon = icon;
     entry.accept_textures = accept_textures;
     entry.hidden = hidden;
-    entry.preserved = preserve(fields)?;
-    Ok(Ok(entry))
+    match preserve(fields.clone()) {
+        Ok(preserved) => {
+            entry.preserved = preserved;
+            Ok(entry)
+        }
+        Err(_) => Err(fields),
+    }
 }
 
 fn encode_entry(entry: &ServerEntry) -> Result<Value, ServerListStoreError> {

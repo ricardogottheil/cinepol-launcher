@@ -89,7 +89,8 @@ where
     if !games.claim(&id, &kill) {
         return Err(PlayOnCinepolError::AlreadyRunning(id));
     }
-    let session = async {
+    let _claim = Claim { games, id: &id };
+    async {
         let instance = prepare_cinepol_instance(config, install.instances, servers).await?;
         install_instance(&instance.id, install, reporter, cancel).await?;
         reporter.report(ProgressUpdate {
@@ -104,15 +105,27 @@ where
         let outcome = launch_instance(&request, launch, logs, kill).await?;
         Ok(CinepolSession { instance, outcome })
     }
-    .await;
-    games.release(&id);
-    session
+    .await
+}
+
+/// Releases a claimed instance however the session ends, including when its
+/// future is dropped before it finishes.
+struct Claim<'a, G: RunningGames> {
+    games: &'a G,
+    id: &'a InstanceId,
+}
+
+impl<G: RunningGames> Drop for Claim<'_, G> {
+    fn drop(&mut self) {
+        self.games.release(self.id);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
+    use std::time::Duration;
 
     use super::*;
     use crate::application::load_server_config::fixtures::cinepol;
@@ -322,5 +335,24 @@ mod tests {
         let id = InstanceId::parse("cinepol").unwrap();
         assert!(!world.games.is_busy(&id), "released after a failed session");
         assert!(world.games.claim(&id, &kill), "free for the next session");
+    }
+
+    #[tokio::test]
+    async fn a_dropped_session_releases_its_claim() {
+        let mut world = World::new().await;
+        world.runner = FakeGameProcess::running_until_killed();
+
+        let dropped = tokio::time::timeout(
+            Duration::from_millis(100),
+            world.play(CancellationToken::new()),
+        )
+        .await;
+
+        assert!(dropped.is_err(), "the game was still running");
+        let id = InstanceId::parse("cinepol").unwrap();
+        assert!(
+            !world.games.is_busy(&id),
+            "released when the future is dropped"
+        );
     }
 }

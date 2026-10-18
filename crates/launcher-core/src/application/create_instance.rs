@@ -70,7 +70,7 @@ pub async fn create_instance<R: InstanceRepository, S: ServerListStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::server_list::ServerAddress;
+    use crate::domain::server_list::{ServerAddress, ServerListStoreError};
     use crate::testing::{InMemoryInstanceRepository, InMemoryServerListStore};
 
     fn vanilla(name: &'static str, version: &'static str) -> NewInstance<'static> {
@@ -147,6 +147,50 @@ mod tests {
                 .unwrap()
                 .entries()
                 .is_empty()
+        );
+    }
+
+    /// A `servers.dat` that cannot be read; remembers whether anything was saved.
+    #[derive(Default)]
+    struct CorruptServerList {
+        saved: std::sync::Mutex<bool>,
+    }
+
+    impl ServerListStore for CorruptServerList {
+        async fn load(
+            &self,
+            _instance: &InstanceId,
+        ) -> Result<crate::domain::server_list::ServerList, ServerListStoreError> {
+            Err(ServerListStoreError::Corrupt("garbage".into()))
+        }
+
+        async fn save(
+            &self,
+            _instance: &InstanceId,
+            _list: &crate::domain::server_list::ServerList,
+        ) -> Result<(), ServerListStoreError> {
+            *self.saved.lock().unwrap() = true;
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn a_corrupt_server_list_is_never_overwritten_by_the_seed() {
+        let repo = InMemoryInstanceRepository::default();
+        let servers = CorruptServerList::default();
+        let request = NewInstance {
+            seed_server: Some(cinepol_entry()),
+            ..vanilla("Survival World", "26.2")
+        };
+        let instance = create_instance(request, &repo, &servers).await.unwrap();
+        assert_eq!(
+            repo.list().await.unwrap(),
+            [instance],
+            "the instance is still created"
+        );
+        assert!(
+            !*servers.saved.lock().unwrap(),
+            "the unreadable file is left alone"
         );
     }
 }
