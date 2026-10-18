@@ -191,11 +191,7 @@ impl Resolver<'_> {
 
     fn output(&self, path: &str, sha1: &str) -> Result<PlannedOutput, ProcessorPlanError> {
         let path = PathBuf::from(self.argument(path)?);
-        let contained = path.starts_with(&self.env.root)
-            && !path
-                .components()
-                .any(|part| matches!(part, std::path::Component::ParentDir));
-        if !contained {
+        if !inside(&path, &self.env.root) {
             return Err(ProcessorPlanError::OutputOutsideRoot(text(&path)));
         }
         let sha1 = self.argument(sha1)?;
@@ -217,14 +213,19 @@ fn implied_outputs(args: &[String], env: &ProcessorEnvironment) -> Vec<PlannedOu
     args.windows(2)
         .filter(|pair| pair[0] == "--output")
         .map(|pair| PathBuf::from(&pair[1]))
-        .filter(|path| {
-            path.starts_with(&env.root)
-                && !path
-                    .components()
-                    .any(|part| matches!(part, std::path::Component::ParentDir))
-        })
+        .filter(|path| inside(path, &env.root))
         .map(|path| PlannedOutput { path, sha1: None })
         .collect()
+}
+
+/// `path` is `root` followed by parts that never climb (`..`) back out. The
+/// root itself may hold `..` (a data dir given as `crates/x/../../data`).
+fn inside(path: &Path, root: &Path) -> bool {
+    path.strip_prefix(root).is_ok_and(|rest| {
+        !rest
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+    })
 }
 
 fn library_path(env: &ProcessorEnvironment, coordinate: &MavenCoordinate) -> PathBuf {
@@ -438,6 +439,33 @@ mod tests {
                 sha1: None,
             }]
         );
+    }
+
+    #[test]
+    fn a_data_root_that_itself_holds_dot_dot_is_fine() {
+        let mut env = env();
+        env.root = PathBuf::from("/work/crates/core/../../data");
+        env.libraries_dir = env.root.join("libraries");
+        let (processors, data) = forge_profile();
+        let planned = plan_processors(&processors, &data, &env).unwrap();
+        assert_eq!(
+            planned[0].outputs[0].path,
+            env.libraries_dir
+                .join("net/minecraftforge/forge/26.2-65.1.5/forge-26.2-65.1.5-client.jar")
+        );
+
+        // A `..` the profile adds after the root still escapes.
+        let escaping = vec![ProcessorSpec {
+            outputs: vec![(
+                "{ROOT}/../outside.jar".into(),
+                "'be81e6d24785e467d30f30bcf31c18733233d3fe'".into(),
+            )],
+            ..processors[1].clone()
+        }];
+        assert!(matches!(
+            plan_processors(&escaping, &data, &env),
+            Err(ProcessorPlanError::OutputOutsideRoot(_))
+        ));
     }
 
     #[test]
