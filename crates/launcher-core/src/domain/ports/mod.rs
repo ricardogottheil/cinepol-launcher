@@ -15,5 +15,5 @@ pub use delay::Delay;
 pub use download::{DownloadError, DownloadRequest, DownloadSummary, Downloader};
 pub use filesystem::{FileSystem, FileSystemError};
 pub use http::{HttpClient, HttpError};
-pub use progress::{ProgressReporter, ProgressStage, ProgressUpdate, StagedReporter};
+pub use progress::{ProgressReporter, ProgressStage, ProgressUnit, ProgressUpdate, StagedReporter};
 pub use secrets::{Secret, SecretKey, SecretStore, SecretStoreError};

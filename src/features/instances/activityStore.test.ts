@@ -47,10 +47,10 @@ describe("playCinepol", () => {
     const result = useActivityStore.getState().playCinepol();
     expect(session()?.activity.kind).toBe("installing");
 
-    handlers?.onProgress({ stage: "libraries", done: 3, total: 10 });
+    handlers?.onProgress({ stage: "libraries", done: 3, total: 10, unit: "bytes" });
     expect(session()?.activity).toMatchObject({ kind: "installing", stage: "libraries", done: 3 });
 
-    handlers?.onProgress({ stage: "launching", done: 0, total: 1 });
+    handlers?.onProgress({ stage: "launching", done: 0, total: 1, unit: "steps" });
     handlers?.onLog({ stream: "stdout", line: "Setting user: polispol1" });
     expect(session()?.activity.kind).toBe("running");
     expect(session()?.logs).toHaveLength(1);

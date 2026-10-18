@@ -11,8 +11,8 @@ use ts_rs::{Config, TS};
 use crate::dto::{
     AccountDto, AccountKindDto, AccountsDto, AppInfo, CommunityLinksDto, ConfigOriginDto,
     GameVersionDto, GameVersionsDto, InstallSummaryDto, InstanceDto, InstanceOriginDto,
-    LaunchOutcomeDto, LogLineDto, LogStreamDto, ProgressEvent, ProgressStageDto, ServerConfigDto,
-    ServerStatusDto, SettingsDto,
+    LaunchOutcomeDto, LogLineDto, LogStreamDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
+    ServerConfigDto, ServerStatusDto, SettingsDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -35,6 +35,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
     vec![
         AppInfo::decl(cfg),
         ProgressStageDto::decl(cfg),
+        ProgressUnitDto::decl(cfg),
         ProgressEvent::decl(cfg),
         ErrorCode::decl(cfg),
         AppError::decl(cfg),

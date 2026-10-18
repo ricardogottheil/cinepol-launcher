@@ -85,7 +85,7 @@ describe("InstancesPage", () => {
     );
     renderWithQuery(<InstancesPage />);
     fireEvent.click(await screen.findByRole("button", { name: labels.install }));
-    act(() => onProgress({ done: 40, total: 100, stage: "assets" }));
+    act(() => onProgress({ done: 40, total: 100, stage: "assets", unit: "bytes" }));
 
     expect(screen.getByText(esCommon.stages.assets)).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "40");

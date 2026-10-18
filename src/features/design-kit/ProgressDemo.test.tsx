@@ -36,7 +36,7 @@ describe("ProgressDemo", () => {
     fireEvent.click(screen.getByRole("button", { name: labels.start }));
     expect(screen.getByRole("status")).toHaveTextContent(labels.state.running);
 
-    act(() => options?.onProgress({ done: 5, total: 20, stage: null }));
+    act(() => options?.onProgress({ done: 5, total: 20, stage: null, unit: "steps" }));
     expect(screen.getByRole("progressbar", { name: labels.progressLabel })).toHaveAttribute(
       "aria-valuenow",
       "5",

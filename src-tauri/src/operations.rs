@@ -1,6 +1,7 @@
 //! Registry of running long operations, so the UI can cancel them by id.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use launcher_core::domain::instance::InstanceId;
@@ -61,6 +62,34 @@ impl RunningGames for OperationRegistry {
 
     fn release(&self, instance: &InstanceId) {
         self.finish(instance.as_str());
+    }
+}
+
+/// Lets one session of a kind run at a time (one Play on CINEPOL, so two
+/// presses never race to create the managed instance twice).
+#[derive(Debug, Default)]
+pub struct SessionGate {
+    busy: AtomicBool,
+}
+
+impl SessionGate {
+    /// `None` while another session holds the gate.
+    pub fn try_enter(&self) -> Option<SessionPass<'_>> {
+        self.busy
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| SessionPass { gate: self })
+    }
+}
+
+/// Holds the gate until dropped.
+pub struct SessionPass<'a> {
+    gate: &'a SessionGate,
+}
+
+impl Drop for SessionPass<'_> {
+    fn drop(&mut self) {
+        self.gate.busy.store(false, Ordering::Release);
     }
 }
 
@@ -127,5 +156,18 @@ mod tests {
         assert!(session.is_cancelled());
         games.release(&id);
         assert!(games.start("cinepol").is_ok());
+    }
+
+    #[test]
+    fn the_session_gate_lets_one_session_in_at_a_time() {
+        let gate = SessionGate::default();
+        let first = gate.try_enter();
+        assert!(first.is_some());
+        assert!(
+            gate.try_enter().is_none(),
+            "a second session waits for the first"
+        );
+        drop(first);
+        assert!(gate.try_enter().is_some(), "free again once the first ends");
     }
 }

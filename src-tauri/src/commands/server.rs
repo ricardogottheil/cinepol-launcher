@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::dto::{
     LaunchOutcomeDto, LogLineDto, ProgressEvent, ServerConfigDto, ServerStatusDto, SettingsDto,
 };
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
 use crate::logs::ChannelLogSink;
 use crate::progress::ChannelReporter;
@@ -44,6 +44,12 @@ pub async fn play_on_cinepol(
     on_progress: Channel<ProgressEvent>,
     on_log: Channel<LogLineDto>,
 ) -> Result<LaunchOutcomeDto, AppError> {
+    let _session = state.cinepol_session.try_enter().ok_or_else(|| {
+        AppError::new(
+            ErrorCode::AlreadyRunning,
+            "a Play on CINEPOL session is already running",
+        )
+    })?;
     let token = state.operations.start(&operation_id)?;
     let config = state.current_config();
     let install = InstallDeps {

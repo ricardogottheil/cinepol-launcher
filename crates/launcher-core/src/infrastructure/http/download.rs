@@ -392,8 +392,10 @@ impl<'a, R: ProgressReporter> BatchProgress<'a, R> {
     }
 
     fn report(&self, done: u64) {
-        self.reporter
-            .report(ProgressUpdate::new(done.min(self.total), Some(self.total)));
+        self.reporter.report(ProgressUpdate::bytes(
+            done.min(self.total),
+            Some(self.total),
+        ));
     }
 }
 
@@ -508,6 +510,7 @@ mod tests {
 
     use super::*;
     use crate::domain::integrity::{Checksum, HashAlgorithm};
+    use crate::domain::ports::ProgressUnit;
     use crate::infrastructure::http::test_server::{Reply, TestServer};
     use crate::testing::RecordingReporter;
 
@@ -836,6 +839,7 @@ mod tests {
         assert!(!updates.is_empty());
         assert!(updates.iter().all(|u| u.total == Some(15)));
         assert_eq!(updates.last().map(|u| u.done), Some(15));
+        assert!(updates.iter().all(|u| u.unit == ProgressUnit::Bytes));
     }
 
     #[tokio::test]

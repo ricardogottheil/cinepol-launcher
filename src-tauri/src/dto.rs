@@ -7,7 +7,7 @@ use launcher_core::application::launch_instance::LaunchOutcome;
 use launcher_core::domain::account::{Account, AccountKind};
 use launcher_core::domain::instance::{Instance, InstanceOrigin};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
-use launcher_core::domain::ports::{ProgressStage, ProgressUpdate};
+use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -52,6 +52,24 @@ pub struct ProgressEvent {
     #[ts(type = "number | null")]
     pub total: Option<u64>,
     pub stage: Option<ProgressStageDto>,
+    /// What `done` and `total` count.
+    pub unit: ProgressUnitDto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProgressUnitDto {
+    Steps,
+    Bytes,
+}
+
+impl From<ProgressUnit> for ProgressUnitDto {
+    fn from(unit: ProgressUnit) -> Self {
+        match unit {
+            ProgressUnit::Steps => Self::Steps,
+            ProgressUnit::Bytes => Self::Bytes,
+        }
+    }
 }
 
 impl From<ProgressUpdate> for ProgressEvent {
@@ -60,6 +78,7 @@ impl From<ProgressUpdate> for ProgressEvent {
             done: update.done,
             total: update.total,
             stage: update.stage.map(Into::into),
+            unit: update.unit.into(),
         }
     }
 }

@@ -20,7 +20,7 @@ use launcher_core::infrastructure::server_ping::MinecraftServerPinger;
 use launcher_core::infrastructure::time::{SystemClock, TokioDelay};
 
 use crate::error::{AppError, ErrorCode};
-use crate::operations::OperationRegistry;
+use crate::operations::{OperationRegistry, SessionGate};
 
 /// Build-time `requirePremiumForOffline`: CINEPOL accepts non-premium
 /// players, so offline profiles are allowed unless the build opts out.
@@ -42,6 +42,8 @@ pub struct AppState {
     pub operations: OperationRegistry,
     /// Running games by instance id, so the UI can stop them.
     pub games: OperationRegistry,
+    /// One Play on CINEPOL session at a time.
+    pub cinepol_session: SessionGate,
     pub delay: TokioDelay,
     pub paths: LauncherPaths,
     pub platform: Platform,
@@ -94,6 +96,7 @@ impl AppState {
         Ok(Self {
             operations: OperationRegistry::default(),
             games: OperationRegistry::default(),
+            cinepol_session: SessionGate::default(),
             delay: TokioDelay,
             platform: Platform::current(),
             offline_policy: OfflinePolicy {

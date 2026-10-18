@@ -7,7 +7,13 @@ export type AppInfo = { name: string, version: string, };
 
 export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "natives" | "launching";
 
-export type ProgressEvent = { done: number, total: number | null, stage: ProgressStageDto | null, };
+export type ProgressUnitDto = "steps" | "bytes";
+
+export type ProgressEvent = { done: number, total: number | null, stage: ProgressStageDto | null, 
+/**
+ * What `done` and `total` count.
+ */
+unit: ProgressUnitDto, };
 
 export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "internal";
 

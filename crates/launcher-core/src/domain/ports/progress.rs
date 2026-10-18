@@ -9,22 +9,43 @@ pub enum ProgressStage {
     Launching,
 }
 
+/// What `done` and `total` count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ProgressUnit {
+    /// Steps or files.
+    #[default]
+    Steps,
+    /// Downloaded bytes.
+    Bytes,
+}
+
 /// One progress step of a long-running operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgressUpdate {
-    /// Units completed so far (steps, files or bytes, per stage).
+    /// Units completed so far, counted in `unit`.
     pub done: u64,
     /// Total units, when known.
     pub total: Option<u64>,
     pub stage: Option<ProgressStage>,
+    pub unit: ProgressUnit,
 }
 
 impl ProgressUpdate {
+    /// Progress counted in steps.
     pub fn new(done: u64, total: Option<u64>) -> Self {
         Self {
             done,
             total,
             stage: None,
+            unit: ProgressUnit::Steps,
+        }
+    }
+
+    /// Progress counted in downloaded bytes.
+    pub fn bytes(done: u64, total: Option<u64>) -> Self {
+        Self {
+            unit: ProgressUnit::Bytes,
+            ..Self::new(done, total)
         }
     }
 }
