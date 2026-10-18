@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
@@ -6,18 +8,24 @@ import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "./activi
 import { splitPlaytime } from "./formatPlaytime";
 import { LogPanel } from "./LogPanel";
 import { ProgressMeter } from "./ProgressMeter";
+import { instancesKey } from "./useInstances";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const { t } = useTranslation();
   const own = useInstanceActivity(instance.id);
   const cinepolSession = useInstanceActivity(CINEPOL_SESSION);
   // A Play on CINEPOL session started from Home runs this instance too.
-  const { activity, logs, error, lastExit } =
+  const { activity, logs, error, lastExit, notice } =
     instance.origin === "cinepolServer" && cinepolSession.activity.kind !== "idle"
       ? cinepolSession
       : own;
-  const { install, play, stop } = useActivityStore();
+  const { install, play, stop, updatePack, exportPack } = useActivityStore();
   const busy = activity.kind !== "idle";
+  const queryClient = useQueryClient();
+  // An update may move the instance to another game or loader version.
+  useEffect(() => {
+    if (notice?.kind === "updated") void queryClient.invalidateQueries({ queryKey: instancesKey });
+  }, [notice, queryClient]);
   const loader = instance.loaderVersion
     ? `${instance.loader} ${instance.loaderVersion}`
     : instance.loader;
@@ -42,6 +50,14 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
             <Button onClick={() => void stop(instance.id)}>{t("instances.stop")}</Button>
           ) : (
             <>
+              {instance.origin === "modpack" ? (
+                <Button onClick={() => void updatePack(instance.id)} disabled={busy}>
+                  {t("instances.update")}
+                </Button>
+              ) : null}
+              <Button onClick={() => void exportPack(instance.id)} disabled={busy}>
+                {t("instances.export")}
+              </Button>
               <Button onClick={() => void install(instance.id)} disabled={busy}>
                 {t("instances.install")}
               </Button>
@@ -72,6 +88,18 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           <span className="text-stale">{t(`errors.${error}`)}</span>
         ) : activity.kind === "running" ? (
           <span className="text-silk-dim">{t("instances.playing")}</span>
+        ) : notice?.kind === "upToDate" ? (
+          <span className="text-silk-dim">{t("instances.upToDate")}</span>
+        ) : notice?.kind === "updated" ? (
+          <span className="text-silk-dim">
+            {notice.kept > 0
+              ? t("instances.keptChanges", { count: notice.kept })
+              : t("instances.updated")}
+          </span>
+        ) : notice?.kind === "exported" ? (
+          <span className="break-all text-silk-dim">
+            {t("instances.exported", { path: notice.path })}
+          </span>
         ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
           <span className="text-stale">
             {t("instances.exited", { code: lastExit.exitCode ?? "-" })}

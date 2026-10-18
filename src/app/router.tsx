@@ -9,7 +9,7 @@ import { AccountsPage } from "../features/accounts/AccountsPage";
 import { DesignKitPage } from "../features/design-kit/DesignKitPage";
 import { HomePage } from "../features/home/HomePage";
 import { InstancesPage } from "../features/instances/InstancesPage";
-import { PlaceholderPage, type PlaceholderSection } from "../features/placeholder/PlaceholderPage";
+import { ModpacksPage } from "../features/modpacks/ModpacksPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { AppShell } from "./shell/AppShell";
 
@@ -21,14 +21,6 @@ const homeRoute = createRoute({
   component: () => <HomePage />,
 });
 
-function placeholderRoute(section: PlaceholderSection) {
-  return createRoute({
-    getParentRoute: () => rootRoute,
-    path: `/${section}`,
-    component: () => <PlaceholderPage section={section} />,
-  });
-}
-
 const designRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/design",
@@ -38,7 +30,7 @@ const designRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   homeRoute,
   createRoute({ getParentRoute: () => rootRoute, path: "/instances", component: InstancesPage }),
-  placeholderRoute("modpacks"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/modpacks", component: ModpacksPage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/accounts", component: AccountsPage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage }),
   ...(import.meta.env.DEV ? [designRoute] : []),

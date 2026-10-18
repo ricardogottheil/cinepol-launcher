@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   type ClientErrorCode,
+  exportMrpack,
   type InstallSummaryDto,
   installInstance,
   killInstance,
@@ -11,6 +12,7 @@ import {
   type ProgressUnitDto,
   playOnCinepol,
   toIpcError,
+  updateModpack,
 } from "../../ipc/client";
 
 /** Store key of the "Play on CINEPOL" session (instance ids never contain a colon). */
@@ -36,11 +38,18 @@ export type Activity =
       cancel?: () => Promise<boolean>;
     };
 
+/** The outcome of the last modpack update or export, shown under the row. */
+export type ActivityNotice =
+  | { kind: "updated"; kept: number }
+  | { kind: "upToDate" }
+  | { kind: "exported"; path: string };
+
 export interface InstanceActivity {
   activity: Activity;
   logs: LogLineDto[];
   error: ClientErrorCode | null;
   lastExit: LaunchOutcomeDto | null;
+  notice?: ActivityNotice | null;
 }
 
 interface ActivityState {
@@ -48,6 +57,10 @@ interface ActivityState {
   install: (instanceId: string) => Promise<InstallSummaryDto | null>;
   play: (instanceId: string) => Promise<LaunchOutcomeDto | null>;
   stop: (instanceId: string) => Promise<void>;
+  /** Updates a modpack instance in place, keeping the player's changes. */
+  updatePack: (instanceId: string) => Promise<void>;
+  /** Asks where to save and exports the instance as a `.mrpack`. */
+  exportPack: (instanceId: string) => Promise<void>;
   playCinepol: () => Promise<LaunchOutcomeDto | null>;
 }
 
@@ -99,6 +112,54 @@ export const useActivityStore = create<ActivityState>((set) => {
     } catch (error) {
       update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
       return null;
+    }
+  };
+
+  const updatePack = async (instanceId: string) => {
+    const operation = updateModpack(instanceId, (event) =>
+      update(instanceId, {
+        activity: {
+          kind: "installing",
+          stage: event.stage,
+          done: event.done,
+          total: event.total,
+          unit: event.unit,
+          cancel: operation.cancel,
+        },
+      }),
+    );
+    update(instanceId, {
+      activity: {
+        kind: "installing",
+        stage: null,
+        done: 0,
+        total: null,
+        unit: "steps",
+        cancel: operation.cancel,
+      },
+      error: null,
+      notice: null,
+    });
+    try {
+      const outcome = await operation.done;
+      update(instanceId, {
+        activity: { kind: "idle" },
+        notice: outcome.upToDate
+          ? { kind: "upToDate" }
+          : { kind: "updated", kept: outcome.files?.kept ?? 0 },
+      });
+    } catch (error) {
+      update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
+    }
+  };
+
+  const exportPack = async (instanceId: string) => {
+    update(instanceId, { error: null, notice: null });
+    try {
+      const exported = await exportMrpack(instanceId);
+      if (exported) update(instanceId, { notice: { kind: "exported", path: exported.path } });
+    } catch (error) {
+      update(instanceId, { error: toIpcError(error).code });
     }
   };
 
@@ -197,7 +258,7 @@ export const useActivityStore = create<ActivityState>((set) => {
     }
   };
 
-  return { byInstance: {}, install, play, stop, playCinepol };
+  return { byInstance: {}, install, play, stop, updatePack, exportPack, playCinepol };
 });
 
 export function useInstanceActivity(instanceId: string): InstanceActivity {

@@ -60,9 +60,6 @@
     },
     "signInAgain": "Sign in again"
   },
-  "placeholder": {
-    "notAvailable": "This section is not available yet."
-  },
   "designKit": {
     "title": "Design kit",
     "lead": "Every base component in the CINEPOL look, rendered with real copy.",
@@ -202,7 +199,14 @@
     },
     "unstable": "{{version}} (not recommended)",
     "forgeNote": "Forge is funded by the ads on its download page, which the launcher skips.",
-    "supportForge": "Support Forge"
+    "supportForge": "Support Forge",
+    "update": "Update modpack",
+    "export": "Export .mrpack",
+    "upToDate": "The modpack is already up to date.",
+    "updated": "Modpack updated.",
+    "keptChanges_one": "Modpack updated. {{count}} file you changed was kept.",
+    "keptChanges_other": "Modpack updated. {{count}} files you changed were kept.",
+    "exported": "Saved to {{path}}"
   },
   "settings": {
     "title": "Settings",
@@ -219,5 +223,40 @@
   },
   "units": {
     "megabytes": "MB"
+  },
+  "modpacks": {
+    "title": "Modpacks",
+    "source": "From Modrinth",
+    "import": "Import .mrpack",
+    "searchLabel": "Search Modrinth",
+    "searchPlaceholder": "Name or keyword",
+    "loaderLabel": "Loader",
+    "anyLoader": "Any loader",
+    "results": "Modpacks",
+    "loading": "Searching Modrinth",
+    "empty": "No modpack matches this search.",
+    "pages": "Result pages",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}",
+    "pageOf": "Page {{page}} of {{count}}",
+    "downloads": "Downloads",
+    "showVersions": "Versions",
+    "hideVersions": "Hide versions",
+    "versionsLoading": "Loading versions",
+    "noVersions": "This modpack has no versions yet.",
+    "spec": {
+      "version": "Version",
+      "minecraft": "Minecraft",
+      "loader": "Loader",
+      "size": "Size"
+    },
+    "install": "Install",
+    "notInstallable": "No .mrpack file",
+    "progress": "Modpack install",
+    "installing": "Installing {{name}}",
+    "importing": "Importing the modpack",
+    "cancel": "Cancel",
+    "installed": "{{name}} is ready in Instances."
   }
 }

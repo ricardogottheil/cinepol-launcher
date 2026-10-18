@@ -15,6 +15,8 @@ const client = vi.hoisted(() => ({
   launchInstance: vi.fn(),
   killInstance: vi.fn(),
   openExternal: vi.fn(),
+  updateModpack: vi.fn(),
+  exportMrpack: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -271,5 +273,66 @@ describe("InstancesPage", () => {
     const other = screen.getByRole("heading", { name: "Survival" }).closest("li");
     if (!other) throw new Error("no Survival row");
     expect(within(other).getByRole("button", { name: labels.play })).toBeEnabled();
+  });
+
+  it("offers modpack updates only on modpack instances and reports kept changes", async () => {
+    client.listInstances.mockResolvedValue([
+      instance,
+      { ...instance, id: "fo", name: "Fabulously Optimized", origin: "modpack" },
+    ]);
+    client.updateModpack.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({
+        upToDate: false,
+        instance: { ...instance, id: "fo", name: "Fabulously Optimized", origin: "modpack" },
+        files: { written: 3, unchanged: 40, kept: 2, removed: 1 },
+      }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<InstancesPage />);
+    const row = (await screen.findByRole("heading", { name: "Fabulously Optimized" })).closest(
+      "li",
+    );
+    const other = screen.getByRole("heading", { name: "Survival" }).closest("li");
+    if (!row || !other) throw new Error("rows not found");
+    expect(within(other).queryByRole("button", { name: labels.update })).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: labels.update }));
+    expect(client.updateModpack).toHaveBeenCalledWith("fo", expect.any(Function));
+    expect(
+      await within(row).findByText(labels.keptChanges_other.replace("{{count}}", "2")),
+    ).toBeInTheDocument();
+  });
+
+  it("says when a modpack is already up to date", async () => {
+    client.listInstances.mockResolvedValue([{ ...instance, origin: "modpack" }]);
+    client.updateModpack.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({ upToDate: true, instance: null, files: null }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.update }));
+    expect(await screen.findByText(labels.upToDate)).toBeInTheDocument();
+  });
+
+  it("exports an instance as a .mrpack and shows where it was saved", async () => {
+    client.exportMrpack.mockResolvedValue({
+      path: "/home/steve/Survival.mrpack",
+      indexed: 10,
+      overrides: 2,
+    });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.export }));
+    expect(client.exportMrpack).toHaveBeenCalledWith("survival");
+    expect(
+      await screen.findByText(labels.exported.replace("{{path}}", "/home/steve/Survival.mrpack")),
+    ).toBeInTheDocument();
+  });
+
+  it("shows why an export failed", async () => {
+    client.exportMrpack.mockRejectedValue(new IpcError("network", "offline"));
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.export }));
+    expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
 });

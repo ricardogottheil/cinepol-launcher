@@ -60,9 +60,6 @@
     },
     "signInAgain": "Volver a iniciar sesión"
   },
-  "placeholder": {
-    "notAvailable": "Esta sección todavía no está disponible."
-  },
   "designKit": {
     "title": "Kit de diseño",
     "lead": "Todos los componentes base con el aspecto de CINEPOL y textos reales.",
@@ -202,7 +199,14 @@
     },
     "unstable": "{{version}} (no recomendada)",
     "forgeNote": "Forge se financia con los anuncios de su página de descarga, que el launcher se salta.",
-    "supportForge": "Apoyar a Forge"
+    "supportForge": "Apoyar a Forge",
+    "update": "Actualizar modpack",
+    "export": "Exportar .mrpack",
+    "upToDate": "El modpack ya está al día.",
+    "updated": "Modpack actualizado.",
+    "keptChanges_one": "Modpack actualizado. Se conservó {{count}} archivo que cambiaste.",
+    "keptChanges_other": "Modpack actualizado. Se conservaron {{count}} archivos que cambiaste.",
+    "exported": "Guardado en {{path}}"
   },
   "settings": {
     "title": "Ajustes",
@@ -219,5 +223,40 @@
   },
   "units": {
     "megabytes": "MB"
+  },
+  "modpacks": {
+    "title": "Modpacks",
+    "source": "Desde Modrinth",
+    "import": "Importar .mrpack",
+    "searchLabel": "Buscar en Modrinth",
+    "searchPlaceholder": "Nombre o palabra clave",
+    "loaderLabel": "Loader",
+    "anyLoader": "Cualquier loader",
+    "results": "Modpacks",
+    "loading": "Buscando en Modrinth",
+    "empty": "Ningún modpack coincide con la búsqueda.",
+    "pages": "Páginas de resultados",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "page": "Página {{page}}",
+    "pageOf": "Página {{page}} de {{count}}",
+    "downloads": "Descargas",
+    "showVersions": "Versiones",
+    "hideVersions": "Ocultar versiones",
+    "versionsLoading": "Cargando versiones",
+    "noVersions": "Este modpack todavía no tiene versiones.",
+    "spec": {
+      "version": "Versión",
+      "minecraft": "Minecraft",
+      "loader": "Loader",
+      "size": "Tamaño"
+    },
+    "install": "Instalar",
+    "notInstallable": "Sin archivo .mrpack",
+    "progress": "Instalación del modpack",
+    "installing": "Instalando {{name}}",
+    "importing": "Importando el modpack",
+    "cancel": "Cancelar",
+    "installed": "{{name}} está listo en Instancias."
   }
 }
