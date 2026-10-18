@@ -1,0 +1,1 @@
+{"error":"authorization_declined","error_description":"AADSTS70000: The user denied the authorization request.","error_codes":[70000],"timestamp":"2026-10-17 12:00:00Z","trace_id":"00000000-0000-0000-0000-000000000001","correlation_id":"00000000-0000-0000-0000-000000000002"}

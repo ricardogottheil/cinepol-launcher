@@ -1,0 +1,1 @@
+{"error":"slow_down","error_description":"AADSTS70016: Polling too frequently.","error_codes":[70016],"timestamp":"2026-10-17 12:00:00Z","trace_id":"00000000-0000-0000-0000-000000000001","correlation_id":"00000000-0000-0000-0000-000000000002"}

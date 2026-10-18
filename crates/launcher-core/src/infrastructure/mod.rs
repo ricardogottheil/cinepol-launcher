@@ -7,6 +7,7 @@ pub mod fs;
 pub mod http;
 pub mod java;
 pub mod mojang;
+pub mod msa;
 pub mod nbt;
 pub mod process;
 pub mod server_ping;

@@ -1,0 +1,1 @@
+{"error":"invalid_grant","error_description":"AADSTS70000: The provided value for the refresh_token is not valid or has expired.","error_codes":[70000],"timestamp":"2026-10-17 12:00:00Z","trace_id":"00000000-0000-0000-0000-000000000001","correlation_id":"00000000-0000-0000-0000-000000000002","error_uri":"https://login.microsoftonline.com/error?code=70000"}
