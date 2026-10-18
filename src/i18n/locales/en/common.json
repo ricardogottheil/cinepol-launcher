@@ -118,7 +118,8 @@
     "sign_in_refused": "Microsoft did not allow this sign-in. Check the account on xbox.com",
     "not_entitled": "This account does not own Minecraft: Java Edition",
     "app_not_approved": "Microsoft sign-in is not enabled for this launcher yet",
-    "keychain_unavailable": "The system keychain is not available to store the session"
+    "keychain_unavailable": "The system keychain is not available to store the session",
+    "microsoft_not_configured": "This build of the launcher has no Microsoft sign-in"
   },
   "stages": {
     "metadata": "Reading the version",

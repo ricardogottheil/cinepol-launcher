@@ -26,6 +26,18 @@
         },
         {
           "url": "https://cinepol.policarpiers.com/*"
+        },
+        {
+          "url": "https://www.microsoft.com/link*"
+        },
+        {
+          "url": "https://microsoft.com/link*"
+        },
+        {
+          "url": "https://www.microsoft.com/devicelogin*"
+        },
+        {
+          "url": "https://microsoft.com/devicelogin*"
         }
       ]
     }

@@ -1,11 +1,14 @@
 //! The serializable error every command returns. The frontend switches on
 //! `code`; `message` is for logs and developers, never parsed.
 
+use launcher_core::application::account_skin::AccountSkinError;
 use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::launch_instance::LaunchError;
+use launcher_core::application::login_microsoft::LoginError;
 use launcher_core::application::refresh_session::SessionError;
+use launcher_core::application::remove_account::RemoveAccountError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
 use launcher_core::domain::account::AccountRepositoryError;
 use launcher_core::domain::account::AuthError;
@@ -40,6 +43,8 @@ pub enum ErrorCode {
     AppNotApproved,
     /// The OS keychain is missing or refused access.
     KeychainUnavailable,
+    /// This build has no `MSA_CLIENT_ID`, so it cannot sign in with Microsoft.
+    MicrosoftNotConfigured,
     Internal,
 }
 
@@ -235,6 +240,40 @@ impl From<launcher_core::application::play_on_cinepol::PlayOnCinepolError> for A
                 Self::new(ErrorCode::AlreadyRunning, error.to_string())
             }
         }
+    }
+}
+
+impl From<LoginError> for AppError {
+    fn from(error: LoginError) -> Self {
+        let code = match &error {
+            LoginError::Auth(auth) => auth_code(auth),
+            LoginError::Cancelled => ErrorCode::Cancelled,
+            LoginError::Storage(_) => ErrorCode::Internal,
+            LoginError::Keychain(_) => ErrorCode::KeychainUnavailable,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<RemoveAccountError> for AppError {
+    fn from(error: RemoveAccountError) -> Self {
+        let code = match &error {
+            RemoveAccountError::NotFound => ErrorCode::NotFound,
+            RemoveAccountError::Storage(_) => ErrorCode::Internal,
+            RemoveAccountError::Keychain(_) => ErrorCode::KeychainUnavailable,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<AccountSkinError> for AppError {
+    fn from(error: AccountSkinError) -> Self {
+        let code = match &error {
+            AccountSkinError::NotFound => ErrorCode::NotFound,
+            AccountSkinError::Storage(_) => ErrorCode::Internal,
+            AccountSkinError::Auth(auth) => auth_code(auth),
+        };
+        Self::new(code, error.to_string())
     }
 }
 

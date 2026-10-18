@@ -22,6 +22,7 @@ path = "src/bin/export_bindings.rs"
 tauri-build = { version = "2.7.3", features = [] }
 
 [dependencies]
+base64.workspace = true
 cinepol-launcher-core.workspace = true
 tauri = { version = "2.12.4", features = [] }
 tauri-plugin-opener.workspace = true

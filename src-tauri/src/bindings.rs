@@ -9,10 +9,11 @@
 use ts_rs::{Config, TS};
 
 use crate::dto::{
-    AccountDto, AccountKindDto, AccountsDto, AppInfo, CommunityLinksDto, ConfigOriginDto,
-    GameVersionDto, GameVersionsDto, InstallSummaryDto, InstanceDto, InstanceOriginDto,
-    LaunchOutcomeDto, LogLineDto, LogStreamDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
-    ProgressUnitDto, ServerConfigDto, ServerStatusDto, SettingsDto,
+    AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, CommunityLinksDto,
+    ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto, InstallSummaryDto,
+    InstanceDto, InstanceOriginDto, LaunchOutcomeDto, LogLineDto, LogStreamDto, PremiumNameDto,
+    ProgressEvent, ProgressStageDto, ProgressUnitDto, ServerConfigDto, ServerStatusDto,
+    SettingsDto, SkinDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -43,6 +44,9 @@ fn declarations(cfg: &Config) -> Vec<String> {
         AccountDto::decl(cfg),
         AccountsDto::decl(cfg),
         PremiumNameDto::decl(cfg),
+        AccountPolicyDto::decl(cfg),
+        DeviceCodeDto::decl(cfg),
+        SkinDto::decl(cfg),
         GameVersionDto::decl(cfg),
         GameVersionsDto::decl(cfg),
         InstanceOriginDto::decl(cfg),
@@ -95,6 +99,25 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             "check_premium_name",
             vec![("username", string())],
             PremiumNameDto::name(cfg),
+        ),
+        command("get_account_policy", vec![], AccountPolicyDto::name(cfg)),
+        command(
+            "login_microsoft",
+            vec![
+                ("operationId", string()),
+                ("onCode", format!("Channel<{}>", DeviceCodeDto::name(cfg))),
+            ],
+            AccountDto::name(cfg),
+        ),
+        command(
+            "remove_account",
+            vec![("accountId", string())],
+            "null".to_owned(),
+        ),
+        command(
+            "get_account_skin",
+            vec![("accountId", string())],
+            format!("{} | null", SkinDto::name(cfg)),
         ),
         command(
             "set_active_account",
@@ -233,6 +256,10 @@ mod tests {
             "list_accounts",
             "create_offline_account",
             "check_premium_name",
+            "get_account_policy",
+            "login_microsoft",
+            "remove_account",
+            "get_account_skin",
             "set_active_account",
             "list_game_versions",
             "list_instances",

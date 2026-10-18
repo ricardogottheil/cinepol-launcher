@@ -105,7 +105,7 @@ pub async fn launch_instance(
         fs: &state.fs,
         paths: &state.paths,
         platform: &state.platform,
-        sessions: &launcher_core::application::refresh_session::NoPremiumSessions,
+        sessions: &state.sessions(),
         launcher_name: crate::state::LAUNCHER_NAME,
         launcher_version: &state.launcher_version,
     };

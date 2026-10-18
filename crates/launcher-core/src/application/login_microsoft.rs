@@ -220,7 +220,10 @@ mod tests {
         assert!(
             matches!(&account.kind, AccountKind::Microsoft(m) if m.xuid == "2535428" && m.skin == profile.skin)
         );
-        assert_eq!(world.accounts.list().await.unwrap(), std::slice::from_ref(&account));
+        assert_eq!(
+            world.accounts.list().await.unwrap(),
+            std::slice::from_ref(&account)
+        );
         assert_eq!(world.accounts.active().await.unwrap(), Some(account.id));
         assert_eq!(
             world

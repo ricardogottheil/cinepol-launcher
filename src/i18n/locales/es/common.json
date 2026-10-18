@@ -118,7 +118,8 @@
     "sign_in_refused": "Microsoft no permitió este inicio de sesión. Revisa la cuenta en xbox.com",
     "not_entitled": "Esta cuenta no tiene Minecraft: Java Edition",
     "app_not_approved": "El inicio de sesión con Microsoft todavía no está habilitado para este launcher",
-    "keychain_unavailable": "El llavero del sistema no está disponible para guardar la sesión"
+    "keychain_unavailable": "El llavero del sistema no está disponible para guardar la sesión",
+    "microsoft_not_configured": "Esta versión del launcher no incluye inicio de sesión con Microsoft"
   },
   "stages": {
     "metadata": "Leyendo la versión",

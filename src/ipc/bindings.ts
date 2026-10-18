@@ -15,7 +15,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -26,6 +26,20 @@ export type AccountDto = { id: string, kind: AccountKindDto, username: string, p
 export type AccountsDto = { accounts: Array<AccountDto>, activeId: string | null, };
 
 export type PremiumNameDto = "premium" | "free" | "unknown";
+
+export type AccountPolicyDto = { 
+/**
+ * This build can sign in with Microsoft (it has an `MSA_CLIENT_ID`).
+ */
+microsoftAvailable: boolean, 
+/**
+ * Offline profiles need a premium account first.
+ */
+requirePremiumForOffline: boolean, };
+
+export type DeviceCodeDto = { userCode: string, verificationUri: string, expiresInSecs: number, };
+
+export type SkinDto = { dataUrl: string, slim: boolean, };
 
 export type GameVersionDto = { id: string, 
 /**
@@ -73,6 +87,10 @@ export interface Commands {
   list_accounts: { args: Record<string, never>; result: AccountsDto };
   create_offline_account: { args: { username: string }; result: AccountDto };
   check_premium_name: { args: { username: string }; result: PremiumNameDto };
+  get_account_policy: { args: Record<string, never>; result: AccountPolicyDto };
+  login_microsoft: { args: { operationId: string; onCode: Channel<DeviceCodeDto> }; result: AccountDto };
+  remove_account: { args: { accountId: string }; result: null };
+  get_account_skin: { args: { accountId: string }; result: SkinDto | null };
   set_active_account: { args: { accountId: string }; result: null };
   list_game_versions: { args: { includeSnapshots: boolean }; result: GameVersionsDto };
   list_instances: { args: Record<string, never>; result: Array<InstanceDto> };

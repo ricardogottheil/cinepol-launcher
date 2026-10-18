@@ -2,10 +2,12 @@
 //!
 //! Every DTO exported to TypeScript is registered in `crate::bindings`.
 
+use launcher_core::application::account_skin::SkinTexture;
 use launcher_core::application::check_premium_name::PremiumNameCheck;
 use launcher_core::application::install_instance::InstallSummary;
 use launcher_core::application::launch_instance::LaunchOutcome;
 use launcher_core::domain::account::{Account, AccountKind};
+use launcher_core::domain::account::{DeviceCode, SkinVariant};
 use launcher_core::domain::instance::{Instance, InstanceOrigin};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
@@ -108,6 +110,58 @@ impl From<PremiumNameCheck> for PremiumNameDto {
 pub enum AccountKindDto {
     Microsoft,
     Offline,
+}
+
+/// What the Accounts screen may offer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountPolicyDto {
+    /// This build can sign in with Microsoft (it has an `MSA_CLIENT_ID`).
+    pub microsoft_available: bool,
+    /// Offline profiles need a premium account first.
+    pub require_premium_for_offline: bool,
+}
+
+/// The code to show while a Microsoft sign-in waits for approval.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceCodeDto {
+    pub user_code: String,
+    pub verification_uri: String,
+    #[ts(type = "number")]
+    pub expires_in_secs: u64,
+}
+
+impl From<&DeviceCode> for DeviceCodeDto {
+    fn from(code: &DeviceCode) -> Self {
+        Self {
+            user_code: code.user_code.clone(),
+            verification_uri: code.verification_uri.clone(),
+            expires_in_secs: code.expires_in_secs,
+        }
+    }
+}
+
+/// A skin texture as a `data:image/png;base64,...` URL (the CSP allows no
+/// remote images), with its arm model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinDto {
+    pub data_url: String,
+    pub slim: bool,
+}
+
+impl From<&SkinTexture> for SkinDto {
+    fn from(skin: &SkinTexture) -> Self {
+        use base64::Engine;
+        Self {
+            data_url: format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(&skin.png)
+            ),
+            slim: skin.variant == SkinVariant::Slim,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

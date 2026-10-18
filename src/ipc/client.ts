@@ -67,6 +67,7 @@ const BACKEND_CODES = {
   not_entitled: true,
   app_not_approved: true,
   keychain_unavailable: true,
+  microsoft_not_configured: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 

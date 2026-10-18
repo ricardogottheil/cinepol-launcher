@@ -3,8 +3,12 @@
 use std::path::PathBuf;
 use std::sync::{PoisonError, RwLock};
 
-use launcher_core::domain::account::OfflinePolicy;
+use launcher_core::application::refresh_session::{
+    MicrosoftSessions, PremiumSessions, SessionError,
+};
+use launcher_core::domain::account::{Account, OfflinePolicy};
 use launcher_core::domain::launch::{LauncherPaths, Platform};
+use launcher_core::domain::ports::Secret;
 use launcher_core::domain::server::ServerConfig;
 use launcher_core::infrastructure::archive::ZipNativesExtractor;
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
@@ -13,7 +17,9 @@ use launcher_core::infrastructure::fs::{
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
+use launcher_core::infrastructure::keychain::KeyringSecretStore;
 use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
+use launcher_core::infrastructure::msa::MsaClient;
 use launcher_core::infrastructure::nbt::NbtServerListStore;
 use launcher_core::infrastructure::process::TokioGameProcessRunner;
 use launcher_core::infrastructure::server_ping::MinecraftServerPinger;
@@ -27,6 +33,20 @@ use crate::operations::{OperationRegistry, SessionGate};
 fn require_premium_for_offline() -> bool {
     option_env!("CINEPOL_REQUIRE_PREMIUM_FOR_OFFLINE") == Some("true")
 }
+
+/// The Azure app (client) id for Microsoft sign-in: `MSA_CLIENT_ID` at run
+/// time (development) or at build time (`build.rs` reads it from `.env`).
+/// `None` builds a launcher without Microsoft sign-in.
+fn msa_client_id() -> Option<String> {
+    std::env::var("MSA_CLIENT_ID")
+        .ok()
+        .or_else(|| option_env!("MSA_CLIENT_ID").map(str::to_owned))
+        .map(|id| id.trim().to_owned())
+        .filter(|id| !id.is_empty())
+}
+
+/// The keychain service name: the app identifier, so entries are easy to find.
+const KEYCHAIN_SERVICE: &str = "com.policarpiers.cinepol-launcher";
 
 /// `${launcher_name}` passed to the game.
 pub const LAUNCHER_NAME: &str = "cinepol-launcher";
@@ -61,6 +81,10 @@ pub struct AppState {
     pub servers: NbtServerListStore,
     pub pinger: MinecraftServerPinger,
     pub premium_names: MojangPremiumNames<ReqwestHttpClient>,
+    /// Microsoft sign-in; `None` when the build has no `MSA_CLIENT_ID`.
+    pub msa: Option<MsaClient<ReqwestHttpClient>>,
+    /// Account tokens, in the OS keychain only.
+    pub secrets: KeyringSecretStore,
     pub config_source: HttpServerConfigSource<ReqwestHttpClient>,
     pub settings: JsonSettingsRepository,
     pub bundled_config: ServerConfig,
@@ -69,6 +93,11 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Game tokens for premium accounts, refreshed silently before launch.
+    pub fn sessions(&self) -> AppSessions<'_> {
+        AppSessions(self)
+    }
+
     pub fn current_config(&self) -> ServerConfig {
         self.current_config
             .read()
@@ -112,6 +141,8 @@ impl AppState {
             servers: NbtServerListStore::new(paths.clone()),
             pinger: MinecraftServerPinger::new(),
             premium_names: MojangPremiumNames::new(http.clone()),
+            msa: msa_client_id().map(|client_id| MsaClient::new(http.clone(), client_id)),
+            secrets: KeyringSecretStore::new(KEYCHAIN_SERVICE),
             current_config: RwLock::new(bundled_config.clone()),
             bundled_config,
             java: ManagedJavaRuntimes::new(
@@ -127,5 +158,24 @@ impl AppState {
             fs: TokioFileSystem,
             paths,
         })
+    }
+}
+
+/// Premium sessions of the running app: Microsoft sign-in when configured.
+pub struct AppSessions<'a>(&'a AppState);
+
+impl PremiumSessions for AppSessions<'_> {
+    async fn session_token(&self, account: &Account) -> Result<Secret, SessionError> {
+        let Some(auth) = &self.0.msa else {
+            // Without sign-in no session can be renewed.
+            return Err(SessionError::Expired);
+        };
+        MicrosoftSessions {
+            auth,
+            secrets: &self.0.secrets,
+            clock: &self.0.clock,
+        }
+        .session_token(account)
+        .await
     }
 }
