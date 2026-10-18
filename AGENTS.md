@@ -93,6 +93,7 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
 | Network tests (opt-in) | `cargo test -p cinepol-launcher-core --features network-tests` |
 | Real vanilla E2E (opt-in, ~1 GB, opens the game) | `cargo test -p cinepol-launcher-core --features network-tests --test e2e_vanilla -- --nocapture` (data in `target/e2e-data`; delete it afterwards) |
 | Real loader E2E | the same command with `CINEPOL_E2E_LOADER=fabric` (or `quilt`, `forge`, `neoforge`) |
+| Real modpack E2E (opt-in, opens the game) | `cargo test -p cinepol-launcher-core --features network-tests --test e2e_modpack -- --nocapture` (installs Fabulously Optimized from Modrinth; `CINEPOL_E2E_MODPACK` for another project; delete `target/e2e-data` afterwards) |
 | Frontend tests | `pnpm test` |
 | English-only check | `pnpm check:english` |
 | Regenerate bindings | `pnpm bindings` |
