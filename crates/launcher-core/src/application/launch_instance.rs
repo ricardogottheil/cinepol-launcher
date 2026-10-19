@@ -479,6 +479,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_game_the_launcher_killed_never_counts_as_a_crash() {
+        let mut world = World::installed().await;
+        world.runner = FakeGameProcess::running_until_killed();
+        world.fs.add_file_at(
+            crash_dir().join("crash-new.txt"),
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_005),
+        );
+        let kill = CancellationToken::new();
+        kill.cancel();
+        let outcome = launch_instance(&request(), &world.deps(), RecordingLogSink::default(), kill)
+            .await
+            .unwrap();
+        assert!(outcome.exit.killed_by_launcher);
+        assert_eq!(outcome.crash_report, None);
+    }
+
+    #[tokio::test]
     async fn decodes_log4j_events_before_streaming_them() {
         let mut world = World::installed().await;
         world.runner = FakeGameProcess::exiting_with_output(

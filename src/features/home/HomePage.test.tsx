@@ -4,7 +4,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { act, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import serverConfig from "../../../config/server-config.json";
 import esCommon from "../../i18n/locales/es/common.json";
@@ -14,6 +14,7 @@ import { CINEPOL_SESSION, useActivityStore } from "../instances/activityStore";
 import { HomePage } from "./HomePage";
 
 const client = vi.hoisted(() => ({
+  openCrashReport: vi.fn(),
   listAccounts: vi.fn(),
   listInstances: vi.fn(),
   getServerConfig: vi.fn(),
@@ -226,5 +227,30 @@ describe("HomePage", () => {
       "href",
       "/accounts",
     );
+  });
+
+  it("offers to open the crash report after a Play on CINEPOL crash", async () => {
+    const report = "crash-2026-10-19_12.00.00-client.txt";
+    client.openCrashReport.mockResolvedValue(undefined);
+    useActivityStore.setState({
+      byInstance: {
+        [CINEPOL_SESSION]: {
+          activity: { kind: "idle" },
+          logs: [],
+          error: null,
+          lastExit: {
+            instanceId: "cinepol",
+            exitCode: 255,
+            killed: false,
+            playedSecs: 30,
+            crashReport: report,
+          },
+        },
+      },
+    });
+    renderHome();
+    expect(await screen.findByText(esCommon.instances.crashed)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: esCommon.instances.openCrashReport }));
+    expect(client.openCrashReport).toHaveBeenCalledWith("cinepol", report);
   });
 });

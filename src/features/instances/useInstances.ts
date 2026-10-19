@@ -105,7 +105,7 @@ export function useManualDownloads(instanceId: string, enabled: boolean) {
   });
 }
 
-const serversKey = (instanceId: string) => ["servers", instanceId] as const;
+export const serversKey = (instanceId: string) => ["servers", instanceId] as const;
 
 export function useServers(instanceId: string) {
   return useQuery({ queryKey: serversKey(instanceId), queryFn: () => listServers(instanceId) });

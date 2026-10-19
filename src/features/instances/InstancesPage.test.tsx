@@ -781,6 +781,32 @@ describe("InstancesPage", () => {
       );
     });
 
+    it("locks reordering and removal while a server is being edited", async () => {
+      const s = (n: string) => ({ ...cinepol, name: n, address: `${n.toLowerCase()}.example.com` });
+      const [a, b, c] = ["A", "B", "C"].map(s);
+      client.listServers.mockResolvedValue({ servers: [a, b, c] });
+      client.editServerList.mockResolvedValue({ servers: [a, b, c] });
+      const panel = await openServers();
+      const rowC = (await within(panel).findByText("C")).closest("li");
+      const rowA = within(panel).getByText("A").closest("li");
+      if (!rowC || !rowA) throw new Error("no rows");
+      fireEvent.click(within(rowC).getByRole("button", { name: serverLabels.edit }));
+      expect(within(rowA).getByRole("button", { name: serverLabels.remove })).toBeDisabled();
+      expect(within(rowA).getByRole("button", { name: serverLabels.moveDown })).toBeDisabled();
+      fireEvent.change(within(panel).getByLabelText(serverLabels.name), {
+        target: { value: "C renamed" },
+      });
+      fireEvent.click(within(panel).getByRole("button", { name: serverLabels.save }));
+      await waitFor(() =>
+        expect(client.editServerList).toHaveBeenLastCalledWith("survival", {
+          kind: "update",
+          index: 2,
+          form: { name: "C renamed", address: "c.example.com", acceptTextures: null },
+        }),
+      );
+      expect(within(rowA).getByRole("button", { name: serverLabels.remove })).toBeEnabled();
+    });
+
     it("explains why the list cannot change while playing", async () => {
       client.listServers.mockResolvedValue({ servers: [cinepol] });
       client.editServerList.mockRejectedValue(new IpcError("already_running", "busy"));

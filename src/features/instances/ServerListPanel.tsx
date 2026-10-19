@@ -28,6 +28,8 @@ export function ServerListPanel({ instanceId }: { instanceId: string }) {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
   const list = servers.data?.servers ?? [];
+  // Positions must not move under an open edit, or Save would hit another server.
+  const locked = edit.isPending || editing !== null;
   // Content keys: the same server can be listed twice, so repeats are numbered.
   const seen = new Map<string, number>();
   const keys = list.map((server) => {
@@ -112,13 +114,13 @@ export function ServerListPanel({ instanceId }: { instanceId: string }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  disabled={edit.isPending || index === 0}
+                  disabled={locked || index === 0}
                   onClick={() => edit.mutate({ kind: "move", from: index, to: index - 1 })}
                 >
                   {t("instances.servers.moveUp")}
                 </Button>
                 <Button
-                  disabled={edit.isPending || index === list.length - 1}
+                  disabled={locked || index === list.length - 1}
                   onClick={() => edit.mutate({ kind: "move", from: index, to: index + 1 })}
                 >
                   {t("instances.servers.moveDown")}
@@ -126,13 +128,7 @@ export function ServerListPanel({ instanceId }: { instanceId: string }) {
                 <Button disabled={edit.isPending} onClick={() => startEdit(index, server)}>
                   {t("instances.servers.edit")}
                 </Button>
-                <Button
-                  disabled={edit.isPending}
-                  onClick={() => {
-                    if (editing === index) stopEdit();
-                    edit.mutate({ kind: "remove", index });
-                  }}
-                >
+                <Button disabled={locked} onClick={() => edit.mutate({ kind: "remove", index })}>
                   {t("instances.servers.remove")}
                 </Button>
               </div>

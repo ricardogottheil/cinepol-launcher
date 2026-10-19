@@ -23,11 +23,6 @@ pub trait FileSystem: Send + Sync {
         &self,
         path: &Path,
     ) -> impl Future<Output = Result<(), FileSystemError>> + Send;
-    /// Copies the directory tree `from` into the new directory `to`. Symbolic
-    /// links are skipped, so nothing outside `from` is copied; an existing
-    /// `to` is an error, never merged or replaced. When the copy fails after
-    /// `to` was created, `to` is removed again, and only then: a folder that
-    /// existed before is never touched.
     /// The newest regular file directly inside `dir` modified at or after
     /// `since` (crash reports written during a launch); `None` when there is
     /// none or the folder is missing.
@@ -36,6 +31,11 @@ pub trait FileSystem: Send + Sync {
         dir: &Path,
         since: std::time::SystemTime,
     ) -> impl Future<Output = Result<Option<std::path::PathBuf>, FileSystemError>> + Send;
+    /// Copies the directory tree `from` into the new directory `to`. Symbolic
+    /// links are skipped, so nothing outside `from` is copied; an existing
+    /// `to` is an error, never merged or replaced. When the copy fails after
+    /// `to` was created, `to` is removed again, and only then: a folder that
+    /// existed before is never touched.
     fn copy_dir_all(
         &self,
         from: &Path,

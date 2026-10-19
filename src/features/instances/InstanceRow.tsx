@@ -3,15 +3,16 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
-import { type InstanceDto, openCrashReport, toIpcError } from "../../ipc/client";
+import type { InstanceDto } from "../../ipc/client";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "./activityStore";
+import { CrashNotice } from "./CrashNotice";
 import { splitPlaytime } from "./formatPlaytime";
 import { InstanceSettingsPanel } from "./InstanceSettingsPanel";
 import { LogPanel } from "./LogPanel";
 import { ManualDownloadsPanel } from "./ManualDownloadsPanel";
 import { ProgressMeter } from "./ProgressMeter";
 import { ServerListPanel } from "./ServerListPanel";
-import { instancesKey, manualDownloadsKey, useManualDownloads } from "./useInstances";
+import { instancesKey, manualDownloadsKey, serversKey, useManualDownloads } from "./useInstances";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const { t } = useTranslation();
@@ -33,16 +34,13 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const busy = activity.kind !== "idle";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [serversOpen, setServersOpen] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const openReport = async (fileName: string) => {
-    setReportError(null);
-    try {
-      await openCrashReport(instance.id, fileName);
-    } catch (failure) {
-      setReportError(t(`errors.${toIpcError(failure).code}`));
-    }
-  };
+
   const queryClient = useQueryClient();
+  // The game rewrites servers.dat when it exits.
+  useEffect(() => {
+    if (lastExit) void queryClient.invalidateQueries({ queryKey: serversKey(instance.id) });
+  }, [lastExit, queryClient, instance.id]);
+
   // An update may move the instance to another game or loader version, and a
   // packwiz update may add files to download by hand.
   useEffect(() => {
@@ -119,9 +117,7 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
       ) : null}
 
       <p role="status" className="m-0 text-[0.875rem]">
-        {reportError ? (
-          <span className="text-stale">{reportError}</span>
-        ) : error ? (
+        {error ? (
           <span className="text-stale">{t(`errors.${error}`)}</span>
         ) : activity.kind === "running" ? (
           <span className="text-silk-dim">{t("instances.playing")}</span>
@@ -140,12 +136,7 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
             {t("instances.exported", { path: notice.path })}
           </span>
         ) : lastExit?.crashReport && !lastExit.killed ? (
-          <span className="flex flex-wrap items-center gap-3 text-stale">
-            {t("instances.crashed")}
-            <Button onClick={() => void openReport(lastExit.crashReport ?? "")}>
-              {t("instances.openCrashReport")}
-            </Button>
-          </span>
+          <CrashNotice instanceId={lastExit.instanceId} report={lastExit.crashReport} />
         ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
           <span className="text-stale">
             {t("instances.exited", { code: lastExit.exitCode ?? "-" })}

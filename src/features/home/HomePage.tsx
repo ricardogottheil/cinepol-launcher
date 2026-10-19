@@ -12,6 +12,7 @@ import { WorldFrame } from "../../components/ui/WorldFrame";
 import { toIpcError } from "../../ipc/client";
 import { useAccounts } from "../accounts/useAccounts";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../instances/activityStore";
+import { CrashNotice } from "../instances/CrashNotice";
 import { splitPlaytime } from "../instances/formatPlaytime";
 import { LogPanel } from "../instances/LogPanel";
 import { ProgressMeter } from "../instances/ProgressMeter";
@@ -114,6 +115,8 @@ function QuickPlay({ recommended }: { recommended: string }) {
               </Link>
             ) : null}
           </>
+        ) : lastExit?.crashReport && !lastExit.killed ? (
+          <CrashNotice instanceId={lastExit.instanceId} report={lastExit.crashReport} />
         ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
           <span className="text-stale">
             {t("instances.exited", { code: lastExit.exitCode ?? "-" })}

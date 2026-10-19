@@ -79,7 +79,13 @@ struct Partial {
     logger: Option<String>,
     timestamp_ms: Option<u64>,
     text: String,
+    /// The original lines, shown as plain text if the event never closes.
+    raw: Vec<String>,
 }
+
+/// An event longer than this is not log4j output after all (or never closes):
+/// its lines are let through as plain text instead of being held back.
+pub const MAX_EVENT_LINES: usize = 1000;
 
 impl Log4jDecoder {
     /// Feeds one line; returns the entries it completes (zero or more).
@@ -97,6 +103,7 @@ impl Log4jDecoder {
                 logger: attribute(header, "logger"),
                 timestamp_ms: attribute(header, "timestamp").and_then(|ts| ts.parse().ok()),
                 text: String::new(),
+                raw: vec![line.to_owned()],
             };
             partial
                 .text
@@ -109,8 +116,17 @@ impl Log4jDecoder {
         };
         event.text.push('\n');
         event.text.push_str(line);
+        event.raw.push(line.to_owned());
         if !line.contains(EVENT_END) {
-            return Vec::new();
+            if event.raw.len() <= MAX_EVENT_LINES {
+                return Vec::new();
+            }
+            let raw = std::mem::take(&mut event.raw);
+            self.event = None;
+            return raw
+                .into_iter()
+                .map(|line| LogEntry::plain(stream, line))
+                .collect();
         }
         self.event
             .take()
@@ -335,5 +351,26 @@ mod tests {
         let messages: Vec<&str> = entries.iter().map(|e| e.message.as_str()).collect();
         assert_eq!(messages, ["stderr line", "ok"]);
         assert_eq!(entries[0].stream, LogStream::Stderr);
+    }
+
+    #[test]
+    fn an_event_that_never_closes_falls_back_to_plain_lines() {
+        let mut decoder = Log4jDecoder::default();
+        let mut entries = decoder.feed(
+            LogStream::Stdout,
+            r#"<log4j:Event logger="x" timestamp="5" level="INFO" thread="t">"#,
+        );
+        for n in 0..MAX_EVENT_LINES {
+            entries.extend(decoder.feed(LogStream::Stdout, &format!("line {n}")));
+        }
+        // Nothing is held back forever: the raw lines come out as plain text.
+        assert_eq!(entries.len(), MAX_EVENT_LINES + 1);
+        assert!(entries.iter().all(|entry| entry.level.is_none()));
+        assert_eq!(
+            entries.last().unwrap().message,
+            format!("line {}", MAX_EVENT_LINES - 1)
+        );
+        let next = decoder.feed(LogStream::Stdout, "after");
+        assert_eq!(next[0].message, "after");
     }
 }

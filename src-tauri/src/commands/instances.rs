@@ -154,21 +154,19 @@ pub fn open_crash_report(
     use tauri_plugin_opener::OpenerExt;
 
     let id = parse_instance_id(&instance_id)?;
-    let single = is_report_name(&file_name);
-    if !single {
+    if !is_report_name(&file_name) {
         return Err(AppError::invalid_input("not a crash report name"));
     }
-    let path = state
+    let crash_reports = state
         .paths
         .game_dir(&id)
-        .join(launcher_core::application::launch_instance::CRASH_REPORTS_DIR)
-        .join(&file_name);
-    if !path.is_file() {
+        .join(launcher_core::application::launch_instance::CRASH_REPORTS_DIR);
+    let Some(path) = report_path(&crash_reports, &file_name) else {
         return Err(AppError::new(
             ErrorCode::NotFound,
             format!("{file_name} was not found"),
         ));
-    }
+    };
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))
@@ -179,9 +177,46 @@ fn is_report_name(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\', ':', '\0']) && name != "." && name != ".."
 }
 
+/// The report itself: a regular `.txt` file (not a symlink) whose real path
+/// is inside `crash_reports`, so nothing else can be opened with the default app.
+fn report_path(crash_reports: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+    let path = crash_reports.join(name);
+    let is_txt = path
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"));
+    // `symlink_metadata` does not follow links, so a link is never "a file".
+    let regular = std::fs::symlink_metadata(&path).is_ok_and(|meta| meta.is_file());
+    if !is_txt || !regular {
+        return None;
+    }
+    let real = std::fs::canonicalize(&path).ok()?;
+    let folder = std::fs::canonicalize(crash_reports).ok()?;
+    real.starts_with(&folder).then_some(real)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::is_report_name;
+    use super::{is_report_name, report_path};
+
+    #[test]
+    fn only_regular_txt_reports_inside_the_folder_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let reports = dir.path().join("crash-reports");
+        std::fs::create_dir(&reports).unwrap();
+        std::fs::write(reports.join("crash-a.txt"), b"report").unwrap();
+        std::fs::write(reports.join("run.command"), b"#!/bin/sh").unwrap();
+        let outside = dir.path().join("secret.txt");
+        std::fs::write(&outside, b"secret").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, reports.join("link.txt")).unwrap();
+
+        let opened = report_path(&reports, "crash-a.txt").unwrap();
+        assert_eq!(opened.file_name().unwrap(), "crash-a.txt");
+        assert_eq!(report_path(&reports, "run.command"), None);
+        assert_eq!(report_path(&reports, "missing.txt"), None);
+        #[cfg(unix)]
+        assert_eq!(report_path(&reports, "link.txt"), None);
+    }
 
     #[test]
     fn crash_report_names_are_plain_file_names() {
