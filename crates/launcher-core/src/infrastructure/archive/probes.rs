@@ -14,6 +14,8 @@ enum Z<'a> {
     File(&'a str, &'a [u8]),
     Dir(&'a str),
     Link(&'a str, &'a str),
+    /// Only the Unix exec-bit probe builds these; Windows has no exec bit.
+    #[cfg(unix)]
     Exec(&'a str, &'a [u8]),
 }
 
@@ -25,6 +27,7 @@ fn zip_bytes(entries: &[Z]) -> Vec<u8> {
                 w.start_file(*n, SimpleFileOptions::default()).unwrap();
                 w.write_all(b).unwrap();
             }
+            #[cfg(unix)]
             Z::Exec(n, b) => {
                 w.start_file(*n, SimpleFileOptions::default().unix_permissions(0o755))
                     .unwrap();
