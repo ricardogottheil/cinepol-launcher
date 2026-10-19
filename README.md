@@ -53,6 +53,13 @@ CINEPOL server accepts non-premium players). See
 
 All checks, conventions and recipes are in [`AGENTS.md`](AGENTS.md).
 
+## Releases
+
+Installers are published to the public
+[releases repository](https://github.com/ricardogottheil/cinepol-launcher-releases/releases),
+and the launcher updates itself from there. How to sign and cut a release is in
+[`docs/release.md`](docs/release.md).
+
 ## License
 
 The source code is licensed under the [GNU General Public License v3.0 only](LICENSE)
