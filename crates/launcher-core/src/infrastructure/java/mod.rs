@@ -15,5 +15,8 @@ pub use provider::ManagedJavaRuntimes;
 mod tests;
 
 /// Adversarial regression probes from the independent security verification.
+/// Unix only: they attack symlinks and check exec bits, and on Windows links
+/// are extracted as copies (`archive::extract::link_or_copy`).
 #[cfg(test)]
+#[cfg(unix)]
 mod probes;
