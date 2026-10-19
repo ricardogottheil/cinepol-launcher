@@ -1,0 +1,2 @@
+# Fixtures are real-world bytes checked by hash: never convert their line endings.
+crates/*/tests/fixtures/** -text
