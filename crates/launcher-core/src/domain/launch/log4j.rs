@@ -135,6 +135,23 @@ impl Log4jDecoder {
     }
 }
 
+impl Log4jDecoder {
+    /// The lines of an event that never closed (the game died while writing
+    /// it), as plain entries.
+    pub fn finish(&mut self, stream: LogStream) -> Vec<LogEntry> {
+        self.event
+            .take()
+            .map(|event| {
+                event
+                    .raw
+                    .into_iter()
+                    .map(|line| LogEntry::plain(stream, line))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+}
+
 const EVENT_START: &str = "<log4j:Event";
 const EVENT_END: &str = "</log4j:Event>";
 
@@ -195,7 +212,7 @@ fn unescape(raw: &str) -> String {
 }
 
 /// A [`LogSink`] that decodes log4j events before forwarding them as entries.
-pub struct Log4jSink<S> {
+pub struct Log4jSink<S: LogSink> {
     inner: S,
     stdout: Mutex<Log4jDecoder>,
     stderr: Mutex<Log4jDecoder>,
@@ -207,6 +224,24 @@ impl<S: LogSink> Log4jSink<S> {
             inner,
             stdout: Mutex::default(),
             stderr: Mutex::default(),
+        }
+    }
+}
+
+/// The game is gone once the sink is dropped: show whatever was held back.
+impl<S: LogSink> Drop for Log4jSink<S> {
+    fn drop(&mut self) {
+        for (stream, decoder) in [
+            (LogStream::Stdout, &self.stdout),
+            (LogStream::Stderr, &self.stderr),
+        ] {
+            let entries = decoder
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .finish(stream);
+            for entry in entries {
+                self.inner.entry(entry);
+            }
         }
     }
 }
@@ -372,5 +407,41 @@ mod tests {
         );
         let next = decoder.feed(LogStream::Stdout, "after");
         assert_eq!(next[0].message, "after");
+    }
+
+    #[test]
+    fn a_game_that_dies_mid_event_still_shows_its_lines() {
+        #[derive(Default, Clone)]
+        struct Collect(std::sync::Arc<Mutex<Vec<LogEntry>>>);
+        impl LogSink for Collect {
+            fn line(&self, stream: LogStream, line: String) {
+                self.entry(LogEntry::plain(stream, line));
+            }
+            fn entry(&self, entry: LogEntry) {
+                self.0.lock().unwrap().push(entry);
+            }
+        }
+        let collected = Collect::default();
+        {
+            let sink = Log4jSink::new(collected.clone());
+            sink.line(
+                LogStream::Stdout,
+                r#"<log4j:Event logger="x" timestamp="6" level="FATAL" thread="t">"#.into(),
+            );
+            sink.line(
+                LogStream::Stdout,
+                "<log4j:Message><![CDATA[Out of memory".into(),
+            );
+            // The process ends here and the sink is dropped.
+        }
+        let messages: Vec<String> = collected
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|e| e.message.clone())
+            .collect();
+        assert_eq!(messages.len(), 2);
+        assert!(messages[1].contains("Out of memory"));
     }
 }
