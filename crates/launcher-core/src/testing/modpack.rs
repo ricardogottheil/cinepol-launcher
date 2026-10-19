@@ -15,6 +15,7 @@ use crate::domain::instance::InstanceId;
 use crate::domain::integrity::{Checksum, HashAlgorithm, curseforge_fingerprint};
 use crate::domain::launch::RelativePath;
 use crate::domain::modpack::mrpack::MrpackIndex;
+use crate::domain::modpack::packwiz::{RawMetafile, RawPackIndex, RawPackToml};
 use crate::domain::modpack::sync::{LocalFile, PackManifest};
 use crate::domain::modpack::{
     MrpackArchive, PackFileError, PackFileLocation, PackFiles, PackLocation, PackManifestStore,
@@ -232,46 +233,68 @@ impl PackManifestStore for InMemoryPackManifestStore {
     }
 }
 
-/// Serves pack files from memory by path relative to the pack folder. The
-/// pack's own `pack.toml` is the entry named `pack.toml`. `locate` points at
-/// `base` (a URL prefix or a folder) so tests can assert download requests.
-#[derive(Debug, Default)]
+/// Serves parsed pack files from memory by path relative to the pack folder,
+/// and records which checksums the caller asked to verify. `locate` points
+/// at `url_base` (or `/pack` when `None`) so tests can assert the requests.
+#[derive(Debug)]
 pub struct FakePackwizSource {
-    pub files: HashMap<String, Vec<u8>>,
+    pub pack: RawPackToml,
+    pub index: RawPackIndex,
+    pub metafiles: HashMap<String, RawMetafile>,
     /// `https://example.com/pack/` style prefix; `None` locates local paths under `/pack`.
     pub url_base: Option<String>,
+    verified: Mutex<Vec<(String, Checksum)>>,
 }
 
 impl FakePackwizSource {
-    pub fn with(files: impl IntoIterator<Item = (&'static str, Vec<u8>)>) -> Self {
+    pub fn new(pack: RawPackToml, index: RawPackIndex) -> Self {
         Self {
-            files: files
-                .into_iter()
-                .map(|(path, bytes)| (path.to_owned(), bytes))
-                .collect(),
+            pack,
+            index,
+            metafiles: HashMap::new(),
             url_base: Some("https://example.com/pack/".into()),
+            verified: Mutex::default(),
         }
     }
 
-    fn get(&self, relative: &str) -> Result<Vec<u8>, PackFileError> {
-        self.files
-            .get(relative)
-            .cloned()
-            .ok_or_else(|| PackFileError::Source(format!("{relative} was not found")))
+    /// Every (path, expected checksum) the caller passed to a verified read.
+    pub fn verified(&self) -> Vec<(String, Checksum)> {
+        self.verified.lock().unwrap().clone()
     }
 }
 
 impl PackwizSource for FakePackwizSource {
-    async fn read_pack(&self, _pack: &PackLocation) -> Result<Vec<u8>, PackFileError> {
-        self.get("pack.toml")
+    async fn read_pack(&self, _pack: &PackLocation) -> Result<RawPackToml, PackFileError> {
+        Ok(self.pack.clone())
     }
 
-    async fn read(
+    async fn read_index(
         &self,
         _pack: &PackLocation,
         relative: &RelativePath,
-    ) -> Result<Vec<u8>, PackFileError> {
-        self.get(relative.as_str())
+        expected: &Checksum,
+    ) -> Result<RawPackIndex, PackFileError> {
+        self.verified
+            .lock()
+            .unwrap()
+            .push((relative.to_string(), expected.clone()));
+        Ok(self.index.clone())
+    }
+
+    async fn read_metafile(
+        &self,
+        _pack: &PackLocation,
+        relative: &RelativePath,
+        expected: &Checksum,
+    ) -> Result<RawMetafile, PackFileError> {
+        self.verified
+            .lock()
+            .unwrap()
+            .push((relative.to_string(), expected.clone()));
+        self.metafiles
+            .get(relative.as_str())
+            .cloned()
+            .ok_or_else(|| PackFileError::Source(format!("{relative} was not found")))
     }
 
     fn locate(

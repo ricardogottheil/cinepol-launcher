@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use super::mrpack::{MrpackError, MrpackIndex};
-use super::packwiz::PackwizError;
+use super::packwiz::{PackwizError, RawMetafile, RawPackIndex, RawPackToml};
 use super::sync::{LocalFile, PackManifest};
 use super::{ModpackPage, ModpackQuery, ModpackSourceKind, ModpackSummary, ModpackVersion};
 use crate::domain::instance::InstanceId;
-use crate::domain::integrity::HashAlgorithm;
+use crate::domain::integrity::{Checksum, HashAlgorithm};
 use crate::domain::launch::RelativePath;
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -202,22 +202,31 @@ pub enum PackFileLocation {
     Path(PathBuf),
 }
 
-/// Reads packwiz files relative to the folder holding `pack.toml`.
+/// Reads and parses packwiz files relative to the folder holding `pack.toml`.
+/// Every read is size-capped; files the index lists are verified against the
+/// checksum the caller passes before they are parsed.
 pub trait PackwizSource: Send + Sync {
-    /// The `pack.toml` itself (size-capped).
+    /// `pack.toml` itself.
     fn read_pack(
         &self,
         pack: &PackLocation,
-    ) -> impl Future<Output = Result<Vec<u8>, PackFileError>> + Send;
-    /// A small text file next to `pack.toml` (`index.toml`, `*.pw.toml`),
-    /// size-capped.
-    fn read(
+    ) -> impl Future<Output = Result<RawPackToml, PackFileError>> + Send;
+    /// `index.toml` (or wherever `pack.toml` points), verified with `expected`.
+    fn read_index(
         &self,
         pack: &PackLocation,
         relative: &RelativePath,
-    ) -> impl Future<Output = Result<Vec<u8>, PackFileError>> + Send;
-    /// Where a pack file is fetched from, for downloads and copies; never
-    /// outside the pack's folder.
+        expected: &Checksum,
+    ) -> impl Future<Output = Result<RawPackIndex, PackFileError>> + Send;
+    /// One `*.pw.toml`, verified with the index's `expected` checksum.
+    fn read_metafile(
+        &self,
+        pack: &PackLocation,
+        relative: &RelativePath,
+        expected: &Checksum,
+    ) -> impl Future<Output = Result<RawMetafile, PackFileError>> + Send;
+    /// Where a plain pack file is fetched from, for downloads and copies;
+    /// never outside the pack's folder.
     fn locate(
         &self,
         pack: &PackLocation,
