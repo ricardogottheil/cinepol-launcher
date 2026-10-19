@@ -12,6 +12,7 @@ pub mod modrinth;
 pub mod mojang;
 pub mod msa;
 pub mod nbt;
+pub mod packwiz;
 pub mod process;
 pub mod server_ping;
 pub mod time;
