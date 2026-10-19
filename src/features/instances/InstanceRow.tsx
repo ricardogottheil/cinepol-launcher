@@ -32,10 +32,13 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const busy = activity.kind !== "idle";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const queryClient = useQueryClient();
-  // An update may move the instance to another game or loader version.
+  // An update may move the instance to another game or loader version, and a
+  // packwiz update may add files to download by hand.
   useEffect(() => {
-    if (notice?.kind === "updated") void queryClient.invalidateQueries({ queryKey: instancesKey });
-  }, [notice, queryClient]);
+    if (notice?.kind !== "updated") return;
+    void queryClient.invalidateQueries({ queryKey: instancesKey });
+    void queryClient.invalidateQueries({ queryKey: ["manual-downloads", instance.id] });
+  }, [notice, queryClient, instance.id]);
   const loader = instance.loaderVersion
     ? `${instance.loader} ${instance.loaderVersion}`
     : instance.loader;

@@ -150,10 +150,11 @@ fn local_pack_file(path: &Path) -> PathBuf {
 }
 
 fn https_url(raw: &str) -> Result<reqwest::Url, PackFileError> {
-    let url = reqwest::Url::parse(raw)
-        .map_err(|error| PackFileError::Source(format!("invalid pack URL {raw:?}: {error}")))?;
+    let url = reqwest::Url::parse(raw).map_err(|error| {
+        PackFileError::InvalidLocation(format!("invalid pack URL {raw:?}: {error}"))
+    })?;
     if url.scheme() != "https" || url.host_str().is_none_or(str::is_empty) {
-        return Err(PackFileError::Source(format!(
+        return Err(PackFileError::InvalidLocation(format!(
             "only https URLs are supported: {raw}"
         )));
     }
@@ -173,7 +174,7 @@ fn join_url(pack: &str, relative: &RelativePath) -> Result<String, PackFileError
     {
         let mut segments = url
             .path_segments_mut()
-            .map_err(|()| PackFileError::Source(format!("invalid pack URL {pack:?}")))?;
+            .map_err(|()| PackFileError::InvalidLocation(format!("invalid pack URL {pack:?}")))?;
         // Drops `pack.toml`, keeping its folder.
         segments.pop();
         segments.pop_if_empty();
@@ -265,7 +266,7 @@ fn verify(name: &str, bytes: &[u8], expected: &Checksum) -> Result<(), PackFileE
     if expected.matches(&actual) {
         Ok(())
     } else {
-        Err(PackFileError::Source(format!(
+        Err(PackFileError::HashMismatch(format!(
             "{name} does not match its {:?} hash: expected {}, got {actual}",
             expected.algorithm(),
             expected.value()

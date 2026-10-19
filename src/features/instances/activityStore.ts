@@ -46,7 +46,7 @@ export type PackSource = "modrinth" | "packwiz";
 
 /** The outcome of the last modpack update or export, shown under the row. */
 export type ActivityNotice =
-  | { kind: "updated"; kept: number }
+  | { kind: "updated"; kept: number; pending: number }
   | { kind: "upToDate" }
   | { kind: "exported"; path: string };
 
@@ -65,8 +65,8 @@ interface ActivityState {
   play: (instanceId: string, options?: { syncPack?: boolean }) => Promise<LaunchOutcomeDto | null>;
   stop: (instanceId: string) => Promise<void>;
   /** Updates a modpack instance in place, keeping the player's changes. */
-  /** Resolves `true` when the update finished. */
-  updatePack: (instanceId: string, source?: PackSource) => Promise<boolean>;
+  /** Resolves with what the update left to download by hand, or `null` when it failed. */
+  updatePack: (instanceId: string, source?: PackSource) => Promise<{ pending: number } | null>;
   /** Asks where to save and exports the instance as a `.mrpack`. */
   exportPack: (instanceId: string) => Promise<void>;
   playCinepol: () => Promise<LaunchOutcomeDto | null>;
@@ -153,15 +153,16 @@ export const useActivityStore = create<ActivityState>((set) => {
     });
     try {
       const outcome = await operation.done;
+      const pending = "pending" in outcome ? outcome.pending.length : 0;
       const notice: ActivityNotice =
         "upToDate" in outcome && outcome.upToDate
           ? { kind: "upToDate" }
-          : { kind: "updated", kept: outcome.files?.kept ?? 0 };
+          : { kind: "updated", kept: outcome.files?.kept ?? 0, pending };
       update(instanceId, { activity: { kind: "idle" }, notice });
-      return true;
+      return { pending };
     } catch (error) {
       update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
-      return false;
+      return null;
     }
   };
 
@@ -182,7 +183,12 @@ export const useActivityStore = create<ActivityState>((set) => {
     instanceId: string,
     options: { syncPack?: boolean } = {},
   ): Promise<LaunchOutcomeDto | null> => {
-    if (options.syncPack && !(await updatePack(instanceId, "packwiz"))) return null;
+    if (options.syncPack) {
+      const synced = await updatePack(instanceId, "packwiz");
+      // A pack with files still to download by hand cannot start yet; the row
+      // shows the list instead.
+      if (!synced || synced.pending > 0) return null;
+    }
     const appendLine = (line: LogLineDto) =>
       set((state) => {
         const current = state.byInstance[instanceId] ?? IDLE;

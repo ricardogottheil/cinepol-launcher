@@ -365,6 +365,8 @@ fn pack_file_code(error: &PackFileError) -> ErrorCode {
         | PackFileError::Packwiz(_)
         | PackFileError::TooLarge(_) => ErrorCode::InvalidModpack,
         PackFileError::Source(_) => ErrorCode::Network,
+        PackFileError::HashMismatch(_) => ErrorCode::UnverifiedFile,
+        PackFileError::InvalidLocation(_) => ErrorCode::InvalidInput,
     }
 }
 

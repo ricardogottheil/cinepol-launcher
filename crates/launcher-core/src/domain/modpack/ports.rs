@@ -66,6 +66,10 @@ pub enum PackFileError {
     Packwiz(#[from] PackwizError),
     #[error("could not read the pack: {0}")]
     Source(String),
+    #[error("{0}")]
+    HashMismatch(String),
+    #[error("invalid pack location: {0}")]
+    InvalidLocation(String),
     #[error("{0} is too large")]
     TooLarge(String),
 }
@@ -176,11 +180,11 @@ impl PackLocation {
         if raw.starts_with("https://") {
             Ok(Self::Url(raw.to_owned()))
         } else if raw.contains("://") {
-            Err(PackFileError::Source(format!(
+            Err(PackFileError::InvalidLocation(format!(
                 "only https URLs are supported: {raw}"
             )))
         } else if raw.is_empty() {
-            Err(PackFileError::Source("empty pack location".into()))
+            Err(PackFileError::InvalidLocation("empty pack location".into()))
         } else {
             Ok(Self::Local(PathBuf::from(raw)))
         }

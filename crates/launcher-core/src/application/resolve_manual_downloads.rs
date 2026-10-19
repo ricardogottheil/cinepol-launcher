@@ -58,7 +58,13 @@ where
         let target = file.path.under(&game_dir);
         // The player may have put it in the game folder directly.
         let mut installed = has_checksum(deps.files, &target, &file.checksum).await?;
-        if !installed && let Some(candidate) = find(deps.files, &found, &file).await? {
+        // A different file already at the path is the player's: never replace
+        // it (the file stays pending, like a sync keeps player changes).
+        let free = installed || deps.files.sha1(&target).await?.is_none();
+        if !installed
+            && free
+            && let Some(candidate) = find(deps.files, &found, &file).await?
+        {
             deps.files.place(&candidate, &target).await?;
             // The download may have changed between the check and the copy.
             installed = has_checksum(deps.files, &target, &file.checksum).await?;
@@ -268,5 +274,22 @@ mod tests {
             assert!(!is_candidate(name, "jei.jar"), "{name}");
         }
         assert!(is_candidate("README (3)", "README"));
+    }
+
+    #[tokio::test]
+    async fn never_replaces_a_different_file_the_player_put_at_the_path() {
+        let jei = manual("mods/jei.jar", b"jei");
+        let world = world_with(vec![jei.clone()]);
+        world.write_game_file(ID, "mods/jei.jar", b"player own jar");
+        let dir = downloads(&world, &[("jei.jar", b"jei")]);
+
+        let outcome = resolve(&world, &dir).await;
+
+        assert!(outcome.resolved.is_empty());
+        assert_eq!(outcome.remaining, [jei]);
+        assert_eq!(
+            world.read_game_file(ID, "mods/jei.jar").as_deref(),
+            Some(b"player own jar".as_slice())
+        );
     }
 }

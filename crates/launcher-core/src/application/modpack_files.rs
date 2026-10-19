@@ -395,7 +395,7 @@ where
                 let staged = path.under(&local_dir);
                 deps.files.place(from, &staged).await?;
                 if !has_checksum(deps.files, &staged, checksum).await? {
-                    return Err(PackFileError::Source(format!(
+                    return Err(PackFileError::HashMismatch(format!(
                         "{path} does not match its declared hash"
                     ))
                     .into());
@@ -930,7 +930,10 @@ mod tests {
         let bad = [local("config/bad.toml", "bad.toml", b"original")];
         let result = run(&world, &FakeDownloader::default(), &bad, &[]).await;
         assert!(
-            matches!(result, Err(PackSyncError::Files(PackFileError::Source(_)))),
+            matches!(
+                result,
+                Err(PackSyncError::Files(PackFileError::HashMismatch(_)))
+            ),
             "{result:?}"
         );
         assert!(world.read_game_file(ID, "config/bad.toml").is_none());

@@ -227,6 +227,18 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
             MetafileSource::CurseForge(file) => manual.push(file),
         }
     }
+    // Two entries for one file (folders on macOS and Windows ignore case)
+    // would silently overwrite each other.
+    let mut targets = std::collections::BTreeSet::new();
+    let paths = entries
+        .iter()
+        .map(|entry| &entry.path)
+        .chain(manual.iter().map(|file| &file.path));
+    for path in paths {
+        if !targets.insert(path.as_str().to_lowercase()) {
+            return Err(files_error(PackwizError::DuplicatePath(path.to_string())));
+        }
+    }
     Ok(PackwizContents {
         pack,
         entries,
@@ -637,6 +649,37 @@ mod tests {
         assert_eq!(origin.version, UNVERSIONED);
     }
 
+    #[tokio::test]
+    async fn refuses_two_files_that_land_on_the_same_path() {
+        let world = World::new(vec![]);
+        let source = source(
+            pack_toml(Some("1.0"), "1.21.1"),
+            vec![meta("mods/a.pw.toml"), meta("mods/b.pw.toml")],
+            vec![
+                ("mods/a.pw.toml", modrinth("sodium.jar", b"one", "both")),
+                ("mods/b.pw.toml", modrinth("Sodium.jar", b"two", "both")),
+            ],
+        );
+        let result = install(
+            &world,
+            &source,
+            &FakeDownloader::default(),
+            &location(),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert!(
+            matches!(
+                result,
+                Err(InstallPackwizError::Pack(PackSyncError::Files(
+                    PackFileError::Packwiz(PackwizError::DuplicatePath(_))
+                )))
+            ),
+            "{result:?}"
+        );
+        assert!(world.instances.list().await.unwrap().is_empty());
+    }
+
     fn local_pack(world: &World, content: &[u8]) -> LocalPack {
         let root = world.paths.temp_dir().join("my-pack");
         std::fs::create_dir_all(root.join("config")).unwrap();
@@ -693,7 +736,7 @@ mod tests {
             matches!(
                 result,
                 Err(InstallPackwizError::Pack(PackSyncError::Files(
-                    PackFileError::Source(_)
+                    PackFileError::HashMismatch(_)
                 )))
             ),
             "{result:?}"

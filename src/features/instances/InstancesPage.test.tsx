@@ -636,4 +636,46 @@ describe("InstancesPage", () => {
     await within(panel).findByLabelText(labels.nameLabel);
     expect(within(panel).queryByLabelText(settingsLabels.updateOnLaunch)).not.toBeInTheDocument();
   });
+
+  it("does not launch when the on-launch sync leaves files to download by hand", async () => {
+    client.listInstances.mockResolvedValue([{ ...packwizInstance, updatePackOnLaunch: true }]);
+    client.checkManualDownloads
+      .mockResolvedValueOnce({ resolved: [], remaining: [] })
+      .mockResolvedValue({ resolved: [], remaining: [jei] });
+    client.updatePackwiz.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({
+        instance: packwizInstance,
+        files: { written: 1, unchanged: 3, kept: 0, removed: 0 },
+        pending: [jei],
+      }),
+      cancel: vi.fn(),
+    });
+    client.launchInstance.mockResolvedValue({ ...outcome, instanceId: "gto" });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    await waitFor(() => expect(client.updatePackwiz).toHaveBeenCalled());
+    expect(await screen.findByRole("region", { name: manual.title })).toBeInTheDocument();
+    expect(client.launchInstance).not.toHaveBeenCalled();
+  });
+
+  it("a manual Update that adds pending files shows the list and disables Play", async () => {
+    client.listInstances.mockResolvedValue([packwizInstance]);
+    client.checkManualDownloads
+      .mockResolvedValueOnce({ resolved: [], remaining: [] })
+      .mockResolvedValue({ resolved: [], remaining: [jei] });
+    client.updatePackwiz.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({
+        instance: packwizInstance,
+        files: { written: 1, unchanged: 3, kept: 0, removed: 0 },
+        pending: [jei],
+      }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.update }));
+    expect(await screen.findByRole("region", { name: manual.title })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.play })).toBeDisabled();
+  });
 });

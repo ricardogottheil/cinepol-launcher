@@ -93,9 +93,9 @@ struct CurseForgeUpdate {
 
 fn parse<T: serde::de::DeserializeOwned>(name: &str, bytes: &[u8]) -> Result<T, PackFileError> {
     let text = std::str::from_utf8(bytes)
-        .map_err(|_| PackFileError::Source(format!("{name} is not valid UTF-8")))?;
+        .map_err(|_| PackFileError::InvalidArchive(format!("{name} is not valid UTF-8")))?;
     toml::from_str(text).map_err(|error| {
-        PackFileError::Source(format!("{name} is not a valid packwiz file: {error}"))
+        PackFileError::InvalidArchive(format!("{name} is not a valid packwiz file: {error}"))
     })
 }
 

@@ -157,7 +157,7 @@ fn bad_toml_names_the_file() {
         ),
     ] {
         assert!(
-            matches!(&result, Err(PackFileError::Source(reason)) if reason.contains(name)),
+            matches!(&result, Err(PackFileError::InvalidArchive(reason)) if reason.contains(name)),
             "{name}: {result:?}"
         );
     }
@@ -261,7 +261,10 @@ fn urls_are_joined_segment_by_segment() {
         "https://exa mple.com/pack.toml",
     ] {
         assert!(
-            matches!(locate(bad, "options.txt"), Err(PackFileError::Source(_))),
+            matches!(
+                locate(bad, "options.txt"),
+                Err(PackFileError::InvalidLocation(_))
+            ),
             "{bad}"
         );
     }
@@ -378,14 +381,14 @@ async fn checksum_mismatches_are_rejected_in_every_algorithm() {
     for checksum in wrong {
         let result = source.read_metafile(&location, &relative, &checksum).await;
         assert!(
-            matches!(&result, Err(PackFileError::Source(reason)) if reason.contains("mods/sodium.pw.toml") && reason.contains("hash")),
+            matches!(&result, Err(PackFileError::HashMismatch(reason)) if reason.contains("mods/sodium.pw.toml") && reason.contains("hash")),
             "{checksum}: {result:?}"
         );
     }
     let index = source
         .read_index(&location, &relative, &sha256(b"other"))
         .await;
-    assert!(matches!(index, Err(PackFileError::Source(_))), "{index:?}");
+    assert!(matches!(index, Err(PackFileError::HashMismatch(_))), "{index:?}");
 }
 
 #[tokio::test]
