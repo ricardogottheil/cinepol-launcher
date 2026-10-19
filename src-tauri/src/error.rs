@@ -358,7 +358,10 @@ fn pack_file_code(error: &PackFileError) -> ErrorCode {
         PackFileError::Index(MrpackError::UnverifiedFile(_)) => ErrorCode::UnverifiedFile,
         PackFileError::InvalidArchive(_)
         | PackFileError::UnsafeEntry(_)
-        | PackFileError::Index(_) => ErrorCode::InvalidModpack,
+        | PackFileError::Index(_)
+        | PackFileError::Packwiz(_)
+        | PackFileError::TooLarge(_) => ErrorCode::InvalidModpack,
+        PackFileError::Source(_) => ErrorCode::Network,
     }
 }
 

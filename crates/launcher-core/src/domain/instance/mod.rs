@@ -36,6 +36,8 @@ pub struct LaunchSettings {
     /// `None` uses the game's default window.
     pub window: Option<WindowSize>,
     pub env: EnvVars,
+    /// packwiz instances: sync the pack from its source before every launch.
+    pub update_pack_on_launch: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

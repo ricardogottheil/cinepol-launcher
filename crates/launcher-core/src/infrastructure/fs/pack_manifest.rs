@@ -130,6 +130,7 @@ mod tests {
                 (RelativePath::parse("options.txt").unwrap(), "b".repeat(40)),
             ]
             .into(),
+            pending: Vec::new(),
         };
         store.save(&id(), &manifest).await.unwrap();
         assert_eq!(store.load(&id()).await.unwrap(), manifest);

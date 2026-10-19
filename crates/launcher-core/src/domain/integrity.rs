@@ -96,6 +96,41 @@ impl Checksum {
     }
 }
 
+/// CurseForge's file fingerprint: MurmurHash2 (32-bit, seed 1) over the bytes
+/// with every tab, line feed, carriage return and space removed.
+pub fn curseforge_fingerprint(bytes: &[u8]) -> u32 {
+    const M: u32 = 0x5bd1_e995;
+    let data: Vec<u8> = bytes
+        .iter()
+        .copied()
+        .filter(|b| !matches!(b, 9 | 10 | 13 | 32))
+        .collect();
+    // The length is part of the seed, so it is the filtered length (truncated
+    // to 32 bits like CurseForge's implementation).
+    let mut h: u32 = 1 ^ (data.len() as u32);
+    let (blocks, rest) = data.as_chunks::<4>();
+    for block in blocks {
+        let mut k = u32::from_le_bytes(*block);
+        k = k.wrapping_mul(M);
+        k ^= k >> 24;
+        k = k.wrapping_mul(M);
+        h = h.wrapping_mul(M) ^ k;
+    }
+    if rest.len() == 3 {
+        h ^= u32::from(rest[2]) << 16;
+    }
+    if rest.len() >= 2 {
+        h ^= u32::from(rest[1]) << 8;
+    }
+    if !rest.is_empty() {
+        h ^= u32::from(rest[0]);
+        h = h.wrapping_mul(M);
+    }
+    h ^= h >> 13;
+    h = h.wrapping_mul(M);
+    h ^ (h >> 15)
+}
+
 impl fmt::Display for Checksum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}:{}", self.algorithm, self.value)
@@ -154,5 +189,29 @@ mod tests {
     fn parses_packwiz_algorithm_names() {
         assert_eq!(HashAlgorithm::parse("SHA512"), Some(HashAlgorithm::Sha512));
         assert_eq!(HashAlgorithm::parse("md5"), None);
+    }
+
+    #[test]
+    fn curseforge_fingerprints_ignore_whitespace() {
+        // Reference values from an independent MurmurHash2 implementation.
+        for (bytes, expected) in [
+            (b"".as_slice(), 1_540_447_798_u32),
+            (b"a", 626_045_324),
+            (b"ab", 1_692_487_918),
+            (b"abc", 1_621_425_345),
+            (b"abcd", 3_376_380_438),
+            (b"hello world", 2_824_650_221),
+            (b"Hello, Cinepol!\n", 3_748_367_926),
+        ] {
+            assert_eq!(curseforge_fingerprint(bytes), expected, "{bytes:?}");
+        }
+        assert_eq!(
+            curseforge_fingerprint(b" \t\r\n"),
+            curseforge_fingerprint(b"")
+        );
+        assert_eq!(
+            curseforge_fingerprint(b"hel lo\nworld"),
+            curseforge_fingerprint(b"helloworld")
+        );
     }
 }

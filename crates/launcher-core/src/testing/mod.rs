@@ -36,7 +36,8 @@ pub use launch::{
     RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,
 };
 pub use modpack::{
-    FakeMrpackArchive, FakePackFiles, InMemoryPackManifestStore, WrittenPack, sha1_hex, sha512_hex,
+    FakeMrpackArchive, FakePackFiles, FakePackwizSource, InMemoryPackManifestStore, WrittenPack,
+    sha1_hex, sha512_hex,
 };
 pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySettingsRepository};
 

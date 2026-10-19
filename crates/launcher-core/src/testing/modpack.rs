@@ -12,12 +12,13 @@ use sha1::{Digest, Sha1};
 use sha2::Sha512;
 
 use crate::domain::instance::InstanceId;
-use crate::domain::integrity::{Checksum, HashAlgorithm};
+use crate::domain::integrity::{Checksum, HashAlgorithm, curseforge_fingerprint};
 use crate::domain::launch::RelativePath;
 use crate::domain::modpack::mrpack::MrpackIndex;
 use crate::domain::modpack::sync::{LocalFile, PackManifest};
 use crate::domain::modpack::{
-    MrpackArchive, PackFileError, PackFiles, PackManifestStore, StagedFile,
+    MrpackArchive, PackFileError, PackFileLocation, PackFiles, PackLocation, PackManifestStore,
+    PackwizSource, StagedFile,
 };
 
 fn io(path: &Path, error: std::io::Error) -> PackFileError {
@@ -120,6 +121,37 @@ impl PackFiles for FakePackFiles {
         }
     }
 
+    async fn digest(
+        &self,
+        path: &Path,
+        algorithm: HashAlgorithm,
+    ) -> Result<Option<String>, PackFileError> {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(io(path, error)),
+        };
+        Ok(Some(match algorithm {
+            HashAlgorithm::Sha1 => sha1_hex(&bytes),
+            HashAlgorithm::Sha256 => hex::encode(sha2::Sha256::digest(&bytes)),
+            HashAlgorithm::Sha512 => sha512_hex(&bytes),
+            HashAlgorithm::Murmur2 => curseforge_fingerprint(&bytes).to_string(),
+        }))
+    }
+
+    async fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, PackFileError> {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Ok(Vec::new());
+        };
+        let mut files: Vec<PathBuf> = entries
+            .flatten()
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+            .map(|entry| entry.path())
+            .collect();
+        files.sort();
+        Ok(files)
+    }
+
     async fn place(&self, from: &Path, to: &Path) -> Result<(), PackFileError> {
         if let Some(parent) = to.parent() {
             std::fs::create_dir_all(parent).map_err(|e| io(parent, e))?;
@@ -197,6 +229,60 @@ impl PackManifestStore for InMemoryPackManifestStore {
             .unwrap()
             .insert(id.clone(), manifest.clone());
         Ok(())
+    }
+}
+
+/// Serves pack files from memory by path relative to the pack folder. The
+/// pack's own `pack.toml` is the entry named `pack.toml`. `locate` points at
+/// `base` (a URL prefix or a folder) so tests can assert download requests.
+#[derive(Debug, Default)]
+pub struct FakePackwizSource {
+    pub files: HashMap<String, Vec<u8>>,
+    /// `https://example.com/pack/` style prefix; `None` locates local paths under `/pack`.
+    pub url_base: Option<String>,
+}
+
+impl FakePackwizSource {
+    pub fn with(files: impl IntoIterator<Item = (&'static str, Vec<u8>)>) -> Self {
+        Self {
+            files: files
+                .into_iter()
+                .map(|(path, bytes)| (path.to_owned(), bytes))
+                .collect(),
+            url_base: Some("https://example.com/pack/".into()),
+        }
+    }
+
+    fn get(&self, relative: &str) -> Result<Vec<u8>, PackFileError> {
+        self.files
+            .get(relative)
+            .cloned()
+            .ok_or_else(|| PackFileError::Source(format!("{relative} was not found")))
+    }
+}
+
+impl PackwizSource for FakePackwizSource {
+    async fn read_pack(&self, _pack: &PackLocation) -> Result<Vec<u8>, PackFileError> {
+        self.get("pack.toml")
+    }
+
+    async fn read(
+        &self,
+        _pack: &PackLocation,
+        relative: &RelativePath,
+    ) -> Result<Vec<u8>, PackFileError> {
+        self.get(relative.as_str())
+    }
+
+    fn locate(
+        &self,
+        _pack: &PackLocation,
+        relative: &RelativePath,
+    ) -> Result<PackFileLocation, PackFileError> {
+        Ok(match &self.url_base {
+            Some(base) => PackFileLocation::Url(format!("{base}{}", relative.as_str())),
+            None => PackFileLocation::Path(relative.under(Path::new("/pack"))),
+        })
     }
 }
 

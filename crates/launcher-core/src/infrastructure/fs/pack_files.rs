@@ -7,9 +7,9 @@ use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
 
 use sha1::{Digest, Sha1};
-use sha2::Sha512;
+use sha2::{Sha256, Sha512};
 
-use crate::domain::integrity::{Checksum, HashAlgorithm};
+use crate::domain::integrity::{Checksum, HashAlgorithm, curseforge_fingerprint};
 use crate::domain::launch::RelativePath;
 use crate::domain::modpack::sync::LocalFile;
 use crate::domain::modpack::{PackFileError, PackFiles};
@@ -30,6 +30,56 @@ impl PackFiles for StdPackFiles {
                 Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
                 Err(error) => Err(io_error(&owned, error)),
             }
+        })
+        .await
+    }
+
+    async fn digest(
+        &self,
+        path: &Path,
+        algorithm: HashAlgorithm,
+    ) -> Result<Option<String>, PackFileError> {
+        let owned = path.to_path_buf();
+        blocking(path, move || {
+            let result = match algorithm {
+                HashAlgorithm::Sha1 => streamed::<Sha1>(&owned),
+                HashAlgorithm::Sha256 => streamed::<Sha256>(&owned),
+                HashAlgorithm::Sha512 => streamed::<Sha512>(&owned),
+                // The fingerprint's seed needs the whole filtered length first.
+                HashAlgorithm::Murmur2 => {
+                    fs::read(&owned).map(|bytes| curseforge_fingerprint(&bytes).to_string())
+                }
+            };
+            match result {
+                Ok(digest) => Ok(Some(digest)),
+                Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(io_error(&owned, error)),
+            }
+        })
+        .await
+    }
+
+    async fn list_dir(&self, dir: &Path) -> Result<Vec<PathBuf>, PackFileError> {
+        let owned = dir.to_path_buf();
+        blocking(dir, move || {
+            let entries = match fs::read_dir(&owned) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+                Err(error) => return Err(io_error(&owned, error)),
+            };
+            let mut files = Vec::new();
+            for entry in entries {
+                let entry = entry.map_err(|error| io_error(&owned, error))?;
+                // `file_type` does not follow symlinks, so links are skipped.
+                let kind = entry
+                    .file_type()
+                    .map_err(|error| io_error(&entry.path(), error))?;
+                if kind.is_file() {
+                    files.push(entry.path());
+                }
+            }
+            files.sort();
+            Ok(files)
         })
         .await
     }
@@ -169,6 +219,12 @@ fn local_file(path: &Path, relative: RelativePath) -> Result<LocalFile, PackFile
     })
 }
 
+fn streamed<D: Digest>(path: &Path) -> std::io::Result<String> {
+    let mut hasher = D::new();
+    hash_file(path, |chunk| hasher.update(chunk))?;
+    Ok(hex::encode(hasher.finalize()))
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -301,5 +357,65 @@ mod tests {
                 "{entry}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn digests_in_every_declared_algorithm_and_lists_only_regular_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.txt");
+        std::fs::write(&file, b"hello world").unwrap();
+        let files = StdPackFiles;
+        assert_eq!(
+            files
+                .digest(&file, HashAlgorithm::Sha1)
+                .await
+                .unwrap()
+                .unwrap(),
+            "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"
+        );
+        assert_eq!(
+            files
+                .digest(&file, HashAlgorithm::Sha256)
+                .await
+                .unwrap()
+                .unwrap(),
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+        assert_eq!(
+            files
+                .digest(&file, HashAlgorithm::Sha512)
+                .await
+                .unwrap()
+                .unwrap()
+                .len(),
+            128
+        );
+        assert_eq!(
+            files
+                .digest(&file, HashAlgorithm::Murmur2)
+                .await
+                .unwrap()
+                .unwrap(),
+            "2824650221"
+        );
+        assert_eq!(
+            files
+                .digest(&dir.path().join("missing"), HashAlgorithm::Sha1)
+                .await
+                .unwrap(),
+            None
+        );
+
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&file, dir.path().join("link.txt")).unwrap();
+        assert_eq!(files.list_dir(dir.path()).await.unwrap(), [file]);
+        assert!(
+            files
+                .list_dir(&dir.path().join("missing"))
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 }

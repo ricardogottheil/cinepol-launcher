@@ -75,6 +75,8 @@ struct SettingsRecord {
     window: Option<(u32, u32)>,
     #[serde(default)]
     env: BTreeMap<String, String>,
+    #[serde(default)]
+    update_pack_on_launch: bool,
 }
 
 impl Default for SettingsRecord {
@@ -87,6 +89,7 @@ impl Default for SettingsRecord {
             jvm_args: vec![],
             window: None,
             env: BTreeMap::new(),
+            update_pack_on_launch: false,
         }
     }
 }
@@ -134,6 +137,7 @@ impl From<&Instance> for InstanceRecord {
                     .iter()
                     .map(|(k, v)| (k.to_owned(), v.to_owned()))
                     .collect(),
+                update_pack_on_launch: settings.update_pack_on_launch,
             },
             default_account: instance.default_account.map(|id| id.as_uuid()),
             playtime_secs: instance.playtime_secs,
@@ -198,6 +202,7 @@ impl TryFrom<InstanceRecord> for Instance {
                 jvm_args: JvmArgs::parse(settings.jvm_args).map_err(|e| e.to_string())?,
                 window,
                 env: EnvVars::parse(settings.env).map_err(|e| e.to_string())?,
+                update_pack_on_launch: settings.update_pack_on_launch,
             },
             default_account: record.default_account.map(AccountId::from_uuid),
             playtime_secs: record.playtime_secs,

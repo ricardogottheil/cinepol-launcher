@@ -117,6 +117,8 @@ where
         jvm_args,
         window,
         env,
+        // Not edited here yet; kept as stored.
+        update_pack_on_launch: instance.settings.update_pack_on_launch,
     };
     deps.instances.save(&instance).await?;
     Ok(instance)

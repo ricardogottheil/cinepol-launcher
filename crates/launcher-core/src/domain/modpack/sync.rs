@@ -7,16 +7,68 @@
 //! player added or changed is kept.
 
 use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
 
 use crate::domain::integrity::Checksum;
 use crate::domain::launch::RelativePath;
 
 use super::mrpack::{EnvSupport, MrpackFile, is_allowed_download, is_exportable};
 
-/// The files a pack installed into an instance, by path, with their sha1 (lowercase hex).
+/// The files a pack installed into an instance, by path, with their sha1
+/// (lowercase hex), and the files still waiting for a manual download.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PackManifest {
     pub files: BTreeMap<RelativePath, String>,
+    /// Files the player must download by hand before the pack is complete.
+    pub pending: Vec<ManualFile>,
+}
+
+/// A pack file the launcher may not download itself (CurseForge files it
+/// cannot resolve, or whose author forbids third-party distribution): the
+/// player downloads it from its page and the launcher picks it up from the
+/// Downloads folder, verified with `checksum`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManualFile {
+    /// Where it goes in the game folder.
+    pub path: RelativePath,
+    /// The mod's display name.
+    pub name: String,
+    /// The file name CurseForge serves it under (one path segment).
+    pub filename: String,
+    pub checksum: Checksum,
+    pub project_id: u64,
+    pub file_id: u64,
+}
+
+impl ManualFile {
+    /// The project page the player downloads it from.
+    pub fn page_url(&self) -> String {
+        format!("https://www.curseforge.com/projects/{}", self.project_id)
+    }
+}
+
+/// Where a pack file comes from, for the shared sync pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntrySource {
+    /// Fetched from the first URL and verified against `checksum`.
+    Download {
+        urls: Vec<String>,
+        checksum: Checksum,
+        size: Option<u64>,
+    },
+    /// Copied from a local file (a local pack folder) after verifying `checksum`.
+    Local { path: PathBuf, checksum: Checksum },
+    /// Already extracted into staging (an archive's overrides), with its sha1.
+    Staged { path: PathBuf, sha1: String },
+}
+
+/// One file a pack wants in the game folder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackEntry {
+    pub path: RelativePath,
+    pub source: EntrySource,
+    /// Written once and never replaced by a later update (packwiz `preserve`).
+    pub preserve: bool,
 }
 
 /// A file the new pack version wants at `path`.
@@ -149,6 +201,7 @@ mod tests {
                 .iter()
                 .map(|(p, sha1)| (path(p), (*sha1).to_owned()))
                 .collect(),
+            pending: Vec::new(),
         }
     }
 

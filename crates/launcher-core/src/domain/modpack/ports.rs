@@ -5,9 +5,11 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use super::mrpack::{MrpackError, MrpackIndex};
+use super::packwiz::PackwizError;
 use super::sync::{LocalFile, PackManifest};
 use super::{ModpackPage, ModpackQuery, ModpackSourceKind, ModpackSummary, ModpackVersion};
 use crate::domain::instance::InstanceId;
+use crate::domain::integrity::HashAlgorithm;
 use crate::domain::launch::RelativePath;
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -60,6 +62,12 @@ pub enum PackFileError {
     UnsafeEntry(String),
     #[error(transparent)]
     Index(#[from] MrpackError),
+    #[error(transparent)]
+    Packwiz(#[from] PackwizError),
+    #[error("could not read the pack: {0}")]
+    Source(String),
+    #[error("{0} is too large")]
+    TooLarge(String),
 }
 
 /// A file extracted from an archive into a staging folder.
@@ -106,6 +114,19 @@ pub trait PackFiles: Send + Sync {
         &self,
         path: &Path,
     ) -> impl Future<Output = Result<Option<String>, PackFileError>> + Send;
+    /// A file's digest in `algorithm` (lowercase hex; decimal for murmur2,
+    /// the CurseForge fingerprint), `None` when it does not exist.
+    fn digest(
+        &self,
+        path: &Path,
+        algorithm: HashAlgorithm,
+    ) -> impl Future<Output = Result<Option<String>, PackFileError>> + Send;
+    /// Regular files directly inside `dir` (not recursive), for finding
+    /// manual downloads. A missing folder is empty.
+    fn list_dir(
+        &self,
+        dir: &Path,
+    ) -> impl Future<Output = Result<Vec<PathBuf>, PackFileError>> + Send;
     /// Moves (or copies) `from` to `to`, creating parent folders and replacing
     /// `to` atomically.
     fn place(
@@ -137,4 +158,69 @@ pub trait PackManifestStore: Send + Sync {
         id: &InstanceId,
         manifest: &PackManifest,
     ) -> impl Future<Output = Result<(), PackFileError>> + Send;
+}
+
+/// Where a packwiz pack lives: the `pack.toml` URL or its local path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PackLocation {
+    /// An `https` URL of a `pack.toml`.
+    Url(String),
+    /// A local `pack.toml`.
+    Local(PathBuf),
+}
+
+impl PackLocation {
+    /// `https://...` is a URL; any other scheme is refused; the rest is a local path.
+    pub fn parse(raw: &str) -> Result<Self, PackFileError> {
+        let raw = raw.trim();
+        if raw.starts_with("https://") {
+            Ok(Self::Url(raw.to_owned()))
+        } else if raw.contains("://") {
+            Err(PackFileError::Source(format!(
+                "only https URLs are supported: {raw}"
+            )))
+        } else if raw.is_empty() {
+            Err(PackFileError::Source("empty pack location".into()))
+        } else {
+            Ok(Self::Local(PathBuf::from(raw)))
+        }
+    }
+
+    /// The form stored in the instance origin.
+    pub fn as_string(&self) -> String {
+        match self {
+            Self::Url(url) => url.clone(),
+            Self::Local(path) => path.display().to_string(),
+        }
+    }
+}
+
+/// Where one file of a packwiz pack can be fetched from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PackFileLocation {
+    Url(String),
+    Path(PathBuf),
+}
+
+/// Reads packwiz files relative to the folder holding `pack.toml`.
+pub trait PackwizSource: Send + Sync {
+    /// The `pack.toml` itself (size-capped).
+    fn read_pack(
+        &self,
+        pack: &PackLocation,
+    ) -> impl Future<Output = Result<Vec<u8>, PackFileError>> + Send;
+    /// A small text file next to `pack.toml` (`index.toml`, `*.pw.toml`),
+    /// size-capped.
+    fn read(
+        &self,
+        pack: &PackLocation,
+        relative: &RelativePath,
+    ) -> impl Future<Output = Result<Vec<u8>, PackFileError>> + Send;
+    /// Where a pack file is fetched from, for downloads and copies; never
+    /// outside the pack's folder.
+    fn locate(
+        &self,
+        pack: &PackLocation,
+        relative: &RelativePath,
+    ) -> Result<PackFileLocation, PackFileError>;
 }
