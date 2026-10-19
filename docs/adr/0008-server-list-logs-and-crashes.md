@@ -31,7 +31,9 @@ game rewrites `servers.dat` when it exits, and writes a crash report into
   errors in `stale` (there is no error red).
 - **Crash detection:** a launch that ends with a non-zero exit the launcher
   did not cause, plus a file in `crash-reports/` modified since the launch
-  started (with two seconds of clock skew allowed), is a crash. The outcome
+  started (with two seconds of clock skew allowed), is a crash. Entries of
+  that folder that cannot be read are skipped, so they never hide a readable
+  report. The outcome
   carries the report's file name; the UI offers to open it, and the command
   opens only a plain file name inside that instance's `crash-reports/`
   folder, with the system's default app, from Rust.

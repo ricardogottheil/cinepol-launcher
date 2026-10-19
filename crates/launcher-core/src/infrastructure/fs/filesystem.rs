@@ -67,14 +67,19 @@ fn newest(
         Err(e) => return Err(error(dir, &e)),
     };
     let mut best: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
-    for entry in entries {
-        let entry = entry.map_err(|e| error(dir, &e))?;
+    // An entry that cannot be read (removed meanwhile, no permission) is
+    // skipped: it must not hide a report that can be read.
+    for entry in entries.flatten() {
         // `metadata` from the entry does not follow symlinks.
-        let metadata = entry.metadata().map_err(|e| error(&entry.path(), &e))?;
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
         if !metadata.is_file() {
             continue;
         }
-        let modified = metadata.modified().map_err(|e| error(&entry.path(), &e))?;
+        let Ok(modified) = metadata.modified() else {
+            continue;
+        };
         if modified >= since && best.as_ref().is_none_or(|(time, _)| modified > *time) {
             best = Some((modified, entry.path()));
         }
@@ -216,5 +221,24 @@ mod tests {
         );
         let later = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
         assert_eq!(fs.newest_file_since(&reports, later).await.unwrap(), None);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn entries_that_cannot_be_read_are_skipped_instead_of_failing_the_search() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let reports = dir.path().join("crash-reports");
+        std::fs::create_dir(&reports).unwrap();
+        std::fs::write(reports.join("crash-a.txt"), b"a").unwrap();
+        // Without the execute bit the names can be listed but not stat'ed.
+        std::fs::set_permissions(&reports, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        let result = TokioFileSystem
+            .newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH)
+            .await;
+
+        std::fs::set_permissions(&reports, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(result, Ok(None));
     }
 }

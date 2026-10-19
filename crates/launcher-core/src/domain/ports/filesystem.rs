@@ -25,7 +25,8 @@ pub trait FileSystem: Send + Sync {
     ) -> impl Future<Output = Result<(), FileSystemError>> + Send;
     /// The newest regular file directly inside `dir` modified at or after
     /// `since` (crash reports written during a launch); `None` when there is
-    /// none or the folder is missing.
+    /// none or the folder is missing. Entries that cannot be read are
+    /// skipped; only an unreadable folder is an error.
     fn newest_file_since(
         &self,
         dir: &Path,
