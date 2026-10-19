@@ -66,7 +66,8 @@ Build-time settings (not secrets):
    `latest.json`, creates a draft release in the releases repository, uploads
    every file and publishes it. Only then do installed launchers see it.
 
-A failed run publishes nothing. Delete the draft (if one was left) and the
+A failed run publishes nothing. Re-running the workflow reuses a draft that a
+failed run left behind. To change the code instead, delete that draft and the
 tag, fix the problem and tag again.
 
 ## How updates reach players

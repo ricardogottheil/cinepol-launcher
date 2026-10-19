@@ -238,9 +238,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
+          if [ ! -s release/latest.json ]; then
+            echo "::error::release/latest.json was not written"
+            exit 1
+          fi
           rm release/updater-*.json
+          existing="$(gh release view "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" \
+            --json isDraft --jq .isDraft 2>/dev/null || true)"
+          if [ "$existing" = "false" ]; then
+            echo "::error::${GITHUB_REF_NAME} is already published in ${RELEASES_REPOSITORY}"
+            exit 1
+          fi
           # A draft first, so players never see a release without its files.
-          gh release create "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" \
-            --target main --draft --title "Cinepol Launcher ${GITHUB_REF_NAME}" --notes-file notes.md
-          gh release upload "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" release/*
+          # A draft left by a failed run is reused, and its files replaced.
+          if [ -z "$existing" ]; then
+            gh release create "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" \
+              --target main --draft --title "Cinepol Launcher ${GITHUB_REF_NAME}" --notes-file notes.md
+          fi
+          gh release upload "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" --clobber release/*
           gh release edit "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" --draft=false --latest

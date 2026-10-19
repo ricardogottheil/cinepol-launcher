@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { collect, EXPECTED_PLATFORMS, manifest, plan } from "./bundles.mjs";
 
 const scratch = mkdtempSync(join(tmpdir(), "cinepol-release-"));
@@ -171,5 +173,23 @@ describe("collect and manifest", () => {
       "linux-x86_64",
       "linux-aarch64",
     ]);
+  });
+});
+
+describe("command line", () => {
+  it("runs, and fails on errors, also when started through a symlinked path", () => {
+    const linked = join(scratch, "linked");
+    symlinkSync(dirname(fileURLToPath(import.meta.url)), linked);
+    const empty = join(scratch, "empty");
+    mkdirSync(empty);
+    const run = spawnSync(
+      process.execPath,
+      [join(linked, "bundles.mjs"), "manifest", empty, "0.2.0", "https://x"],
+      {
+        encoding: "utf8",
+      },
+    );
+    assert.equal(run.status, 1, run.stdout + run.stderr);
+    assert.match(run.stderr, /missing platforms/);
   });
 });

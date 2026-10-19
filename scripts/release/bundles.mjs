@@ -7,9 +7,16 @@
 //     Merges every fragment in <dir> into latest.json for tauri-plugin-updater,
 //     refusing a release that misses a shipped platform.
 
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { join, relative, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 /** Every platform a release must serve, in the order of the build matrix. */
 export const EXPECTED_PLATFORMS = [
@@ -156,7 +163,18 @@ function main([command, ...args]) {
   process.exit(2);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+/** Whether this file is the script node was started with (symlinked paths included). */
+function isEntryPoint() {
+  const started = process.argv[1];
+  if (!started) return false;
+  try {
+    return realpathSync(started) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   try {
     main(process.argv.slice(2));
   } catch (error) {
