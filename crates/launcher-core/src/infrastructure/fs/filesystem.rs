@@ -55,7 +55,17 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), FileSystemError> {
     if let Some(parent) = to.parent() {
         std::fs::create_dir_all(parent).map_err(|e| error(parent, &e))?;
     }
+    // Fails when `to` exists, so nothing below can touch a folder we did not create.
     std::fs::create_dir(to).map_err(|e| error(to, &e))?;
+    let copied = copy_entries(from, to);
+    if copied.is_err() {
+        // Ours: created just above. Best effort; the copy error is what matters.
+        let _ = std::fs::remove_dir_all(to);
+    }
+    copied
+}
+
+fn copy_entries(from: &Path, to: &Path) -> Result<(), FileSystemError> {
     let mut pending = vec![(from.to_path_buf(), to.to_path_buf())];
     while let Some((source, target)) = pending.pop() {
         for entry in std::fs::read_dir(&source).map_err(|e| error(&source, &e))? {
@@ -93,6 +103,25 @@ mod tests {
             .unwrap();
     }
 
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_failed_copy_removes_only_the_folder_it_created() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let from = dir.path().join("from");
+        let locked = from.join("locked");
+        std::fs::create_dir_all(&locked).unwrap();
+        std::fs::write(locked.join("x"), b"x").unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let to = dir.path().join("to");
+
+        let result = TokioFileSystem.copy_dir_all(&from, &to).await;
+
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(result.is_err());
+        assert!(!to.exists());
+    }
+
     #[tokio::test]
     async fn copies_a_tree_without_following_symlinks_or_merging() {
         let dir = tempfile::tempdir().unwrap();
@@ -118,6 +147,8 @@ mod tests {
         assert!(to.join("empty").is_dir());
         assert!(std::fs::symlink_metadata(to.join("link.txt")).is_err());
         assert!(fs.copy_dir_all(&from, &to).await.is_err());
+        // The refused copy left the existing folder as it was.
+        assert_eq!(std::fs::read(to.join("instance.json")).unwrap(), b"{}");
         assert!(
             fs.copy_dir_all(&dir.path().join("missing"), &dir.path().join("x"))
                 .await

@@ -611,7 +611,8 @@ mod tests {
         );
     }
 
-    /// Saves a settings edit (a rename) while the first file batch downloads.
+    /// Saves a settings edit (a rename) on the second download call: the first
+    /// one fetches the pack, the second its files, so the edit lands mid-sync.
     struct EditingDownloader<'a> {
         inner: &'a crate::testing::FakeDownloader,
         instances: &'a InMemoryInstanceRepository,

@@ -46,11 +46,12 @@ export function useLoaderVersions(loader: InstanceLoader, gameVersion: string) {
   });
 }
 
-export function useInstanceSettings(instanceId: string, enabled: boolean) {
+const instanceSettingsKey = (instanceId: string) => ["instance-settings", instanceId] as const;
+
+export function useInstanceSettings(instanceId: string) {
   return useQuery({
-    queryKey: ["instance-settings", instanceId],
+    queryKey: instanceSettingsKey(instanceId),
     queryFn: () => getInstanceSettings(instanceId),
-    enabled,
   });
 }
 
@@ -59,7 +60,7 @@ export function useUpdateInstanceSettings(instanceId: string) {
   return useMutation({
     mutationFn: (settings: InstanceSettingsDto) => updateInstanceSettings(instanceId, settings),
     onSuccess: (saved) => {
-      queryClient.setQueryData(["instance-settings", instanceId], saved);
+      queryClient.setQueryData(instanceSettingsKey(instanceId), saved);
       return queryClient.invalidateQueries({ queryKey: instancesKey });
     },
   });

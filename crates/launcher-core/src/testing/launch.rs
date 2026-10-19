@@ -226,7 +226,7 @@ impl FakeFileSystem {
         self.removed.lock().unwrap().clone()
     }
 
-    /// Makes every later `copy_dir_all` fail after creating its target.
+    /// Makes every later `copy_dir_all` fail (leaving nothing behind, as the port promises).
     pub fn fail_copies(&self) {
         self.fail_copies
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -263,7 +263,6 @@ impl FileSystem for FakeFileSystem {
 
     async fn copy_dir_all(&self, from: &Path, to: &Path) -> Result<(), FileSystemError> {
         if self.fail_copies.load(std::sync::atomic::Ordering::SeqCst) {
-            self.paths.lock().unwrap().insert(to.to_path_buf());
             return Err(FileSystemError {
                 path: to.display().to_string(),
                 reason: "permission denied".into(),

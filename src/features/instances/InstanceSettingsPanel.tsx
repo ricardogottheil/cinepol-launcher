@@ -15,6 +15,7 @@ import {
 import { useAccounts } from "../accounts/useAccounts";
 import {
   copyName,
+  MAX_INSTANCE_NAME,
   type SettingsField,
   type SettingsFormValues,
   toFormValues,
@@ -37,7 +38,7 @@ export function InstanceSettingsPanel({
   busy: boolean;
 }) {
   const { t } = useTranslation();
-  const settings = useInstanceSettings(instance.id, true);
+  const settings = useInstanceSettings(instance.id);
 
   return (
     <section
@@ -115,7 +116,7 @@ function SettingsForm({ instanceId, stored }: { instanceId: string; stored: Inst
         <TextField
           label={t("instances.nameLabel")}
           value={values.name}
-          maxLength={64}
+          maxLength={MAX_INSTANCE_NAME}
           onChange={(event) => set({ name: event.target.value })}
         />
         <SelectField

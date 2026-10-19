@@ -71,7 +71,8 @@ where
     A: AccountRepository,
     J: JavaProbe,
 {
-    let mut instance = deps.instances.get(id).await?;
+    // Fails early for an unknown instance; the record is read again below.
+    deps.instances.get(id).await?;
     let name = InstanceName::parse(&change.name)?;
     let memory = MemorySettings::new(change.min_memory_mb, change.max_memory_mb)?;
     let jvm_args = JvmArgs::parse(change.jvm_args)?;
@@ -104,6 +105,10 @@ where
         }
     }
 
+    // Re-read after the awaits above (the Java probe starts a process): an
+    // update or a playtime save that landed meanwhile is kept, and only the
+    // editable fields change.
+    let mut instance = deps.instances.get(id).await?;
     instance.name = name;
     instance.default_account = change.default_account;
     instance.settings = LaunchSettings {
@@ -349,5 +354,50 @@ mod tests {
                 InstanceRepositoryError::NotFound(_)
             ))
         ));
+    }
+
+    /// Answers like a real Java, but a modpack update lands while it runs.
+    struct UpdatingProbe<'a> {
+        instances: &'a InMemoryInstanceRepository,
+    }
+
+    impl JavaProbe for UpdatingProbe<'_> {
+        async fn probe(
+            &self,
+            _executable: &std::path::Path,
+        ) -> Result<JavaVersion, crate::domain::java::JavaProbeError> {
+            let mut instance = self.instances.get(&id()).await.unwrap();
+            instance.game_version = GameVersion::parse("26.3").unwrap();
+            instance.record_playtime(60);
+            self.instances.save(&instance).await.unwrap();
+            Ok(JavaVersion {
+                major: 25,
+                full: "25.0.1".into(),
+                is_64_bit: true,
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn keeps_what_others_saved_while_the_change_was_checked() {
+        let world = world().await;
+        let probe = UpdatingProbe {
+            instances: &world.instances,
+        };
+        let updated = update_instance_settings(
+            &id(),
+            change(&world),
+            &UpdateInstanceSettingsDeps {
+                instances: &world.instances,
+                accounts: &world.accounts,
+                java: &probe,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(updated.name.as_str(), "Survival 2");
+        assert_eq!(updated.game_version.as_str(), "26.3");
+        assert_eq!(updated.playtime_secs, 60);
+        assert_eq!(world.instances.get(&id()).await.unwrap(), updated);
     }
 }

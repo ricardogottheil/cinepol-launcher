@@ -25,7 +25,9 @@ pub trait FileSystem: Send + Sync {
     ) -> impl Future<Output = Result<(), FileSystemError>> + Send;
     /// Copies the directory tree `from` into the new directory `to`. Symbolic
     /// links are skipped, so nothing outside `from` is copied; an existing
-    /// `to` is an error, never merged or replaced.
+    /// `to` is an error, never merged or replaced. When the copy fails after
+    /// `to` was created, `to` is removed again, and only then: a folder that
+    /// existed before is never touched.
     fn copy_dir_all(
         &self,
         from: &Path,

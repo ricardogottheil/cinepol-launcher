@@ -36,13 +36,10 @@ pub async fn duplicate_instance<R: InstanceRepository, F: FileSystem>(
     let name = InstanceName::parse(name)?;
     let id = free_id(&name, instances).await?;
     let target = paths.instance_dir(&id);
-    // `free_id` made sure `target` did not exist, so a partial copy is ours to remove.
-    if let Err(error) = fs.copy_dir_all(&paths.instance_dir(source), &target).await {
-        if let Err(cleanup) = fs.remove_dir_all(&target).await {
-            tracing::warn!(target = %target.display(), %cleanup, "could not remove a failed copy");
-        }
-        return Err(error.into());
-    }
+    // A failed copy removes what it created; a folder that another operation
+    // claimed in the meantime makes it fail without being touched.
+    fs.copy_dir_all(&paths.instance_dir(source), &target)
+        .await?;
     let copy = Instance {
         id,
         name,
@@ -214,16 +211,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_failed_copy_removes_the_partial_folder() {
+    async fn a_failed_copy_saves_no_instance() {
         let world = world(InstanceOrigin::Custom).await;
         world.fs.fail_copies();
         let result = duplicate(&world, "Survival (copy)").await;
         assert!(matches!(result, Err(DuplicateInstanceError::Copy(_))));
-        let target = world
-            .paths
-            .instance_dir(&InstanceId::parse("survival-copy").unwrap());
-        assert!(world.fs.removed().contains(&target));
-        assert!(!world.fs.contains(&target));
         assert_eq!(world.instances.list().await.unwrap().len(), 1);
     }
 }
