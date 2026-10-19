@@ -5,6 +5,7 @@ use launcher_core::application::account_skin::AccountSkinError;
 use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
 use launcher_core::application::duplicate_instance::DuplicateInstanceError;
+use launcher_core::application::edit_server_list::EditServerListError;
 use launcher_core::application::export_mrpack::ExportMrpackError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::install_modpack::InstallModpackError;
@@ -505,6 +506,19 @@ impl From<ResolveManualDownloadsError> for AppError {
     fn from(error: ResolveManualDownloadsError) -> Self {
         let code = match &error {
             ResolveManualDownloadsError::Files(files) => pack_file_code(files),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<EditServerListError> for AppError {
+    fn from(error: EditServerListError) -> Self {
+        let code = match &error {
+            EditServerListError::InvalidName | EditServerListError::InvalidAddress(_) => {
+                ErrorCode::InvalidInput
+            }
+            EditServerListError::OutOfRange(_) => ErrorCode::NotFound,
+            EditServerListError::Storage(_) => ErrorCode::Internal,
         };
         Self::new(code, error.to_string())
     }

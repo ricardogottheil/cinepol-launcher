@@ -75,6 +75,8 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::packwiz::import_packwiz,
             commands::packwiz::update_packwiz,
             commands::packwiz::check_manual_downloads,
+            commands::servers::list_servers,
+            commands::servers::edit_server_list,
             commands::server::get_server_config,
             commands::server::get_server_status,
             commands::server::play_on_cinepol,

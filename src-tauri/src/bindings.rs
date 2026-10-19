@@ -16,7 +16,8 @@ use crate::dto::{
     ManualFileDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto,
     ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto,
     PackwizUpdateDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
-    ServerConfigDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
+    ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto, ServerListDto, ServerStatusDto,
+    SettingsDto, SkinDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -76,6 +77,10 @@ fn declarations(cfg: &Config) -> Vec<String> {
         PackwizInstallDto::decl(cfg),
         PackwizUpdateDto::decl(cfg),
         ManualDownloadsDto::decl(cfg),
+        ServerDto::decl(cfg),
+        ServerListDto::decl(cfg),
+        ServerFormDto::decl(cfg),
+        ServerEditDto::decl(cfg),
         JavaKindDto::decl(cfg),
         JavaChoiceDto::decl(cfg),
         WindowSizeDto::decl(cfg),
@@ -325,6 +330,19 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             ManualDownloadsDto::name(cfg),
         ),
         command(
+            "list_servers",
+            vec![("instanceId", string())],
+            ServerListDto::name(cfg),
+        ),
+        command(
+            "edit_server_list",
+            vec![
+                ("instanceId", string()),
+                ("change", ServerEditDto::name(cfg)),
+            ],
+            ServerListDto::name(cfg),
+        ),
+        command(
             "export_mrpack",
             vec![("instanceId", string())],
             format!("{} | null", ModpackExportDto::name(cfg)),
@@ -430,6 +448,8 @@ mod tests {
             "import_mrpack",
             "update_modpack",
             "export_mrpack",
+            "list_servers",
+            "edit_server_list",
             "install_packwiz",
             "import_packwiz",
             "update_packwiz",

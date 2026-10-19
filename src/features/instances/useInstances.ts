@@ -4,13 +4,16 @@ import {
   createInstance,
   deleteInstance,
   duplicateInstance,
+  editServerList,
   getInstanceSettings,
   type InstanceLoader,
   type InstanceSettingsDto,
   listGameVersions,
   listInstances,
   listLoaderVersions,
+  listServers,
   type NewInstanceRequest,
+  type ServerEditDto,
   updateInstanceSettings,
 } from "../../ipc/client";
 
@@ -99,5 +102,19 @@ export function useManualDownloads(instanceId: string, enabled: boolean) {
       query.state.status === "error" || (query.state.data?.remaining.length ?? 0) > 0
         ? MANUAL_DOWNLOADS_POLL_MS
         : false,
+  });
+}
+
+const serversKey = (instanceId: string) => ["servers", instanceId] as const;
+
+export function useServers(instanceId: string) {
+  return useQuery({ queryKey: serversKey(instanceId), queryFn: () => listServers(instanceId) });
+}
+
+export function useEditServers(instanceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (change: ServerEditDto) => editServerList(instanceId, change),
+    onSuccess: (list) => queryClient.setQueryData(serversKey(instanceId), list),
   });
 }

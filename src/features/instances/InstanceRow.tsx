@@ -10,6 +10,7 @@ import { InstanceSettingsPanel } from "./InstanceSettingsPanel";
 import { LogPanel } from "./LogPanel";
 import { ManualDownloadsPanel } from "./ManualDownloadsPanel";
 import { ProgressMeter } from "./ProgressMeter";
+import { ServerListPanel } from "./ServerListPanel";
 import { instancesKey, manualDownloadsKey, useManualDownloads } from "./useInstances";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
@@ -31,6 +32,7 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const waitingForFiles = (manual.data?.remaining.length ?? 0) > 0;
   const busy = activity.kind !== "idle";
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [serversOpen, setServersOpen] = useState(false);
   const queryClient = useQueryClient();
   // An update may move the instance to another game or loader version, and a
   // packwiz update may add files to download by hand.
@@ -57,6 +59,9 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           />
         </div>
         <div className="flex flex-wrap gap-3">
+          <Button aria-expanded={serversOpen} onClick={() => setServersOpen(!serversOpen)}>
+            {serversOpen ? t("instances.servers.close") : t("instances.servers.open")}
+          </Button>
           <Button aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>
             {settingsOpen ? t("instances.settings.close") : t("instances.settings.open")}
           </Button>
@@ -138,6 +143,8 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           onCheck={() => void manual.refetch()}
         />
       ) : null}
+
+      {serversOpen ? <ServerListPanel instanceId={instance.id} /> : null}
 
       {settingsOpen ? <InstanceSettingsPanel instance={instance} busy={busy} /> : null}
 

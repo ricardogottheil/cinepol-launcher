@@ -251,6 +251,26 @@
       "done": "Todos los archivos están instalados.",
       "waiting_one": "Falta {{count}} archivo",
       "waiting_other": "Faltan {{count}} archivos"
+    },
+    "servers": {
+      "open": "Servidores",
+      "close": "Cerrar servidores",
+      "title": "Servidores multijugador",
+      "empty": "Todavía no hay servidores.",
+      "name": "Nombre",
+      "address": "Dirección",
+      "textures": "Paquetes de recursos del servidor",
+      "texturesAsk": "Preguntar en el juego",
+      "texturesOn": "Usar",
+      "texturesOff": "No usar",
+      "add": "Agregar servidor",
+      "save": "Guardar servidor",
+      "edit": "Editar",
+      "cancel": "Cancelar",
+      "remove": "Quitar",
+      "moveUp": "Subir",
+      "moveDown": "Bajar",
+      "hint": "Los cambios se aplican la próxima vez que inicies el juego. La lista no se puede cambiar mientras juegas."
     }
   },
   "settings": {

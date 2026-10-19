@@ -251,6 +251,26 @@
       "done": "All files are installed.",
       "waiting_one": "Waiting for {{count}} file",
       "waiting_other": "Waiting for {{count}} files"
+    },
+    "servers": {
+      "open": "Servers",
+      "close": "Close servers",
+      "title": "Multiplayer servers",
+      "empty": "No servers yet.",
+      "name": "Name",
+      "address": "Address",
+      "textures": "Server resource packs",
+      "texturesAsk": "Ask in game",
+      "texturesOn": "Use",
+      "texturesOff": "Do not use",
+      "add": "Add server",
+      "save": "Save server",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "hint": "Changes apply the next time the game starts. The list cannot change while you play."
     }
   },
   "settings": {

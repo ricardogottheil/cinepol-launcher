@@ -10,6 +10,7 @@ pub mod create_instance;
 pub mod create_offline_profile;
 pub mod delete_instance;
 pub mod duplicate_instance;
+pub mod edit_server_list;
 pub mod export_mrpack;
 pub mod get_modpack_details;
 pub mod get_settings;

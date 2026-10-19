@@ -37,6 +37,9 @@ import type {
   ProgressStageDto,
   ProgressUnitDto,
   ServerConfigDto,
+  ServerDto,
+  ServerEditDto,
+  ServerListDto,
   ServerStatusDto,
   SettingsDto,
   SkinDto,
@@ -80,6 +83,9 @@ export type {
   ProgressStageDto,
   ProgressUnitDto,
   ServerConfigDto,
+  ServerDto,
+  ServerEditDto,
+  ServerListDto,
   ServerStatusDto,
   SettingsDto,
   SkinDto,
@@ -424,6 +430,16 @@ export function updatePackwiz(
 /** Installs pending manual downloads found in the Downloads folder. */
 export function checkManualDownloads(instanceId: string): Promise<ManualDownloadsDto> {
   return call("check_manual_downloads", { instanceId });
+}
+
+/** An instance's multiplayer servers (`servers.dat`). */
+export function listServers(instanceId: string): Promise<ServerListDto> {
+  return call("list_servers", { instanceId });
+}
+
+/** Applies one change to the server list; refused while the game runs. */
+export function editServerList(instanceId: string, change: ServerEditDto): Promise<ServerListDto> {
+  return call("edit_server_list", { instanceId, change });
 }
 
 /** Subscribes to an app-wide event; resolves to the unsubscribe function. */

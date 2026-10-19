@@ -129,6 +129,26 @@ export type PackwizUpdateDto = { instance: InstanceDto, files: PackFilesDto, pen
 
 export type ManualDownloadsDto = { resolved: Array<ManualFileDto>, remaining: Array<ManualFileDto>, };
 
+export type ServerDto = { name: string, 
+/**
+ * As the player typed it: `host`, `host:port` or `[ipv6]:port`.
+ */
+address: string, 
+/**
+ * `null` asks in game; otherwise the remembered resource-pack choice.
+ */
+acceptTextures: boolean | null, 
+/**
+ * The icon the game cached, as a `data:image/png` URL.
+ */
+icon: string | null, };
+
+export type ServerListDto = { servers: Array<ServerDto>, };
+
+export type ServerFormDto = { name: string, address: string, acceptTextures: boolean | null, };
+
+export type ServerEditDto = { "kind": "add", form: ServerFormDto, } | { "kind": "update", index: number, form: ServerFormDto, } | { "kind": "remove", index: number, } | { "kind": "move", from: number, to: number, };
+
 export type JavaKindDto = "managed" | "custom";
 
 export type JavaChoiceDto = { kind: JavaKindDto, path: string | null, };
@@ -182,6 +202,8 @@ export interface Commands {
   import_packwiz: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto | null };
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
+  list_servers: { args: { instanceId: string }; result: ServerListDto };
+  edit_server_list: { args: { instanceId: string; change: ServerEditDto }; result: ServerListDto };
   export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };
   get_settings: { args: Record<string, never>; result: SettingsDto };
   set_server_config_url: { args: { url: string | null }; result: SettingsDto };

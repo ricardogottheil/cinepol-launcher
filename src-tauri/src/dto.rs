@@ -18,6 +18,7 @@ use launcher_core::domain::modpack::{
     ModpackPage, ModpackSourceKind, ModpackSummary, ModpackVersion,
 };
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
+use launcher_core::domain::server_list::ServerList;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -728,4 +729,66 @@ pub struct PackwizUpdateDto {
 pub struct ManualDownloadsDto {
     pub resolved: Vec<ManualFileDto>,
     pub remaining: Vec<ManualFileDto>,
+}
+
+/// One entry of an instance's multiplayer server list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerDto {
+    pub name: String,
+    /// As the player typed it: `host`, `host:port` or `[ipv6]:port`.
+    pub address: String,
+    /// `null` asks in game; otherwise the remembered resource-pack choice.
+    pub accept_textures: Option<bool>,
+    /// The icon the game cached, as a `data:image/png` URL.
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerListDto {
+    pub servers: Vec<ServerDto>,
+}
+
+impl From<&ServerList> for ServerListDto {
+    fn from(list: &ServerList) -> Self {
+        Self {
+            servers: list
+                .entries()
+                .iter()
+                .map(|entry| ServerDto {
+                    name: entry.name.clone(),
+                    address: entry.address.to_string(),
+                    accept_textures: entry.accept_textures,
+                    icon: entry
+                        .icon
+                        .as_ref()
+                        .filter(|icon| {
+                            icon.chars()
+                                .all(|c| c.is_ascii_alphanumeric() || "+/=".contains(c))
+                        })
+                        .map(|icon| format!("data:image/png;base64,{icon}")),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// What the player typed for a server.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerFormDto {
+    pub name: String,
+    pub address: String,
+    pub accept_textures: Option<bool>,
+}
+
+/// One change to a server list; positions are zero-based.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ServerEditDto {
+    Add { form: ServerFormDto },
+    Update { index: u32, form: ServerFormDto },
+    Remove { index: u32 },
+    Move { from: u32, to: u32 },
 }

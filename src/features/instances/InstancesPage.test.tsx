@@ -25,6 +25,8 @@ const client = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   updatePackwiz: vi.fn(),
   checkManualDownloads: vi.fn(),
+  listServers: vi.fn(),
+  editServerList: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -677,5 +679,101 @@ describe("InstancesPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(await screen.findByRole("region", { name: manual.title })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.play })).toBeDisabled();
+  });
+
+  describe("server list", () => {
+    const serverLabels = esCommon.instances.servers;
+    const cinepol = {
+      name: "CINEPOL",
+      address: "mc.policarpiers.com",
+      acceptTextures: null,
+      icon: null,
+    };
+    const hypixel = { ...cinepol, name: "Hypixel", address: "mc.hypixel.net" };
+
+    async function openServers() {
+      renderWithQuery(<InstancesPage />);
+      fireEvent.click(await screen.findByRole("button", { name: serverLabels.open }));
+      return screen.findByRole("region", { name: serverLabels.title });
+    }
+
+    it("lists the instance's servers", async () => {
+      client.listServers.mockResolvedValue({ servers: [cinepol, hypixel] });
+      const panel = await openServers();
+      expect(await within(panel).findByText("CINEPOL")).toBeInTheDocument();
+      expect(within(panel).getByText("mc.hypixel.net")).toBeInTheDocument();
+      expect(client.listServers).toHaveBeenCalledWith("survival");
+    });
+
+    it("adds a server", async () => {
+      client.listServers.mockResolvedValue({ servers: [cinepol] });
+      client.editServerList.mockResolvedValue({ servers: [cinepol, hypixel] });
+      const panel = await openServers();
+      await within(panel).findByText("CINEPOL");
+      fireEvent.change(within(panel).getByLabelText(serverLabels.name), {
+        target: { value: "Hypixel" },
+      });
+      fireEvent.change(within(panel).getByLabelText(serverLabels.address), {
+        target: { value: "mc.hypixel.net" },
+      });
+      fireEvent.change(within(panel).getByLabelText(serverLabels.textures), {
+        target: { value: "on" },
+      });
+      fireEvent.click(within(panel).getByRole("button", { name: serverLabels.add }));
+      await waitFor(() =>
+        expect(client.editServerList).toHaveBeenCalledWith("survival", {
+          kind: "add",
+          form: { name: "Hypixel", address: "mc.hypixel.net", acceptTextures: true },
+        }),
+      );
+      expect(await within(panel).findByText("mc.hypixel.net")).toBeInTheDocument();
+    });
+
+    it("edits, reorders and removes servers", async () => {
+      client.listServers.mockResolvedValue({ servers: [cinepol, hypixel] });
+      client.editServerList.mockResolvedValue({ servers: [cinepol, hypixel] });
+      const panel = await openServers();
+      const row = (await within(panel).findByText("Hypixel")).closest("li");
+      if (!row) throw new Error("no server row");
+
+      fireEvent.click(within(row).getByRole("button", { name: serverLabels.moveUp }));
+      await waitFor(() =>
+        expect(client.editServerList).toHaveBeenCalledWith("survival", {
+          kind: "move",
+          from: 1,
+          to: 0,
+        }),
+      );
+      fireEvent.click(within(row).getByRole("button", { name: serverLabels.remove }));
+      await waitFor(() =>
+        expect(client.editServerList).toHaveBeenCalledWith("survival", {
+          kind: "remove",
+          index: 1,
+        }),
+      );
+
+      fireEvent.click(within(row).getByRole("button", { name: serverLabels.edit }));
+      const name = within(panel).getByLabelText(serverLabels.name);
+      expect(name).toHaveValue("Hypixel");
+      fireEvent.change(name, { target: { value: "Hypixel EU" } });
+      fireEvent.click(within(panel).getByRole("button", { name: serverLabels.save }));
+      await waitFor(() =>
+        expect(client.editServerList).toHaveBeenCalledWith("survival", {
+          kind: "update",
+          index: 1,
+          form: { name: "Hypixel EU", address: "mc.hypixel.net", acceptTextures: null },
+        }),
+      );
+    });
+
+    it("explains why the list cannot change while playing", async () => {
+      client.listServers.mockResolvedValue({ servers: [cinepol] });
+      client.editServerList.mockRejectedValue(new IpcError("already_running", "busy"));
+      const panel = await openServers();
+      const row = (await within(panel).findByText("CINEPOL")).closest("li");
+      if (!row) throw new Error("no server row");
+      fireEvent.click(within(row).getByRole("button", { name: serverLabels.remove }));
+      expect(await within(panel).findByText(esCommon.errors.already_running)).toBeInTheDocument();
+    });
   });
 });
