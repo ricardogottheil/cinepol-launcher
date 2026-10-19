@@ -57,7 +57,15 @@ export type InstanceDto = { id: string, name: string, gameVersion: string,
 /**
  * `vanilla`, `fabric`, `quilt`, `forge` or `neoforge`.
  */
-loader: string, loaderVersion: string | null, origin: InstanceOriginDto, playtimeSecs: number, };
+loader: string, loaderVersion: string | null, origin: InstanceOriginDto, 
+/**
+ * For modpack instances: `modrinth`, `curseforge` or `packwiz`.
+ */
+modpackSource: string | null, 
+/**
+ * packwiz instances sync their pack before every launch.
+ */
+updatePackOnLaunch: boolean, playtimeSecs: number, };
 
 export type InstallSummaryDto = { downloadedFiles: number, reusedFiles: number, downloadedBytes: number, javaMajor: number | null, };
 
@@ -113,6 +121,14 @@ indexed: number,
  */
 overrides: number, };
 
+export type ManualFileDto = { name: string, filename: string, pageUrl: string, };
+
+export type PackwizInstallDto = { instance: InstanceDto, files: PackFilesDto, install: InstallSummaryDto, pending: Array<ManualFileDto>, };
+
+export type PackwizUpdateDto = { instance: InstanceDto, files: PackFilesDto, pending: Array<ManualFileDto>, };
+
+export type ManualDownloadsDto = { resolved: Array<ManualFileDto>, remaining: Array<ManualFileDto>, };
+
 export type JavaKindDto = "managed" | "custom";
 
 export type JavaChoiceDto = { kind: JavaKindDto, path: string | null, };
@@ -123,7 +139,11 @@ export type InstanceSettingsDto = { name: string, defaultAccountId: string | nul
 /**
  * `null` keeps the game's own window size.
  */
-window: WindowSizeDto | null, env: { [key in string]: string }, };
+window: WindowSizeDto | null, env: { [key in string]: string }, 
+/**
+ * packwiz instances: sync the pack before every launch.
+ */
+updatePackOnLaunch: boolean, };
 
 /** Every backend command: its arguments and its success result. */
 export interface Commands {
@@ -158,6 +178,10 @@ export interface Commands {
   install_modpack: { args: { operationId: string; project: string; version: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto };
   import_mrpack: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto | null };
   update_modpack: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: ModpackUpdateDto };
+  install_packwiz: { args: { operationId: string; url: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto };
+  import_packwiz: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto | null };
+  update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
+  check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
   export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };
   get_settings: { args: Record<string, never>; result: SettingsDto };
   set_server_config_url: { args: { url: string | null }; result: SettingsDto };

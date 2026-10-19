@@ -20,6 +20,8 @@ import type {
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLineDto,
+  ManualDownloadsDto,
+  ManualFileDto,
   ModpackDetailsDto,
   ModpackExportDto,
   ModpackInstallDto,
@@ -28,6 +30,8 @@ import type {
   ModpackUpdateDto,
   ModpackVersionDto,
   PackFilesDto,
+  PackwizInstallDto,
+  PackwizUpdateDto,
   PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
@@ -59,6 +63,8 @@ export type {
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLineDto,
+  ManualDownloadsDto,
+  ManualFileDto,
   ModpackDetailsDto,
   ModpackExportDto,
   ModpackInstallDto,
@@ -67,6 +73,8 @@ export type {
   ModpackUpdateDto,
   ModpackVersionDto,
   PackFilesDto,
+  PackwizInstallDto,
+  PackwizUpdateDto,
   PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
@@ -382,6 +390,40 @@ export function updateModpack(
 /** Asks where to save and exports the instance; resolves `null` when the picker is closed. */
 export function exportMrpack(instanceId: string): Promise<ModpackExportDto | null> {
   return call("export_mrpack", { instanceId });
+}
+
+/** Installs the packwiz pack at an https `pack.toml` URL, game and loader included. */
+export function installPackwiz(
+  url: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<PackwizInstallDto> {
+  return startOperation("install_packwiz", (operationId) =>
+    call("install_packwiz", { operationId, url, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Asks for a local `pack.toml` and installs it; resolves `null` when the picker is closed. */
+export function importPackwiz(
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<PackwizInstallDto | null> {
+  return startOperation("import_packwiz", (operationId) =>
+    call("import_packwiz", { operationId, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Syncs a packwiz instance with its pack, keeping the player's changes. */
+export function updatePackwiz(
+  instanceId: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<PackwizUpdateDto> {
+  return startOperation("update_packwiz", (operationId) =>
+    call("update_packwiz", { operationId, instanceId, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Installs pending manual downloads found in the Downloads folder. */
+export function checkManualDownloads(instanceId: string): Promise<ManualDownloadsDto> {
+  return call("check_manual_downloads", { instanceId });
 }
 
 /** Subscribes to an app-wide event; resolves to the unsubscribe function. */

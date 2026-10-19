@@ -12,10 +12,11 @@ use crate::dto::{
     AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, CommunityLinksDto,
     ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto, InstallSummaryDto,
     InstanceDto, InstanceOriginDto, InstanceSettingsDto, JavaChoiceDto, JavaKindDto,
-    LaunchOutcomeDto, LoaderReleaseDto, LogLineDto, LogStreamDto, ModpackDetailsDto,
-    ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto,
-    ModpackVersionDto, PackFilesDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
-    ProgressUnitDto, ServerConfigDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
+    LaunchOutcomeDto, LoaderReleaseDto, LogLineDto, LogStreamDto, ManualDownloadsDto,
+    ManualFileDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto,
+    ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto,
+    PackwizUpdateDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
+    ServerConfigDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -71,6 +72,10 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ModpackInstallDto::decl(cfg),
         ModpackUpdateDto::decl(cfg),
         ModpackExportDto::decl(cfg),
+        ManualFileDto::decl(cfg),
+        PackwizInstallDto::decl(cfg),
+        PackwizUpdateDto::decl(cfg),
+        ManualDownloadsDto::decl(cfg),
         JavaKindDto::decl(cfg),
         JavaChoiceDto::decl(cfg),
         WindowSizeDto::decl(cfg),
@@ -280,6 +285,46 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             ModpackUpdateDto::name(cfg),
         ),
         command(
+            "install_packwiz",
+            vec![
+                ("operationId", string()),
+                ("url", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            PackwizInstallDto::name(cfg),
+        ),
+        command(
+            "import_packwiz",
+            vec![
+                ("operationId", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            format!("{} | null", PackwizInstallDto::name(cfg)),
+        ),
+        command(
+            "update_packwiz",
+            vec![
+                ("operationId", string()),
+                ("instanceId", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            PackwizUpdateDto::name(cfg),
+        ),
+        command(
+            "check_manual_downloads",
+            vec![("instanceId", string())],
+            ManualDownloadsDto::name(cfg),
+        ),
+        command(
             "export_mrpack",
             vec![("instanceId", string())],
             format!("{} | null", ModpackExportDto::name(cfg)),
@@ -385,6 +430,10 @@ mod tests {
             "import_mrpack",
             "update_modpack",
             "export_mrpack",
+            "install_packwiz",
+            "import_packwiz",
+            "update_packwiz",
+            "check_manual_downloads",
             "get_server_config",
             "get_server_status",
             "play_on_cinepol",

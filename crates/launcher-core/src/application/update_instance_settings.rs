@@ -51,6 +51,8 @@ pub struct InstanceSettingsChange {
     /// `None` keeps the game's own window size.
     pub window: Option<(u32, u32)>,
     pub env: BTreeMap<String, String>,
+    /// packwiz instances: sync the pack before every launch.
+    pub update_pack_on_launch: bool,
 }
 
 pub struct UpdateInstanceSettingsDeps<'a, I, A, J> {
@@ -117,8 +119,7 @@ where
         jvm_args,
         window,
         env,
-        // Not edited here yet; kept as stored.
-        update_pack_on_launch: instance.settings.update_pack_on_launch,
+        update_pack_on_launch: change.update_pack_on_launch,
     };
     deps.instances.save(&instance).await?;
     Ok(instance)
@@ -184,6 +185,7 @@ mod tests {
             jvm_args: vec!["-XX:+UseZGC".into()],
             window: Some((1280, 720)),
             env: BTreeMap::from([("MESA_GL_VERSION_OVERRIDE".into(), "4.6".into())]),
+            update_pack_on_launch: true,
         }
     }
 
@@ -223,6 +225,7 @@ mod tests {
             updated.settings.window,
             Some(WindowSize::new(1280, 720).unwrap())
         );
+        assert!(updated.settings.update_pack_on_launch);
         assert_eq!(
             updated.settings.env.iter().collect::<Vec<_>>(),
             [("MESA_GL_VERSION_OVERRIDE", "4.6")]

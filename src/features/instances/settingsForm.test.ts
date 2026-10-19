@@ -11,6 +11,7 @@ const dto: InstanceSettingsDto = {
   jvmArgs: ["-XX:+UseZGC"],
   window: null,
   env: { MESA_GL_VERSION_OVERRIDE: "4.6" },
+  updatePackOnLaunch: false,
 };
 
 describe("settingsForm", () => {

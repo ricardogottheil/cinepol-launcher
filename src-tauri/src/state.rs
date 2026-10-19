@@ -29,6 +29,7 @@ use launcher_core::infrastructure::modrinth::ModrinthSource;
 use launcher_core::infrastructure::mojang::{MojangPremiumNames, MojangVersionSource};
 use launcher_core::infrastructure::msa::MsaClient;
 use launcher_core::infrastructure::nbt::NbtServerListStore;
+use launcher_core::infrastructure::packwiz::PackwizFiles;
 use launcher_core::infrastructure::process::{TokioGameProcessRunner, TokioProcessorRunner};
 use launcher_core::infrastructure::server_ping::MinecraftServerPinger;
 use launcher_core::infrastructure::time::{SystemClock, TokioDelay};
@@ -115,6 +116,8 @@ pub struct AppState {
     /// The Modrinth catalog (modpack search, versions, file lookups).
     pub modrinth: ModrinthSource<ReqwestHttpClient>,
     pub mrpack: ZipMrpackArchive,
+    /// packwiz packs over HTTP or from a local folder.
+    pub packwiz: PackwizFiles<ReqwestHttpClient>,
     pub pack_files: StdPackFiles,
     /// Which files each modpack instance got from its pack.
     pub pack_manifests: JsonPackManifestStore,
@@ -223,6 +226,7 @@ impl AppState {
             config_source: HttpServerConfigSource::new(http.clone()),
             modrinth: ModrinthSource::new(http.clone()),
             mrpack: ZipMrpackArchive::new(),
+            packwiz: PackwizFiles::new(http.clone()),
             pack_files: StdPackFiles,
             pack_manifests: JsonPackManifestStore::new(paths.clone()),
             settings: JsonSettingsRepository::new(paths.settings_file()),

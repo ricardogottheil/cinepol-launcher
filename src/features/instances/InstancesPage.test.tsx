@@ -50,6 +50,7 @@ const stored = {
   jvmArgs: [],
   window: null,
   env: {},
+  updatePackOnLaunch: false,
 } as const;
 const outcome = { instanceId: "survival", exitCode: 0, killed: false, playedSecs: 60 };
 

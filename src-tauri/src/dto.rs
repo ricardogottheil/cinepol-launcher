@@ -13,7 +13,10 @@ use launcher_core::domain::account::{DeviceCode, SkinVariant};
 use launcher_core::domain::instance::{Instance, InstanceOrigin, JavaSelection};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
 use launcher_core::domain::loader::LoaderRelease;
-use launcher_core::domain::modpack::{ModpackPage, ModpackSummary, ModpackVersion};
+use launcher_core::domain::modpack::sync::ManualFile;
+use launcher_core::domain::modpack::{
+    ModpackPage, ModpackSourceKind, ModpackSummary, ModpackVersion,
+};
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -346,6 +349,10 @@ pub struct InstanceDto {
     pub loader: String,
     pub loader_version: Option<String>,
     pub origin: InstanceOriginDto,
+    /// For modpack instances: `modrinth`, `curseforge` or `packwiz`.
+    pub modpack_source: Option<String>,
+    /// packwiz instances sync their pack before every launch.
+    pub update_pack_on_launch: bool,
     #[ts(type = "number")]
     pub playtime_secs: u64,
 }
@@ -363,6 +370,18 @@ impl From<&Instance> for InstanceDto {
                 InstanceOrigin::CinepolServer => InstanceOriginDto::CinepolServer,
                 InstanceOrigin::Modpack(_) => InstanceOriginDto::Modpack,
             },
+            modpack_source: match &instance.origin {
+                InstanceOrigin::Modpack(pack) => Some(
+                    match pack.source {
+                        ModpackSourceKind::Modrinth => "modrinth",
+                        ModpackSourceKind::CurseForge => "curseforge",
+                        ModpackSourceKind::Packwiz => "packwiz",
+                    }
+                    .to_owned(),
+                ),
+                _ => None,
+            },
+            update_pack_on_launch: instance.settings.update_pack_on_launch,
             playtime_secs: instance.playtime_secs,
         }
     }
@@ -628,6 +647,8 @@ pub struct InstanceSettingsDto {
     /// `null` keeps the game's own window size.
     pub window: Option<WindowSizeDto>,
     pub env: std::collections::BTreeMap<String, String>,
+    /// packwiz instances: sync the pack before every launch.
+    pub update_pack_on_launch: bool,
 }
 
 impl From<&Instance> for InstanceSettingsDto {
@@ -658,6 +679,53 @@ impl From<&Instance> for InstanceSettingsDto {
                 .iter()
                 .map(|(name, value)| (name.to_owned(), value.to_owned()))
                 .collect(),
+            update_pack_on_launch: settings.update_pack_on_launch,
         }
     }
+}
+
+/// A pack file the player has to download by hand from its CurseForge page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualFileDto {
+    pub name: String,
+    pub filename: String,
+    pub page_url: String,
+}
+
+impl From<&ManualFile> for ManualFileDto {
+    fn from(file: &ManualFile) -> Self {
+        Self {
+            name: file.name.clone(),
+            filename: file.filename.clone(),
+            page_url: file.page_url(),
+        }
+    }
+}
+
+/// A packwiz pack installed into a new instance; `pending` files still have
+/// to be downloaded by hand before the pack is complete.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PackwizInstallDto {
+    pub instance: InstanceDto,
+    pub files: PackFilesDto,
+    pub install: InstallSummaryDto,
+    pub pending: Vec<ManualFileDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PackwizUpdateDto {
+    pub instance: InstanceDto,
+    pub files: PackFilesDto,
+    pub pending: Vec<ManualFileDto>,
+}
+
+/// Manual downloads found in the Downloads folder, and those still missing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualDownloadsDto {
+    pub resolved: Vec<ManualFileDto>,
+    pub remaining: Vec<ManualFileDto>,
 }

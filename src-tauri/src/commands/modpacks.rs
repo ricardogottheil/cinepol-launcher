@@ -259,7 +259,7 @@ async fn update_held(
 }
 
 /// Claims the instance as busy, like a running game.
-fn hold<'a>(
+pub(crate) fn hold<'a>(
     state: &'a AppState,
     id: &InstanceId,
     token: &CancellationToken,

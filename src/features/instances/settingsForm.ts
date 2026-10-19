@@ -19,6 +19,7 @@ export interface SettingsFormValues {
   height: string;
   /** One `NAME=value` pair per line. */
   env: string;
+  updatePackOnLaunch: boolean;
 }
 
 export type SettingsField = "minMemory" | "maxMemory" | "width" | "height" | "env";
@@ -42,6 +43,7 @@ export function toFormValues(settings: InstanceSettingsDto): SettingsFormValues 
     env: Object.entries(settings.env)
       .map(([name, value]) => `${name}=${value}`)
       .join("\n"),
+    updatePackOnLaunch: settings.updatePackOnLaunch,
   };
 }
 
@@ -95,6 +97,7 @@ export function toSettings(values: SettingsFormValues): SettingsFormResult {
         ? { width: numbers.width ?? 0, height: numbers.height ?? 0 }
         : null,
       env,
+      updatePackOnLaunch: values.updatePackOnLaunch,
     },
   };
 }

@@ -8,15 +8,18 @@ use launcher_core::application::duplicate_instance::DuplicateInstanceError;
 use launcher_core::application::export_mrpack::ExportMrpackError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::install_modpack::InstallModpackError;
+use launcher_core::application::install_packwiz::InstallPackwizError;
 use launcher_core::application::launch_instance::LaunchError;
 use launcher_core::application::list_loader_versions::ListLoaderVersionsError;
 use launcher_core::application::login_microsoft::LoginError;
 use launcher_core::application::modpack_files::PackSyncError;
 use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
+use launcher_core::application::resolve_manual_downloads::ResolveManualDownloadsError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
 use launcher_core::application::update_instance_settings::UpdateInstanceSettingsError;
 use launcher_core::application::update_modpack::UpdateModpackError;
+use launcher_core::application::update_packwiz::UpdatePackwizError;
 use launcher_core::domain::account::AccountRepositoryError;
 use launcher_core::domain::account::AuthError;
 use launcher_core::domain::instance::InstanceRepositoryError;
@@ -468,6 +471,43 @@ impl From<UpdateInstanceSettingsError> for AppError {
     }
 }
 
+impl From<InstallPackwizError> for AppError {
+    fn from(error: InstallPackwizError) -> Self {
+        let code = match &error {
+            InstallPackwizError::Create(CreateInstanceError::Storage(_)) => ErrorCode::Internal,
+            InstallPackwizError::Create(_) => ErrorCode::InvalidModpack,
+            InstallPackwizError::Pack(pack) => pack_sync_code(pack),
+            InstallPackwizError::Cancelled => ErrorCode::Cancelled,
+            InstallPackwizError::Busy(_) => ErrorCode::AlreadyRunning,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<UpdatePackwizError> for AppError {
+    fn from(error: UpdatePackwizError) -> Self {
+        let code = match &error {
+            UpdatePackwizError::Instance(InstanceRepositoryError::NotFound(_)) => {
+                ErrorCode::NotFound
+            }
+            UpdatePackwizError::Instance(_) => ErrorCode::Internal,
+            UpdatePackwizError::NotPackwiz(_) => ErrorCode::InvalidInput,
+            UpdatePackwizError::Pack(pack) => pack_sync_code(pack),
+            UpdatePackwizError::Cancelled => ErrorCode::Cancelled,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<ResolveManualDownloadsError> for AppError {
+    fn from(error: ResolveManualDownloadsError) -> Self {
+        let code = match &error {
+            ResolveManualDownloadsError::Files(files) => pack_file_code(files),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,6 +528,29 @@ mod tests {
             ))
             .code,
             ErrorCode::InvalidInput
+        );
+    }
+
+    #[test]
+    fn maps_packwiz_errors_to_actionable_codes() {
+        let unsafe_path = PackSyncError::Files(PackFileError::Packwiz(
+            launcher_core::domain::modpack::packwiz::PackwizError::UnsafePath("../x".into()),
+        ));
+        assert_eq!(
+            AppError::from(InstallPackwizError::Pack(unsafe_path)).code,
+            ErrorCode::InvalidModpack
+        );
+        let unreachable = PackSyncError::Files(PackFileError::Source("offline".into()));
+        assert_eq!(
+            AppError::from(UpdatePackwizError::Pack(unreachable)).code,
+            ErrorCode::Network
+        );
+        assert_eq!(
+            AppError::from(InstallPackwizError::Busy(
+                launcher_core::domain::instance::InstanceId::parse("fo").unwrap()
+            ))
+            .code,
+            ErrorCode::AlreadyRunning
         );
     }
 

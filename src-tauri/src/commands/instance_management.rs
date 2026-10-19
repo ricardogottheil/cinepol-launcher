@@ -98,6 +98,7 @@ pub async fn update_instance_settings(
         jvm_args: settings.jvm_args,
         window: settings.window.map(|window| (window.width, window.height)),
         env: settings.env,
+        update_pack_on_launch: settings.update_pack_on_launch,
     };
     let deps = UpdateInstanceSettingsDeps {
         instances: &state.instances,

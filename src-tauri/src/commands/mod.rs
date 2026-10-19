@@ -10,6 +10,7 @@ pub mod demo;
 pub mod instance_management;
 pub mod instances;
 pub mod modpacks;
+pub mod packwiz;
 pub mod server;
 pub mod versions;
 
