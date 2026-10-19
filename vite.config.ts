@@ -23,5 +23,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    // The first test of a file pays for loading its modules, which takes
+    // several seconds on slow CI runners (windows-latest).
+    testTimeout: 15_000,
   },
 });
