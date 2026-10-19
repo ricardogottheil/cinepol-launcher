@@ -187,7 +187,8 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
             return Err(PackSyncError::Cancelled);
         }
         // Index paths are relative to the index's folder, which is also
-        // where they go in the game folder; reads are relative to `pack.toml`.
+        // where they go in the game folder (at the alias, when there is
+        // one); reads are relative to `pack.toml`.
         let in_pack = beside(&pack.index, &entry.path)?;
         if !entry.metafile {
             let source = match source.locate(location, &in_pack)? {
@@ -202,7 +203,7 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
                 },
             };
             entries.push(PackEntry {
-                path: entry.path,
+                path: entry.target,
                 source,
                 preserve: entry.preserve,
             });
@@ -211,7 +212,7 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
         let raw = source
             .read_metafile(location, &in_pack, &entry.checksum)
             .await?;
-        let Some(file) = Metafile::validate(raw, &entry.path).map_err(files_error)? else {
+        let Some(file) = Metafile::validate(raw, &entry.target).map_err(files_error)? else {
             continue;
         };
         match file.source {
@@ -311,6 +312,7 @@ pub(crate) mod fixtures {
             hash_format: None,
             metafile: false,
             preserve: false,
+            alias: None,
         }
     }
 
@@ -322,6 +324,7 @@ pub(crate) mod fixtures {
             hash_format: Some("sha1".into()),
             metafile: true,
             preserve: false,
+            alias: None,
         }
     }
 
@@ -443,6 +446,7 @@ mod tests {
     use crate::application::modpack_files::fixtures::{FailingDownloader, World, rel};
     use crate::domain::integrity::{Checksum, HashAlgorithm};
     use crate::domain::loader::LoaderKind;
+    use crate::domain::modpack::packwiz::RawIndexEntry;
     use crate::testing::{
         FakeDownloader, FakeFileSystem, FakePackFiles, FakePackwizSource,
         InMemoryInstanceRepository, InMemoryPackManifestStore, InMemoryServerListStore,
@@ -628,6 +632,58 @@ mod tests {
             manifest.files.get(&rel("mods/sodium.jar")),
             Some(&sha1_hex(b"sodium"))
         );
+    }
+
+    #[tokio::test]
+    async fn aliased_entries_install_at_their_alias() {
+        let world = World::new(vec![]);
+        let source = source(
+            pack_toml(Some("1.0"), "1.21.1"),
+            vec![
+                RawIndexEntry {
+                    alias: Some("options.txt".into()),
+                    ..plain("defaults/options.txt", b"fov:90")
+                },
+                RawIndexEntry {
+                    alias: Some("shaderpacks/sodium.pw.toml".into()),
+                    ..meta("mods/sodium.pw.toml")
+                },
+            ],
+            vec![(
+                "mods/sodium.pw.toml",
+                modrinth("sodium.jar", b"sodium", "both"),
+            )],
+        );
+        let downloader = FakeDownloader::with([
+            (format!("{BASE}defaults/options.txt"), b"fov:90".to_vec()),
+            (cdn("sodium.jar"), b"sodium".to_vec()),
+        ]);
+        install(
+            &world,
+            &source,
+            &downloader,
+            &location(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+        // Read from the listed path, installed at the alias (a metafile's
+        // file lands in the alias's folder).
+        assert_eq!(world.read_game_file(ID, "options.txt").unwrap(), b"fov:90");
+        assert!(world.read_game_file(ID, "defaults/options.txt").is_none());
+        assert_eq!(
+            world.read_game_file(ID, "shaderpacks/sodium.jar").unwrap(),
+            b"sodium"
+        );
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+        let manifest = world
+            .manifests
+            .load(&InstanceId::parse(ID).unwrap())
+            .await
+            .unwrap();
+        assert!(manifest.files.contains_key(&rel("options.txt")));
+        assert!(manifest.files.contains_key(&rel("shaderpacks/sodium.jar")));
     }
 
     #[tokio::test]

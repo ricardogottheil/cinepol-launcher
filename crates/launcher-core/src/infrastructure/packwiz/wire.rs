@@ -49,8 +49,7 @@ struct IndexFileEntry {
     metafile: bool,
     #[serde(default)]
     preserve: bool,
-    /// An alternative install path. The domain has no place for it yet, so
-    /// the file installs at `file` and the alias is only logged.
+    /// Where the file is installed instead of `file`.
     #[serde(default)]
     alias: Option<String>,
 }
@@ -121,17 +120,13 @@ pub fn parse_index(name: &str, bytes: &[u8]) -> Result<RawPackIndex, PackFileErr
         files: file
             .files
             .into_iter()
-            .map(|entry| {
-                if let Some(alias) = &entry.alias {
-                    tracing::warn!(file = %entry.file, %alias, "packwiz aliases are not supported; installing at the listed path");
-                }
-                RawIndexEntry {
-                    file: entry.file,
-                    hash: entry.hash,
-                    hash_format: entry.hash_format,
-                    metafile: entry.metafile,
-                    preserve: entry.preserve,
-                }
+            .map(|entry| RawIndexEntry {
+                file: entry.file,
+                hash: entry.hash,
+                hash_format: entry.hash_format,
+                metafile: entry.metafile,
+                preserve: entry.preserve,
+                alias: entry.alias,
             })
             .collect(),
     })

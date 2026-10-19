@@ -74,6 +74,17 @@ fn parses_the_real_index() {
 }
 
 #[test]
+fn parses_an_entry_alias() {
+    let raw = parse_index(
+        "index.toml",
+        b"hash-format = \"sha256\"\n[[files]]\nfile = \"defaults/options.txt\"\nhash = \"ab\"\nalias = \"options.txt\"\n[[files]]\nfile = \"a.txt\"\nhash = \"cd\"\n",
+    )
+    .unwrap();
+    assert_eq!(raw.files[0].alias.as_deref(), Some("options.txt"));
+    assert_eq!(raw.files[1].alias, None);
+}
+
+#[test]
 fn parses_every_metafile_fixture() {
     for name in FO_METAFILES {
         let relative = path(&format!("mods/{name}.pw.toml"));

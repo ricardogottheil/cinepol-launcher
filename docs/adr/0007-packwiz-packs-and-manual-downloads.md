@@ -35,6 +35,8 @@ current API key cannot use (it reads search results but not files).
   files are copied into staging and verified there. Player changes are kept
   as for Modrinth packs (ADR 0006), and `preserve = true` files are written
   only when absent.
+  An index entry's `alias` is where it is installed (validated like any
+  path); a metafile's file lands in the alias's folder.
 - **Manual downloads:** CurseForge-mode files become pending `ManualFile`s in
   the pack manifest. The instance row lists them with a link to the
   project's CurseForge page and checks the Downloads folder every few

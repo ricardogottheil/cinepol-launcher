@@ -81,6 +81,8 @@ pub struct RawIndexEntry {
     pub hash_format: Option<String>,
     pub metafile: bool,
     pub preserve: bool,
+    /// Where the file is installed instead of `file` (packwiz `alias`).
+    pub alias: Option<String>,
 }
 
 /// `index.toml` as written in the file.
@@ -145,7 +147,11 @@ impl PackwizPack {
 /// is also where the file goes in the game folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexEntry {
+    /// Where the entry is read from in the pack.
     pub path: RelativePath,
+    /// Where it goes in the game folder: `path`, or the entry's `alias`.
+    /// A metafile's file lands in this path's folder.
+    pub target: RelativePath,
     pub checksum: Checksum,
     /// The entry is a `*.pw.toml` describing a file to download.
     pub metafile: bool,
@@ -165,8 +171,12 @@ impl PackwizIndex {
         let mut entries = Vec::with_capacity(raw.files.len());
         for file in raw.files {
             let path = safe_path(&file.file)?;
-            if !seen.insert(path.as_str().to_lowercase()) {
-                return Err(PackwizError::DuplicatePath(file.file));
+            let target = match &file.alias {
+                Some(alias) => safe_path(alias)?,
+                None => path.clone(),
+            };
+            if !seen.insert(target.as_str().to_lowercase()) {
+                return Err(PackwizError::DuplicatePath(file.alias.unwrap_or(file.file)));
             }
             let format = file.hash_format.as_deref().unwrap_or(&raw.hash_format);
             let checksum = checksum(format, &file.hash, &file.file)?;
@@ -177,6 +187,7 @@ impl PackwizIndex {
             // packwiz marks metafiles explicitly; the suffix alone does not count.
             entries.push(IndexEntry {
                 path,
+                target,
                 checksum,
                 metafile: file.metafile,
                 preserve: file.preserve,
@@ -411,6 +422,7 @@ mod tests {
             hash_format: format.map(str::to_owned),
             metafile: file.ends_with(".pw.toml"),
             preserve: false,
+            alias: None,
         }
     }
 
@@ -439,6 +451,39 @@ mod tests {
             ]
         );
         assert!(index.entries[1].metafile && !index.entries[0].metafile);
+    }
+
+    #[test]
+    fn an_alias_is_where_the_entry_is_installed() {
+        let validate = |files| {
+            PackwizIndex::validate(RawPackIndex {
+                hash_format: "sha256".into(),
+                files,
+            })
+        };
+        let aliased = |file: &str, alias: &str| RawIndexEntry {
+            alias: Some(alias.into()),
+            ..entry(file, SHA256, None)
+        };
+        let index = validate(vec![
+            aliased("pack/options.txt", "options.txt"),
+            entry("config/a.toml", SHA256, None),
+        ])
+        .unwrap();
+        assert_eq!(index.entries[0].path.as_str(), "pack/options.txt");
+        assert_eq!(index.entries[0].target.as_str(), "options.txt");
+        assert_eq!(index.entries[1].target.as_str(), "config/a.toml");
+        assert_eq!(
+            validate(vec![aliased("a.txt", "../a.txt")]),
+            Err(PackwizError::UnsafePath("../a.txt".into()))
+        );
+        assert_eq!(
+            validate(vec![
+                entry("config/a.toml", SHA256, None),
+                aliased("other/a.toml", "Config/A.toml")
+            ]),
+            Err(PackwizError::DuplicatePath("Config/A.toml".into()))
+        );
     }
 
     #[test]
