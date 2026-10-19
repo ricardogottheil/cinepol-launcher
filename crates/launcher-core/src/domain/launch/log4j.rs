@@ -83,6 +83,8 @@ struct Partial {
     raw: Vec<String>,
     /// Whether the text so far ends inside an unclosed CDATA section.
     in_cdata: bool,
+    /// Every line seen since the header, plain ones printed meanwhile included.
+    lines: usize,
 }
 
 /// Whether `line` ends inside a CDATA section, given whether it started in one.
@@ -130,6 +132,7 @@ impl Log4jDecoder {
                 text: String::new(),
                 raw: vec![line.to_owned()],
                 in_cdata: false,
+                lines: 1,
             };
             partial
                 .text
@@ -141,28 +144,35 @@ impl Log4jDecoder {
             self.event = Some(partial);
             return Vec::new();
         };
-        if !event.in_cdata && !is_markup(line) {
-            return vec![LogEntry::plain(stream, line.to_owned())];
-        }
-        event.in_cdata = ends_in_cdata(event.in_cdata, line);
-        event.text.push('\n');
-        event.text.push_str(line);
-        event.raw.push(line.to_owned());
-        if !line.contains(EVENT_END) {
-            if event.raw.len() <= MAX_EVENT_LINES {
-                return Vec::new();
+        event.lines += 1;
+        let plain = !event.in_cdata && !is_markup(line);
+        if !plain {
+            event.in_cdata = ends_in_cdata(event.in_cdata, line);
+            event.text.push('\n');
+            event.text.push_str(line);
+            event.raw.push(line.to_owned());
+            if line.contains(EVENT_END) {
+                return self
+                    .event
+                    .take()
+                    .map(|event| vec![event.finish(stream)])
+                    .unwrap_or_default();
             }
-            let raw = std::mem::take(&mut event.raw);
-            self.event = None;
-            return raw
-                .into_iter()
-                .map(|line| LogEntry::plain(stream, line))
-                .collect();
         }
-        self.event
-            .take()
-            .map(|event| vec![event.finish(stream)])
-            .unwrap_or_default()
+        let mut entries = Vec::new();
+        if event.lines > MAX_EVENT_LINES {
+            // The held lines were printed before this one.
+            entries.extend(
+                std::mem::take(&mut event.raw)
+                    .into_iter()
+                    .map(|line| LogEntry::plain(stream, line)),
+            );
+            self.event = None;
+        }
+        if plain {
+            entries.push(LogEntry::plain(stream, line.to_owned()));
+        }
+        entries
     }
 }
 
@@ -375,6 +385,19 @@ mod tests {
         );
         assert_eq!(entries[0].level, None);
         assert_eq!(entries[1].level, Some(LogLevel::Trace));
+    }
+
+    #[test]
+    fn a_stray_header_followed_by_plain_lines_is_not_held_forever() {
+        let mut decoder = Log4jDecoder::default();
+        let header = r#"<log4j:Event logger="x" timestamp="6" level="INFO" thread="t">"#;
+        let mut entries = decoder.feed(LogStream::Stdout, header);
+        for n in 0..MAX_EVENT_LINES {
+            entries.extend(decoder.feed(LogStream::Stdout, &format!("plain {n}")));
+        }
+        assert_eq!(entries.len(), MAX_EVENT_LINES + 1);
+        assert!(entries.iter().any(|entry| entry.message == header));
+        assert!(decoder.finish(LogStream::Stdout).is_empty());
     }
 
     #[test]
