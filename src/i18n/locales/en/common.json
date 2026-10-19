@@ -271,6 +271,15 @@
       "moveUp": "Move up",
       "moveDown": "Move down",
       "hint": "Changes apply the next time the game starts. The list cannot change while you play."
+    },
+    "log": {
+      "level": "Show",
+      "all": "Everything",
+      "info": "Info and above",
+      "warn": "Warnings and errors",
+      "error": "Errors only",
+      "search": "Search the log",
+      "count": "{{shown}} of {{total}} lines"
     }
   },
   "settings": {

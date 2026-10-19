@@ -4,6 +4,7 @@
 mod artifact;
 mod assets;
 mod command;
+pub mod log4j;
 mod paths;
 mod plan;
 mod platform;

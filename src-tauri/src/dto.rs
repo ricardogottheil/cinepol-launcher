@@ -11,6 +11,7 @@ use launcher_core::application::modpack_files::SyncSummary;
 use launcher_core::domain::account::{Account, AccountKind};
 use launcher_core::domain::account::{DeviceCode, SkinVariant};
 use launcher_core::domain::instance::{Instance, InstanceOrigin, JavaSelection};
+use launcher_core::domain::launch::log4j::{LogEntry, LogLevel};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
 use launcher_core::domain::loader::LoaderRelease;
 use launcher_core::domain::modpack::sync::ManualFile;
@@ -423,15 +424,59 @@ pub enum LogStreamDto {
 pub struct LogLineDto {
     pub stream: LogStreamDto,
     pub line: String,
+    /// Set for log4j events; plain lines have none.
+    pub level: Option<LogLevelDto>,
+    pub thread: Option<String>,
+    pub logger: Option<String>,
+}
+
+/// A log4j event level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum LogLevelDto {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Fatal,
+}
+
+fn stream_dto(stream: LogStream) -> LogStreamDto {
+    match stream {
+        LogStream::Stdout => LogStreamDto::Stdout,
+        LogStream::Stderr => LogStreamDto::Stderr,
+    }
 }
 
 impl LogLineDto {
     pub fn new(stream: LogStream, line: String) -> Self {
-        let stream = match stream {
-            LogStream::Stdout => LogStreamDto::Stdout,
-            LogStream::Stderr => LogStreamDto::Stderr,
-        };
-        Self { stream, line }
+        Self {
+            stream: stream_dto(stream),
+            line,
+            level: None,
+            thread: None,
+            logger: None,
+        }
+    }
+}
+
+impl From<LogEntry> for LogLineDto {
+    fn from(entry: LogEntry) -> Self {
+        Self {
+            stream: stream_dto(entry.stream),
+            line: entry.message,
+            level: entry.level.map(|level| match level {
+                LogLevel::Trace => LogLevelDto::Trace,
+                LogLevel::Debug => LogLevelDto::Debug,
+                LogLevel::Info => LogLevelDto::Info,
+                LogLevel::Warn => LogLevelDto::Warn,
+                LogLevel::Error => LogLevelDto::Error,
+                LogLevel::Fatal => LogLevelDto::Fatal,
+            }),
+            thread: entry.thread,
+            logger: entry.logger,
+        }
     }
 }
 

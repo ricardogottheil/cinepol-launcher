@@ -248,7 +248,15 @@ describe("InstancesPage", () => {
     client.killInstance.mockResolvedValue(true);
     renderWithQuery(<InstancesPage />);
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
-    act(() => onLog({ stream: "stdout", line: "[Render thread/INFO]: Setting user: Steve" }));
+    act(() =>
+      onLog({
+        stream: "stdout",
+        line: "[Render thread/INFO]: Setting user: Steve",
+        level: null,
+        thread: null,
+        logger: null,
+      }),
+    );
 
     expect(screen.getByRole("log")).toHaveTextContent("Setting user: Steve");
     fireEvent.click(screen.getByRole("button", { name: labels.stop }));

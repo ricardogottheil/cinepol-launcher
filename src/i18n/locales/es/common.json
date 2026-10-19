@@ -271,6 +271,15 @@
       "moveUp": "Subir",
       "moveDown": "Bajar",
       "hint": "Los cambios se aplican la próxima vez que inicies el juego. La lista no se puede cambiar mientras juegas."
+    },
+    "log": {
+      "level": "Mostrar",
+      "all": "Todo",
+      "info": "Info y superiores",
+      "warn": "Advertencias y errores",
+      "error": "Solo errores",
+      "search": "Buscar en el log",
+      "count": "{{shown}} de {{total}} líneas"
     }
   },
   "settings": {

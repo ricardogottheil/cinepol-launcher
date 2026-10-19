@@ -71,7 +71,13 @@ export type InstallSummaryDto = { downloadedFiles: number, reusedFiles: number, 
 
 export type LogStreamDto = "stdout" | "stderr";
 
-export type LogLineDto = { stream: LogStreamDto, line: string, };
+export type LogLevelDto = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
+
+export type LogLineDto = { stream: LogStreamDto, line: string, 
+/**
+ * Set for log4j events; plain lines have none.
+ */
+level: LogLevelDto | null, thread: string | null, logger: string | null, };
 
 export type LaunchOutcomeDto = { instanceId: string, exitCode: number | null, killed: boolean, playedSecs: number, };
 

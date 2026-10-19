@@ -13,6 +13,7 @@ use crate::domain::instance::{
     InstanceId, InstanceRepository, InstanceRepositoryError, JavaSelection,
 };
 use crate::domain::java::{JavaRequirement, JavaRuntimeError, JavaRuntimeProvider};
+use crate::domain::launch::log4j::Log4jSink;
 use crate::domain::launch::{
     ExtractError, Features, GameExit, GameProcessError, GameProcessRunner, LaunchContext,
     LaunchIdentity, LauncherPaths, LogSink, NativesExtractor, Platform, ProcessSpec, VersionSource,
@@ -240,7 +241,8 @@ where
                 working_dir: game_dir,
                 env,
             },
-            logs,
+            // log4j XML events become structured entries; other lines pass through.
+            Log4jSink::new(logs),
             kill,
         )
         .await?;
@@ -395,6 +397,35 @@ mod tests {
             account: None,
             join_server: None,
         }
+    }
+
+    #[tokio::test]
+    async fn decodes_log4j_events_before_streaming_them() {
+        let mut world = World::installed().await;
+        world.runner = FakeGameProcess::exiting_with_output(
+            0,
+            [
+                r#"<log4j:Event logger="net.minecraft.client.Minecraft" timestamp="1" level="INFO" thread="Render thread">"#,
+                "  <log4j:Message><![CDATA[Setting user: polispol1]]></log4j:Message>",
+                "</log4j:Event>",
+            ]
+            .into_iter()
+            .map(|line| (LogStream::Stdout, line.to_owned()))
+            .collect(),
+        );
+        let logs = RecordingLogSink::default();
+        launch_instance(
+            &request(),
+            &world.deps(),
+            logs.clone(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            logs.lines(),
+            [(LogStream::Stdout, "Setting user: polispol1".to_owned())]
+        );
     }
 
     #[tokio::test]

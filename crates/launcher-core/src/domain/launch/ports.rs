@@ -64,6 +64,10 @@ pub enum LogStream {
 /// Receives the game's output line by line.
 pub trait LogSink: Send + Sync + 'static {
     fn line(&self, stream: LogStream, line: String);
+    /// A decoded entry (see `Log4jSink`); sinks that only show text get its message.
+    fn entry(&self, entry: super::log4j::LogEntry) {
+        self.line(entry.stream, entry.message);
+    }
 }
 
 /// How the game process ended.
