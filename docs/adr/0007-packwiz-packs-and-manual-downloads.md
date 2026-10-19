@@ -21,6 +21,9 @@ current API key cannot use (it reads search results but not files).
   entry) and each metafile (one-segment file name, client or both sides,
   `https` URL or CurseForge ids). sha1, sha256, sha512 and murmur2 (the
   CurseForge fingerprint) are verified; md5 and anything else is refused.
+  murmur2 is a 32-bit non-cryptographic hash, so it is trusted only for
+  CurseForge-mode files (matched by fingerprint); index entries and URL-mode
+  metafiles that declare only murmur2 are refused (`WeakHash`).
 - **Verified reads:** the packwiz source verifies the index and every metafile
   against the hash their parent declares before parsing them, and caps their
   size (1 MiB for `pack.toml` and metafiles, 16 MiB for the index). Local
