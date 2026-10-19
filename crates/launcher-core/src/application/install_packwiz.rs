@@ -203,7 +203,7 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
                 },
             };
             entries.push(PackEntry {
-                path: entry.target,
+                path: entry.alias.unwrap_or(entry.path),
                 source,
                 preserve: entry.preserve,
             });
@@ -212,9 +212,15 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
         let raw = source
             .read_metafile(location, &in_pack, &entry.checksum)
             .await?;
-        let Some(file) = Metafile::validate(raw, &entry.target).map_err(files_error)? else {
+        let Some(mut file) = Metafile::validate(raw, &entry.path).map_err(files_error)? else {
             continue;
         };
+        if let Some(alias) = entry.alias {
+            file.path = alias.clone();
+            if let MetafileSource::CurseForge(manual) = &mut file.source {
+                manual.path = alias;
+            }
+        }
         match file.source {
             MetafileSource::Download { url } => entries.push(PackEntry {
                 path: file.path,
@@ -645,7 +651,7 @@ mod tests {
                     ..plain("defaults/options.txt", b"fov:90")
                 },
                 RawIndexEntry {
-                    alias: Some("shaderpacks/sodium.pw.toml".into()),
+                    alias: Some("mods/renamed-sodium.jar".into()),
                     ..meta("mods/sodium.pw.toml")
                 },
             ],
@@ -668,12 +674,12 @@ mod tests {
         .await
         .unwrap();
 
-        // Read from the listed path, installed at the alias (a metafile's
-        // file lands in the alias's folder).
+        // Read from the listed path, installed exactly at the alias (for a
+        // metafile too, as packwiz-installer does).
         assert_eq!(world.read_game_file(ID, "options.txt").unwrap(), b"fov:90");
         assert!(world.read_game_file(ID, "defaults/options.txt").is_none());
         assert_eq!(
-            world.read_game_file(ID, "shaderpacks/sodium.jar").unwrap(),
+            world.read_game_file(ID, "mods/renamed-sodium.jar").unwrap(),
             b"sodium"
         );
         assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
@@ -683,7 +689,7 @@ mod tests {
             .await
             .unwrap();
         assert!(manifest.files.contains_key(&rel("options.txt")));
-        assert!(manifest.files.contains_key(&rel("shaderpacks/sodium.jar")));
+        assert!(manifest.files.contains_key(&rel("mods/renamed-sodium.jar")));
     }
 
     #[tokio::test]

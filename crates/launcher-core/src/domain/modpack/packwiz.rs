@@ -149,9 +149,10 @@ impl PackwizPack {
 pub struct IndexEntry {
     /// Where the entry is read from in the pack.
     pub path: RelativePath,
-    /// Where it goes in the game folder: `path`, or the entry's `alias`.
-    /// A metafile's file lands in this path's folder.
-    pub target: RelativePath,
+    /// Where it goes in the game folder instead of `path` (or, for a
+    /// metafile, instead of its folder plus `filename`), as packwiz-installer
+    /// does.
+    pub alias: Option<RelativePath>,
     pub checksum: Checksum,
     /// The entry is a `*.pw.toml` describing a file to download.
     pub metafile: bool,
@@ -171,10 +172,8 @@ impl PackwizIndex {
         let mut entries = Vec::with_capacity(raw.files.len());
         for file in raw.files {
             let path = safe_path(&file.file)?;
-            let target = match &file.alias {
-                Some(alias) => safe_path(alias)?,
-                None => path.clone(),
-            };
+            let alias = file.alias.as_deref().map(safe_path).transpose()?;
+            let target = alias.as_ref().unwrap_or(&path);
             if !seen.insert(target.as_str().to_lowercase()) {
                 return Err(PackwizError::DuplicatePath(file.alias.unwrap_or(file.file)));
             }
@@ -187,7 +186,7 @@ impl PackwizIndex {
             // packwiz marks metafiles explicitly; the suffix alone does not count.
             entries.push(IndexEntry {
                 path,
-                target,
+                alias,
                 checksum,
                 metafile: file.metafile,
                 preserve: file.preserve,
@@ -471,8 +470,11 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(index.entries[0].path.as_str(), "pack/options.txt");
-        assert_eq!(index.entries[0].target.as_str(), "options.txt");
-        assert_eq!(index.entries[1].target.as_str(), "config/a.toml");
+        assert_eq!(
+            index.entries[0].alias.as_ref().map(RelativePath::as_str),
+            Some("options.txt")
+        );
+        assert_eq!(index.entries[1].alias, None);
         assert_eq!(
             validate(vec![aliased("a.txt", "../a.txt")]),
             Err(PackwizError::UnsafePath("../a.txt".into()))

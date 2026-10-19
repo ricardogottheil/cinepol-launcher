@@ -36,7 +36,7 @@ current API key cannot use (it reads search results but not files).
   as for Modrinth packs (ADR 0006), and `preserve = true` files are written
   only when absent.
   An index entry's `alias` is where it is installed (validated like any
-  path); a metafile's file lands in the alias's folder.
+  path), also for metafiles, as packwiz-installer does.
 - **Manual downloads:** CurseForge-mode files become pending `ManualFile`s in
   the pack manifest. The instance row lists them with a link to the
   project's CurseForge page and checks the Downloads folder every few
