@@ -52,6 +52,10 @@ pub enum SettingsError {
     ReservedJvmArgument(String),
     #[error("too many JVM arguments (max {MAX_JVM_ARGS})")]
     TooManyJvmArguments,
+    #[error("JVM argument {0:?} would load code into the game, so it is not allowed")]
+    CodeLoadingJvmArgument(String),
+    #[error("environment variable {0:?} would load code into the game, so it is not allowed")]
+    CodeLoadingEnvVar(String),
     #[error("invalid environment variable name {0:?}")]
     EnvName(String),
     #[error("environment variable {0:?} has a value with a NUL character")]
@@ -107,6 +111,30 @@ const RESERVED_JVM_PREFIXES: [&str; 6] = [
     "--class-path",
 ];
 
+/// Arguments that make the JVM load or run other code. Instance settings
+/// come from the UI, so these are refused: a compromised UI must not be able
+/// to plant code that runs at the next launch.
+const CODE_LOADING_JVM_PREFIXES: [&str; 6] = [
+    "-javaagent",
+    "-agentlib",
+    "-agentpath",
+    "-XX:OnError",
+    "-XX:OnOutOfMemoryError",
+    "-Xbootclasspath",
+];
+
+/// Environment variables that make the JVM or the dynamic linker load other
+/// code, compared without case (Windows names ignore it). `DYLD_` is a prefix.
+const CODE_LOADING_ENV: [&str; 6] = [
+    "JAVA_TOOL_OPTIONS",
+    "_JAVA_OPTIONS",
+    "JDK_JAVA_OPTIONS",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+    "LD_AUDIT",
+];
+const CODE_LOADING_ENV_PREFIX: &str = "DYLD_";
+
 /// Extra JVM arguments, one per element (never split on spaces by us).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct JvmArgs(Vec<String>);
@@ -125,6 +153,12 @@ impl JvmArgs {
                 .any(|prefix| arg.starts_with(prefix))
             {
                 return Err(SettingsError::ReservedJvmArgument(arg.clone()));
+            }
+            if CODE_LOADING_JVM_PREFIXES
+                .iter()
+                .any(|prefix| arg.starts_with(prefix))
+            {
+                return Err(SettingsError::CodeLoadingJvmArgument(arg.clone()));
             }
         }
         Ok(Self(args))
@@ -149,6 +183,12 @@ impl EnvVars {
                 && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
             if !valid_name {
                 return Err(SettingsError::EnvName(name.clone()));
+            }
+            let upper = name.to_ascii_uppercase();
+            if CODE_LOADING_ENV.contains(&upper.as_str())
+                || upper.starts_with(CODE_LOADING_ENV_PREFIX)
+            {
+                return Err(SettingsError::CodeLoadingEnvVar(name.clone()));
             }
             if value.contains('\0') {
                 return Err(SettingsError::EnvValue(name.clone()));
@@ -285,5 +325,55 @@ mod tests {
     fn window_size_must_not_be_zero() {
         assert!(WindowSize::new(854, 480).is_ok());
         assert_eq!(WindowSize::new(0, 480), Err(SettingsError::WindowSize));
+    }
+
+    #[test]
+    fn jvm_args_reject_flags_that_load_code() {
+        for arg in [
+            "-javaagent:/tmp/agent.jar",
+            "-agentlib:jdwp=transport=dt_socket",
+            "-agentpath:/tmp/libagent.so",
+            "-XX:OnError=sh -c evil",
+            "-XX:OnOutOfMemoryError=evil",
+            "-Xbootclasspath/a:/tmp/evil.jar",
+        ] {
+            assert_eq!(
+                JvmArgs::parse(vec![arg.into()]),
+                Err(SettingsError::CodeLoadingJvmArgument(arg.into())),
+                "{arg}"
+            );
+        }
+        // Ordinary tuning flags still pass.
+        assert!(
+            JvmArgs::parse(vec![
+                "-XX:+UseZGC".into(),
+                "-Dfml.ignoreInvalidMinecraftCertificates=true".into()
+            ])
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn env_vars_reject_names_that_load_code_in_any_case() {
+        for name in [
+            "JAVA_TOOL_OPTIONS",
+            "_JAVA_OPTIONS",
+            "JDK_JAVA_OPTIONS",
+            "LD_PRELOAD",
+            "LD_LIBRARY_PATH",
+            "LD_AUDIT",
+            "DYLD_INSERT_LIBRARIES",
+            "DYLD_LIBRARY_PATH",
+            "java_tool_options",
+        ] {
+            let vars = BTreeMap::from([(name.to_owned(), "x".to_owned())]);
+            assert_eq!(
+                EnvVars::parse(vars),
+                Err(SettingsError::CodeLoadingEnvVar(name.into())),
+                "{name}"
+            );
+        }
+        let ok = BTreeMap::from([("MESA_GL_VERSION_OVERRIDE".to_owned(), "4.6".to_owned())]);
+        assert!(EnvVars::parse(ok).is_ok());
     }
 }

@@ -202,11 +202,13 @@ function SettingsForm({ instanceId, stored }: { instanceId: string; stored: Inst
       <div className="grid gap-4 md:grid-cols-2">
         <TextAreaField
           label={t("instances.settings.jvmArgs")}
+          hint={t("instances.settings.jvmArgsHint")}
           value={values.jvmArgs}
           onChange={(event) => set({ jvmArgs: event.target.value })}
         />
         <TextAreaField
           label={t("instances.settings.env")}
+          hint={t("instances.settings.envHint")}
           value={values.env}
           error={fieldError("env")}
           onChange={(event) => set({ env: event.target.value })}

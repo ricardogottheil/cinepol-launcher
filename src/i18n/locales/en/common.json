@@ -238,7 +238,9 @@
       "delete": "Delete instance",
       "deleteTitle": "Delete {{name}}?",
       "deleteBody": "This deletes its folder with its worlds, mods and settings. It cannot be undone.",
-      "deleteConfirm": "Delete"
+      "deleteConfirm": "Delete",
+      "jvmArgsHint": "Flags that load code (Java agents, -XX:OnError) are not allowed.",
+      "envHint": "Variables that load code (JAVA_TOOL_OPTIONS, LD_PRELOAD, DYLD_*) are not allowed."
     }
   },
   "settings": {

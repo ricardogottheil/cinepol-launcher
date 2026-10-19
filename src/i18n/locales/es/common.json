@@ -238,7 +238,9 @@
       "delete": "Eliminar instancia",
       "deleteTitle": "¿Eliminar {{name}}?",
       "deleteBody": "Se borra su carpeta con los mundos, los mods y la configuración. No se puede deshacer.",
-      "deleteConfirm": "Eliminar"
+      "deleteConfirm": "Eliminar",
+      "jvmArgsHint": "No se permiten opciones que cargan código (agentes de Java, -XX:OnError).",
+      "envHint": "No se permiten variables que cargan código (JAVA_TOOL_OPTIONS, LD_PRELOAD, DYLD_*)."
     }
   },
   "settings": {

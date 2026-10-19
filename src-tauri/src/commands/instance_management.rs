@@ -4,8 +4,10 @@
 //! runs while it plays, installs, updates or exports. Settings can change
 //! while the game runs; they apply on the next launch. A custom Java path is
 //! accepted only when it was picked with the native file picker in this
-//! session or is the one already saved, so the webview cannot make the
-//! launcher run an arbitrary program.
+//! session or is the one already saved, and the core refuses JVM arguments
+//! and environment variables that load code (Java agents, `-XX:OnError`,
+//! `JAVA_TOOL_OPTIONS`, `LD_PRELOAD`, `DYLD_*`), so the webview cannot make
+//! the launcher run an arbitrary program.
 
 use std::path::PathBuf;
 
