@@ -15,6 +15,7 @@ pub mod get_modpack_details;
 pub mod get_settings;
 pub mod install_instance;
 pub mod install_modpack;
+pub mod install_packwiz;
 pub mod launch_instance;
 pub mod list_accounts;
 pub mod list_game_versions;

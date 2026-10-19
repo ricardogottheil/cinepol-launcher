@@ -15,6 +15,7 @@ use crate::application::modpack_files::{
     PackSyncDeps, PackSyncError, SyncSummary, download_pack, release_dir, scratch_dir, sync_pack,
 };
 use crate::domain::instance::{Instance, InstanceId, InstanceOrigin, InstanceRepository};
+use crate::domain::launch::LauncherPaths;
 use crate::domain::modpack::sync::PackManifest;
 use crate::domain::modpack::{
     ModpackRef, ModpackSource, ModpackSourceError, ModpackSourceKind, MrpackArchive, PackFileError,
@@ -219,7 +220,6 @@ where
     }
 }
 
-/// Removes a half-installed instance: its metadata and its folder.
 async fn discard<I, S, C, A, D, F, P, M>(
     deps: &InstallModpackDeps<'_, I, S, C, A, D, F, P, M>,
     id: &InstanceId,
@@ -227,10 +227,20 @@ async fn discard<I, S, C, A, D, F, P, M>(
     I: InstanceRepository,
     F: FileSystem,
 {
-    if let Err(error) = deps.instances.delete(id).await {
+    discard_instance(deps.instances, deps.pack.fs, deps.pack.paths, id).await;
+}
+
+/// Removes a half-installed instance: its metadata and its folder.
+pub(crate) async fn discard_instance<I: InstanceRepository, F: FileSystem>(
+    instances: &I,
+    fs: &F,
+    paths: &LauncherPaths,
+    id: &InstanceId,
+) {
+    if let Err(error) = instances.delete(id).await {
         tracing::warn!(instance = %id, %error, "could not delete a failed modpack instance");
     }
-    release_dir(deps.pack.fs, &deps.pack.paths.instance_dir(id)).await;
+    release_dir(fs, &paths.instance_dir(id)).await;
 }
 
 #[cfg(test)]
