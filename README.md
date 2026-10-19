@@ -26,8 +26,7 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 ## Features
 
 - One click to play on CINEPOL, with live server status.
-- Microsoft (premium) and offline accounts. Microsoft sign-in works once Mojang
-  approves the launcher's app; see below.
+- Microsoft (premium) and offline accounts.
 - Isolated instances with Vanilla, Fabric, Quilt, Forge and NeoForge, each with
   its own Java, memory, JVM arguments and window size.
 - Modpacks from Modrinth (`.mrpack`) and packwiz, kept up to date without
