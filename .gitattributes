@@ -1,2 +1,5 @@
+# Text files are LF on every platform: generated files (src/ipc/bindings.ts)
+# and formatted sources are compared byte for byte, also on Windows checkouts.
+* text=auto eol=lf
 # Fixtures are real-world bytes checked by hash: never convert their line endings.
 crates/*/tests/fixtures/** -text
