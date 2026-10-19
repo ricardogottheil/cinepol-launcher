@@ -10,7 +10,7 @@ import { InstanceSettingsPanel } from "./InstanceSettingsPanel";
 import { LogPanel } from "./LogPanel";
 import { ManualDownloadsPanel } from "./ManualDownloadsPanel";
 import { ProgressMeter } from "./ProgressMeter";
-import { instancesKey, useManualDownloads } from "./useInstances";
+import { instancesKey, manualDownloadsKey, useManualDownloads } from "./useInstances";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const { t } = useTranslation();
@@ -37,7 +37,7 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
   useEffect(() => {
     if (notice?.kind !== "updated") return;
     void queryClient.invalidateQueries({ queryKey: instancesKey });
-    void queryClient.invalidateQueries({ queryKey: ["manual-downloads", instance.id] });
+    void queryClient.invalidateQueries({ queryKey: manualDownloadsKey(instance.id) });
   }, [notice, queryClient, instance.id]);
   const loader = instance.loaderVersion
     ? `${instance.loader} ${instance.loaderVersion}`

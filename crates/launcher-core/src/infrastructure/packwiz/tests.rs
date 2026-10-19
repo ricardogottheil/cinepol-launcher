@@ -388,7 +388,10 @@ async fn checksum_mismatches_are_rejected_in_every_algorithm() {
     let index = source
         .read_index(&location, &relative, &sha256(b"other"))
         .await;
-    assert!(matches!(index, Err(PackFileError::HashMismatch(_))), "{index:?}");
+    assert!(
+        matches!(index, Err(PackFileError::HashMismatch(_))),
+        "{index:?}"
+    );
 }
 
 #[tokio::test]

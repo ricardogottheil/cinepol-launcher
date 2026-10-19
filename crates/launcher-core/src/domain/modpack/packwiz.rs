@@ -46,6 +46,8 @@ pub enum PackwizError {
     UnsupportedHash(String),
     #[error("{0} does not declare a valid hash")]
     InvalidHash(String),
+    #[error("{0} is only protected by murmur2, which is trusted for CurseForge files only")]
+    WeakHash(String),
     #[error("unsupported download mode {0:?}")]
     UnsupportedMode(String),
     #[error("{0} has no https download URL")]
@@ -168,6 +170,10 @@ impl PackwizIndex {
             }
             let format = file.hash_format.as_deref().unwrap_or(&raw.hash_format);
             let checksum = checksum(format, &file.hash, &file.file)?;
+            // Plain files and metafiles are fetched from the pack's own host.
+            if checksum.algorithm() == HashAlgorithm::Murmur2 {
+                return Err(PackwizError::WeakHash(file.file));
+            }
             // packwiz marks metafiles explicitly; the suffix alone does not count.
             entries.push(IndexEntry {
                 path,
@@ -223,6 +229,9 @@ impl Metafile {
         let checksum = checksum(&raw.hash_format, &raw.hash, &raw.filename)?;
         let source = match raw.mode.as_deref() {
             None | Some("") | Some("url") => {
+                if checksum.algorithm() == HashAlgorithm::Murmur2 {
+                    return Err(PackwizError::WeakHash(raw.filename));
+                }
                 let url = raw
                     .url
                     .filter(|url| url.starts_with("https://"))
@@ -412,7 +421,7 @@ mod tests {
             files: vec![
                 entry("config/a.toml", SHA256, None),
                 entry("mods/jei.pw.toml", SHA1, Some("sha1")),
-                entry("config/b.json", "3608199863", Some("murmur2")),
+                entry("config/b.json", &"a".repeat(128), Some("sha512")),
             ],
         })
         .unwrap();
@@ -426,7 +435,7 @@ mod tests {
             [
                 HashAlgorithm::Sha256,
                 HashAlgorithm::Sha1,
-                HashAlgorithm::Murmur2
+                HashAlgorithm::Sha512
             ]
         );
         assert!(index.entries[1].metafile && !index.entries[0].metafile);
@@ -554,6 +563,31 @@ mod tests {
         assert_eq!(
             Metafile::validate(metafile(None, Some("torrent")), &path("mods/jei.pw.toml")),
             Err(PackwizError::UnsupportedMode("torrent".into()))
+        );
+    }
+
+    #[test]
+    fn murmur2_is_only_trusted_for_curseforge_files() {
+        // A 32-bit non-cryptographic hash cannot protect a file fetched from a URL.
+        let mut url_mode = metafile(None, None);
+        url_mode.hash_format = "murmur2".into();
+        url_mode.hash = "3608199863".into();
+        assert_eq!(
+            Metafile::validate(url_mode, &path("mods/jei.pw.toml")),
+            Err(PackwizError::WeakHash(
+                "jei-1.20.1-forge-15.20.0.133.jar".into()
+            ))
+        );
+        let mut curseforge = metafile(None, Some("metadata:curseforge"));
+        curseforge.hash_format = "murmur2".into();
+        curseforge.hash = "3608199863".into();
+        assert!(Metafile::validate(curseforge, &path("mods/jei.pw.toml")).is_ok());
+        assert_eq!(
+            PackwizIndex::validate(RawPackIndex {
+                hash_format: "sha256".into(),
+                files: vec![entry("config/b.json", "3608199863", Some("murmur2"))],
+            }),
+            Err(PackwizError::WeakHash("config/b.json".into()))
         );
     }
 }
