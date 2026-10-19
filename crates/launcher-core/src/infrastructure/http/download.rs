@@ -84,7 +84,7 @@ impl DownloadManager {
             if let Some(size) = request.size {
                 progress.add(size);
             }
-            progress.flush();
+            progress.file_done();
             return Ok(Fetched::Reused);
         }
         if let Some(parent) = request.destination.parent() {
@@ -105,7 +105,7 @@ impl DownloadManager {
             let failure = match result {
                 Ok(bytes) => match rename_into_place(&temp, &request.destination).await {
                     Ok(()) => {
-                        progress.flush();
+                        progress.file_done();
                         return Ok(Fetched::Downloaded(bytes));
                     }
                     Err(error) => Failure::fatal(error),
@@ -233,8 +233,7 @@ impl Downloader for DownloadManager {
             .into_iter()
             .filter(|request| seen.insert(request.destination.clone()))
             .collect();
-        let total = requests.iter().filter_map(|r| r.size).sum();
-        let progress = BatchProgress::new(reporter, total);
+        let progress = BatchProgress::new(reporter, &requests);
         progress.flush();
 
         // Fail fast: the first error cancels the remaining work, which then
@@ -345,22 +344,35 @@ async fn remove_stale_parts(destination: &Path) {
     }
 }
 
-/// Byte progress shared by every download of a batch.
+/// Progress shared by every download of a batch: bytes when every request
+/// declares its size, finished files otherwise (a byte total missing some
+/// files would stall or read "0/0").
 struct BatchProgress<'a, R: ProgressReporter> {
     reporter: &'a R,
-    total: u64,
+    /// The byte total, or `None` when some size is unknown.
+    total: Option<u64>,
+    files: u64,
     done: AtomicU64,
     last_reported: AtomicU64,
+    files_done: AtomicU64,
 }
 
 impl<'a, R: ProgressReporter> BatchProgress<'a, R> {
-    fn new(reporter: &'a R, total: u64) -> Self {
+    fn new(reporter: &'a R, requests: &[DownloadRequest]) -> Self {
         Self {
             reporter,
-            total,
+            total: requests.iter().map(|r| r.size).sum(),
+            files: requests.len() as u64,
             done: AtomicU64::new(0),
             last_reported: AtomicU64::new(0),
+            files_done: AtomicU64::new(0),
         }
+    }
+
+    /// One request finished (downloaded or reused).
+    fn file_done(&self) {
+        self.files_done.fetch_add(1, Ordering::Relaxed);
+        self.flush();
     }
 
     fn add(&self, bytes: u64) {
@@ -390,10 +402,13 @@ impl<'a, R: ProgressReporter> BatchProgress<'a, R> {
     }
 
     fn report(&self, done: u64) {
-        self.reporter.report(ProgressUpdate::bytes(
-            done.min(self.total),
-            Some(self.total),
-        ));
+        self.reporter.report(match self.total {
+            Some(total) => ProgressUpdate::bytes(done.min(total), Some(total)),
+            None => ProgressUpdate::new(
+                self.files_done.load(Ordering::Relaxed).min(self.files),
+                Some(self.files),
+            ),
+        });
     }
 }
 
@@ -851,6 +866,33 @@ mod tests {
         assert!(updates.iter().all(|u| u.total == Some(15)));
         assert_eq!(updates.last().map(|u| u.done), Some(15));
         assert!(updates.iter().all(|u| u.unit == ProgressUnit::Bytes));
+    }
+
+    #[tokio::test]
+    async fn reports_files_when_a_size_is_unknown() {
+        let server = TestServer::start(vec![("/new", vec![Reply::ok("0123456789")])]).await;
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("old"), b"hello").unwrap();
+        let mut no_size = request(&server, "/new", dir.path().join("new"), b"0123456789");
+        no_size.size = None;
+        let reporter = RecordingReporter::default();
+        manager()
+            .download_all(
+                vec![
+                    request(&server, "/old", dir.path().join("old"), b"hello"),
+                    no_size,
+                ],
+                &reporter,
+                &CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+        let updates = reporter.updates();
+        // A byte total missing a file would read "0/0 MB" or end short.
+        assert!(updates.iter().all(|u| u.unit == ProgressUnit::Steps));
+        assert!(updates.iter().all(|u| u.total == Some(2)));
+        assert_eq!(updates.first().map(|u| u.done), Some(0));
+        assert_eq!(updates.last().map(|u| u.done), Some(2));
     }
 
     fn murmur2_of(body: &[u8]) -> Checksum {
