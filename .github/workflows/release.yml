@@ -1,0 +1,246 @@
+name: Release
+
+# Pushing a tag `vX.Y.Z` (matching `version` in src-tauri/tauri.conf.json)
+# builds every target, signs the updater artifacts and publishes them to the
+# public releases repository. The source repository stays private.
+# Only the `publish` job touches the releases repository, so the release and
+# its latest.json appear together, once every target built.
+# See docs/release.md for the secrets, variables and the release checklist.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASES_REPOSITORY: ricardogottheil/cinepol-launcher-releases
+
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The tag matches the app version
+        id: version
+        shell: bash
+        run: |
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          package="$(node -p "require('./package.json').version")"
+          workspace="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+          if [ "${package}" != "${version}" ] || [ "${workspace}" != "${version}" ]; then
+            echo "::error::versions differ: tauri.conf.json ${version}, package.json ${package}, Cargo.toml ${workspace}"
+            exit 1
+          fi
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match tauri.conf.json version ${version}"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: The signing key, public key and releases token are configured
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          CINEPOL_UPDATER_PUBKEY: ${{ vars.CINEPOL_UPDATER_PUBKEY }}
+        run: |
+          missing=0
+          for name in TAURI_SIGNING_PRIVATE_KEY RELEASES_TOKEN CINEPOL_UPDATER_PUBKEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::${name} is not set (see docs/release.md)"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Release helper tests
+        run: node --test scripts/release/bundles.test.mjs
+
+  build:
+    name: ${{ matrix.name }}
+    needs: preflight
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            os: windows
+            arch: x86_64
+            bundles: nsis,msi
+          - name: Windows arm64
+            runner: windows-latest
+            target: aarch64-pc-windows-msvc
+            os: windows
+            arch: aarch64
+            # WiX cannot build arm64 MSIs; the NSIS installer covers arm64.
+            bundles: nsis
+          - name: macOS universal
+            runner: macos-latest
+            target: universal-apple-darwin
+            os: macos
+            arch: universal
+            bundles: app,dmg
+          - name: Linux x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            os: linux
+            arch: x86_64
+            bundles: appimage,deb
+          - name: Linux arm64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            os: linux
+            arch: aarch64
+            bundles: appimage,deb
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev patchelf build-essential file
+
+      - name: Install pinned Rust toolchain and targets
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          if [ "${{ matrix.target }}" = "universal-apple-darwin" ]; then
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          else
+            rustup target add "${{ matrix.target }}"
+          fi
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: ${{ matrix.target }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Release configuration (signed updater artifacts)
+        shell: bash
+        env:
+          CINEPOL_UPDATER_PUBKEY: ${{ vars.CINEPOL_UPDATER_PUBKEY }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const config = {
+              bundle: { createUpdaterArtifacts: true },
+              plugins: { updater: { pubkey: process.env.CINEPOL_UPDATER_PUBKEY } },
+            };
+            fs.writeFileSync("src-tauri/tauri.release.conf.json", JSON.stringify(config));
+          '
+
+      - name: macOS signing and notarization (only when configured)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # An empty variable would make the bundler try to sign with nothing,
+          # so only the configured ones are exported.
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+            APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!name}" ]; then
+              echo "${name}=${!name}" >> "$GITHUB_ENV"
+            fi
+          done
+          if [ -z "${APPLE_SIGNING_IDENTITY}" ]; then
+            echo "::warning::macOS build is not signed or notarized (see docs/release.md)"
+          fi
+
+      - name: Build and sign
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CINEPOL_UPDATER_PUBKEY: ${{ vars.CINEPOL_UPDATER_PUBKEY }}
+          MSA_CLIENT_ID: ${{ secrets.MSA_CLIENT_ID }}
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+        run: >-
+          pnpm tauri build
+          --target ${{ matrix.target }}
+          --bundles ${{ matrix.bundles }}
+          --config src-tauri/tauri.release.conf.json
+
+      - name: Collect the release files
+        shell: bash
+        run: >-
+          node scripts/release/bundles.mjs collect
+          "target/${{ matrix.target }}/release/bundle" release
+          ${{ matrix.os }} ${{ matrix.arch }} ${{ needs.preflight.outputs.version }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.os }}-${{ matrix.arch }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the release
+    needs: [preflight, build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Release notes from the tag message
+        shell: bash
+        run: |
+          git fetch --depth=1 origin "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' > notes.md
+          if [ ! -s notes.md ]; then echo "Cinepol Launcher ${GITHUB_REF_NAME}" > notes.md; fi
+
+      - name: Updater manifest (latest.json)
+        run: >-
+          node scripts/release/bundles.mjs manifest release
+          ${{ needs.preflight.outputs.version }}
+          "https://github.com/${{ env.RELEASES_REPOSITORY }}/releases/download/${{ github.ref_name }}"
+          notes.md
+
+      - name: Create, fill and publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          rm release/updater-*.json
+          # A draft first, so players never see a release without its files.
+          gh release create "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" \
+            --target main --draft --title "Cinepol Launcher ${GITHUB_REF_NAME}" --notes-file notes.md
+          gh release upload "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" release/*
+          gh release edit "${GITHUB_REF_NAME}" --repo "${RELEASES_REPOSITORY}" --draft=false --latest

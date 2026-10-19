@@ -5,6 +5,8 @@ node_modules/
 dist/
 target/
 src-tauri/gen/schemas/
+# Written by the release workflow (signed updater artifacts).
+src-tauri/tauri.release.conf.json
 
 # Local tracking (ODD feature documents, may contain chat-language notes)
 odd/
