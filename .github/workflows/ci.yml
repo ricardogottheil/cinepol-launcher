@@ -62,7 +62,8 @@ jobs:
         run: cargo fmt --all --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        # The feature also lints the bindings tool, which the app build skips.
+        run: cargo clippy --workspace --all-targets --features cinepol-launcher/export-bindings -- -D warnings
 
       - name: cargo test
         run: cargo test --workspace

@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:scripts": "node --test scripts/release/bundles.test.mjs",
-    "bindings": "cargo run --quiet -p cinepol-launcher --bin export-bindings",
+    "bindings": "cargo run --quiet -p cinepol-launcher --features export-bindings --bin export-bindings",
     "check:english": "node scripts/check-english.mjs",
     "tauri": "tauri"
   },
