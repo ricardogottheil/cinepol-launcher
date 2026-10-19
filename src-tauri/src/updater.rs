@@ -106,3 +106,39 @@ impl AppUpdater for TauriAppUpdater {
             .map_err(|error| AppUpdateError::Install(error.to_string()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::Value;
+
+    fn updater_config() -> Value {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json");
+        let config: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        config["plugins"]["updater"].clone()
+    }
+
+    #[test]
+    fn signatures_must_carry_the_announced_version() {
+        // Without it, an edited latest.json could offer an older signed release.
+        assert_eq!(updater_config()["requireSignedVersion"], true);
+        assert_ne!(updater_config()["allowDowngrades"], true);
+    }
+
+    #[test]
+    fn updates_come_only_from_the_releases_repository_over_https() {
+        let endpoints = updater_config()["endpoints"].clone();
+        assert_eq!(
+            endpoints,
+            serde_json::json!([
+                "https://github.com/ricardogottheil/cinepol-launcher-releases/releases/latest/download/latest.json"
+            ])
+        );
+        assert_ne!(updater_config()["dangerousInsecureTransportProtocol"], true);
+    }
+
+    #[test]
+    fn the_repository_holds_no_public_key() {
+        // The key is a build-time setting (CINEPOL_UPDATER_PUBKEY); see docs/release.md.
+        assert_eq!(updater_config()["pubkey"], "");
+    }
+}

@@ -22,14 +22,19 @@ pub async fn install_app_update<U: AppUpdater, G: RunningGames, R: ProgressRepor
         return Err(AppUpdateError::GameRunning);
     }
     updater.download(version, reporter, cancel).await?;
-    // A game may have started while the update downloaded.
-    if games.any_busy() {
-        return Err(AppUpdateError::GameRunning);
-    }
     if cancel.is_cancelled() {
         return Err(AppUpdateError::Cancelled);
     }
-    updater.apply().await
+    // A game may have started while the update downloaded. Freezing checks
+    // that and stops new sessions in one step, until the launcher restarts.
+    if !games.freeze() {
+        return Err(AppUpdateError::GameRunning);
+    }
+    let applied = updater.apply().await;
+    if applied.is_err() {
+        games.unfreeze();
+    }
+    applied
 }
 
 #[cfg(test)]
@@ -105,6 +110,30 @@ mod tests {
             Err(AppUpdateError::GameRunning)
         );
         assert_eq!(updater.applied(), 0);
+    }
+
+    #[tokio::test]
+    async fn no_game_can_start_while_the_update_installs() {
+        let games = Arc::new(InMemoryRunningGames::default());
+        let updater = FakeAppUpdater::offering("0.2.0");
+        install("0.2.0", &updater, &games).await.unwrap();
+        assert_eq!(updater.applied(), 1);
+        // The launcher restarts after a successful install; until then, no session starts.
+        assert!(!games.claim(&survival(), &CancellationToken::new()));
+    }
+
+    #[tokio::test]
+    async fn a_failed_install_lets_games_start_again() {
+        let games = InMemoryRunningGames::default();
+        let updater = FakeAppUpdater {
+            apply_error: Some(AppUpdateError::Install("disk full".into())),
+            ..FakeAppUpdater::offering("0.2.0")
+        };
+        assert_eq!(
+            install("0.2.0", &updater, &games).await,
+            Err(AppUpdateError::Install("disk full".into()))
+        );
+        assert!(games.claim(&survival(), &CancellationToken::new()));
     }
 
     #[tokio::test]

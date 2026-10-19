@@ -410,6 +410,7 @@ pub fn sample_asset_index() -> AssetIndex {
 #[derive(Debug, Default)]
 pub struct InMemoryRunningGames {
     busy: Mutex<HashMap<InstanceId, CancellationToken>>,
+    frozen: std::sync::atomic::AtomicBool,
 }
 
 impl InMemoryRunningGames {
@@ -421,7 +422,7 @@ impl InMemoryRunningGames {
 impl RunningGames for InMemoryRunningGames {
     fn claim(&self, instance: &InstanceId, kill: &CancellationToken) -> bool {
         let mut busy = self.busy.lock().unwrap();
-        if busy.contains_key(instance) {
+        if busy.contains_key(instance) || self.frozen.load(std::sync::atomic::Ordering::SeqCst) {
             return false;
         }
         busy.insert(instance.clone(), kill.clone());
@@ -434,5 +435,19 @@ impl RunningGames for InMemoryRunningGames {
 
     fn any_busy(&self) -> bool {
         !self.busy.lock().unwrap().is_empty()
+    }
+
+    fn freeze(&self) -> bool {
+        let busy = self.busy.lock().unwrap();
+        if !busy.is_empty() {
+            return false;
+        }
+        self.frozen.store(true, std::sync::atomic::Ordering::SeqCst);
+        true
+    }
+
+    fn unfreeze(&self) {
+        self.frozen
+            .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }

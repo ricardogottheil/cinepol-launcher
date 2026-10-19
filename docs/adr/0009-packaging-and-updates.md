@@ -35,9 +35,11 @@ every player.
 - **Updater in the app:** an `AppUpdater` port in the core with the
   `check_app_update` and `install_app_update` use cases;
   `tauri-plugin-updater` implements it in `src-tauri`. Installing downloads
-  and verifies only the version the player accepted, refuses while any
-  instance is busy (installing restarts the launcher), and checks again after
-  the download. The restart uses Tauri's own `AppHandle::restart`. The plugin's
+  and verifies only the version the player accepted and refuses while any
+  instance is busy (installing restarts the launcher). After the download it
+  freezes the games registry: in one step it checks that nothing started
+  meanwhile and refuses every new session until the launcher restarts (or the
+  install fails). The restart uses Tauri's own `AppHandle::restart`. The plugin's
   JavaScript commands are not exposed; the UI goes through our commands.
 
 ## Consequences

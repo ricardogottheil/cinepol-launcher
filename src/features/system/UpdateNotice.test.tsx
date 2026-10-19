@@ -74,10 +74,12 @@ describe("UpdateNotice", () => {
   it("explains a refused install and checks again when the release changed", async () => {
     client.checkAppUpdate.mockResolvedValue(available);
     client.installAppUpdate
-      .mockReturnValueOnce(
+      .mockImplementationOnce(() =>
         running(Promise.reject(new IpcError("already_running", "a game is running"))),
       )
-      .mockReturnValueOnce(running(Promise.reject(new IpcError("update_changed", "moved on"))));
+      .mockImplementationOnce(() =>
+        running(Promise.reject(new IpcError("update_changed", "moved on"))),
+      );
     renderWithQuery(<UpdateNotice />);
     const install = await screen.findByRole("button", { name: labels.install });
 

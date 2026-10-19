@@ -83,7 +83,7 @@ tag, fix the problem and tag again.
   was signed for: an edited `latest.json` cannot offer an older, validly signed
   release as an update.
 - The launcher never installs an update while a game installs or runs, because
-  installing restarts it.
+  installing restarts it, and no game can start while the update installs.
 
 ## macOS notes
 

@@ -14,6 +14,7 @@ pub struct FakeAppUpdater {
     pub available: Option<AppUpdate>,
     pub check_error: Option<AppUpdateError>,
     pub download_error: Option<AppUpdateError>,
+    pub apply_error: Option<AppUpdateError>,
     /// Runs while downloading (for example, a game starts meanwhile).
     pub during_download: Option<Hook>,
     pub(crate) downloaded: Mutex<Vec<String>>,
@@ -82,6 +83,9 @@ impl AppUpdater for FakeAppUpdater {
     }
 
     async fn apply(&self) -> Result<(), AppUpdateError> {
+        if let Some(error) = &self.apply_error {
+            return Err(error.clone());
+        }
         *self.applied.lock().unwrap() += 1;
         Ok(())
     }

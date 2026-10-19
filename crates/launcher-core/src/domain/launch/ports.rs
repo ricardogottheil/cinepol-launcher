@@ -122,4 +122,10 @@ pub trait RunningGames: Send + Sync {
     fn release(&self, instance: &InstanceId);
     /// Whether any instance is busy.
     fn any_busy(&self) -> bool;
+    /// Stops new claims, but only when no instance is busy (checked in the
+    /// same step). Returns `false`, and freezes nothing, when one is busy.
+    /// Used while the launcher installs an update of itself.
+    fn freeze(&self) -> bool;
+    /// Lets claims through again after `freeze`.
+    fn unfreeze(&self);
 }

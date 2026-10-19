@@ -8,13 +8,15 @@ use launcher_core::domain::instance::InstanceId;
 use launcher_core::domain::launch::RunningGames;
 use tokio_util::sync::CancellationToken;
 
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 
 const MAX_ID_LEN: usize = 64;
 
 #[derive(Debug, Default)]
 pub struct OperationRegistry {
     running: Mutex<HashMap<String, CancellationToken>>,
+    /// Set (under the `running` lock) while the launcher installs an update.
+    frozen: AtomicBool,
 }
 
 impl OperationRegistry {
@@ -30,6 +32,12 @@ impl OperationRegistry {
     pub fn adopt(&self, id: &str, token: CancellationToken) -> Result<(), AppError> {
         validate_id(id)?;
         let mut running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
+        if self.frozen.load(Ordering::SeqCst) {
+            return Err(AppError::new(
+                ErrorCode::AlreadyRunning,
+                "the launcher is installing an update",
+            ));
+        }
         if running.contains_key(id) {
             return Err(AppError::invalid_input(format!(
                 "operation {id} is already running"
@@ -92,6 +100,20 @@ impl RunningGames for OperationRegistry {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .is_empty()
+    }
+
+    fn freeze(&self) -> bool {
+        let running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
+        if !running.is_empty() {
+            return false;
+        }
+        self.frozen.store(true, Ordering::SeqCst);
+        true
+    }
+
+    fn unfreeze(&self) {
+        let _running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
+        self.frozen.store(false, Ordering::SeqCst);
     }
 }
 
@@ -195,8 +217,23 @@ mod tests {
         assert!(!games.any_busy());
         assert!(games.claim(&id, &CancellationToken::new()));
         assert!(games.any_busy());
+        assert!(!games.freeze(), "a busy registry does not freeze");
         games.release(&id);
         assert!(!games.any_busy());
+    }
+
+    #[test]
+    fn a_frozen_registry_refuses_new_sessions_until_unfrozen() {
+        let games = OperationRegistry::default();
+        let id = InstanceId::parse("survival").unwrap();
+        assert!(games.freeze());
+        assert!(!games.claim(&id, &CancellationToken::new()));
+        assert_eq!(
+            games.start("survival").map(|_| ()).map_err(|e| e.code),
+            Err(ErrorCode::AlreadyRunning)
+        );
+        games.unfreeze();
+        assert!(games.claim(&id, &CancellationToken::new()));
     }
 
     #[test]
