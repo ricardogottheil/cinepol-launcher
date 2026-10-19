@@ -159,6 +159,15 @@ fn dup(mut b: Vec<u8>) -> Vec<u8> {
     b
 }
 
+/// Link tricks are refused where links exist. Windows creates none
+/// (`link_or_copy`), so there the entry may be accepted; `report` has already
+/// checked, on every platform, that nothing was written outside the output.
+fn refused_on_unix(label: &str, r: &Result<Vec<PathBuf>, crate::domain::launch::ExtractError>) {
+    if cfg!(unix) {
+        assert!(r.is_err(), "{label}: {r:?}");
+    }
+}
+
 fn zip_probe(
     label: &str,
     entries: &[Z],
@@ -229,12 +238,12 @@ fn zip_symlink_probes() {
         "zip symlink ../.. then file through it",
         &[Z::Link("l", "../../.."), Z::File("l/pwn", b"p")],
     );
-    assert!(r.is_err());
+    refused_on_unix("zip symlink ../.. then file through it", &r);
     let (r, _) = zip_probe(
         "zip symlink absolute then file",
         &[Z::Link("l", "/tmp"), Z::File("l/pwn", b"p")],
     );
-    assert!(r.is_err());
+    refused_on_unix("zip symlink absolute then file", &r);
     let (r, sb) = zip_probe(
         "zip symlink . then file",
         &[Z::Link("l", "."), Z::File("l/ok", b"p")],
@@ -254,7 +263,7 @@ fn zip_symlink_probes() {
             Z::File("a/b/pwn", b"p"),
         ],
     );
-    assert!(r.is_err());
+    refused_on_unix("zip chain a->. a/b->..", &r);
     let (r, _) = zip_probe(
         "zip symlink then overwrite link target file",
         &[
@@ -299,9 +308,9 @@ fn zip_symlink_probes() {
         "zip link sub/../..",
         &[Z::Dir("sub/"), Z::Link("l", "sub/../..")],
     );
-    assert!(r.is_err());
+    refused_on_unix("zip link sub/../..", &r);
     let (r, _) = zip_probe("zip link target empty", &[Z::Link("l", "")]);
-    assert!(r.is_err());
+    refused_on_unix("zip link target empty", &r);
     // Natives extractor path with a symlink escape
     let sb = Sb::new();
     let a = sb.archive(&zip_bytes(&[
@@ -310,7 +319,7 @@ fn zip_symlink_probes() {
     ]));
     let r = extract_zip_entries(&a, &sb.out(), &["META-INF/".into()], false);
     report("natives symlink escape", &r, &sb);
-    assert!(r.is_err());
+    refused_on_unix("natives symlink escape", &r);
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -345,10 +354,7 @@ fn tar_probes() {
                 T::Sym("a/b", ".."),
                 T::File("a/b/pwn", b"p", 0o644),
             ],
-            // Refused on Unix, where the chain escapes. Windows creates no
-            // links, so `a/b` are plain folders and the file stays inside
-            // (checked below).
-            !cfg!(unix),
+            false,
         ),
         (
             "tar chain d/a->.. (inside), d/a/b->..",
@@ -484,10 +490,11 @@ fn tar_probes() {
         ),
     ];
     for (label, entries, ok) in cases {
+        let links = entries.iter().any(|entry| matches!(entry, T::Sym(..)));
         let (r, sb) = tar_probe(label, &entries);
-        assert_eq!(r.is_ok(), ok, "{label}: {r:?}");
-        if cfg!(not(unix)) && label == "tar chain a->. a/b->.." {
-            assert!(sb.out().join("a").join("b").join("pwn").is_file());
+        // Without links (Windows) only the escape check in `report` applies.
+        if cfg!(unix) || !links {
+            assert_eq!(r.is_ok(), ok, "{label}: {r:?}");
         }
         if label == "tar setuid file" {
             #[cfg(unix)]

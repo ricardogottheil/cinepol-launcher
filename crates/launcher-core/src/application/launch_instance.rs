@@ -545,16 +545,18 @@ mod tests {
             Path::new("/data/instances/cinepol/minecraft")
         );
         let args = spec.command.args();
+        // Paths use the OS separator; compare them written with `/`.
+        let slashed = crate::testing::forward_slashes_all(&args);
         assert!(args.contains(&"polispol1".to_owned()));
         // The fake platform is Linux, so the classpath separator is `:`.
         assert!(
-            crate::testing::forward_slashes_all(&args).contains(
+            slashed.contains(
                 &"/data/libraries/org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1.jar:/data/versions/26.2/26.2.jar"
                     .to_owned()
             ),
             "{args:?}"
         );
-        assert!(args.contains(
+        assert!(slashed.contains(
             &"-Dlog4j.configurationFile=/data/assets/log_configs/client-1.21.2.xml".to_owned()
         ));
         assert_eq!(logs.lines().len(), 1);

@@ -1009,8 +1009,13 @@ async fn cancelling_stops_the_processors() {
     };
     let cancel = CancellationToken::new();
     let trigger = cancel.clone();
+    let watched = runner.clone();
+    // Cancel once the first processor is running, however long the steps
+    // before it take on this machine.
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        while watched.commands().is_empty() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
         trigger.cancel();
     });
     let result = installers(Offline, installed.root(), runner.clone())
