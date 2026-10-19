@@ -546,7 +546,14 @@ mod tests {
         );
         let args = spec.command.args();
         assert!(args.contains(&"polispol1".to_owned()));
-        assert!(args.iter().any(|arg| arg == "/data/libraries/org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1.jar:/data/versions/26.2/26.2.jar"));
+        // The fake platform is Linux, so the classpath separator is `:`.
+        assert!(
+            crate::testing::forward_slashes_all(&args).contains(
+                &"/data/libraries/org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1.jar:/data/versions/26.2/26.2.jar"
+                    .to_owned()
+            ),
+            "{args:?}"
+        );
         assert!(args.contains(
             &"-Dlog4j.configurationFile=/data/assets/log_configs/client-1.21.2.xml".to_owned()
         ));

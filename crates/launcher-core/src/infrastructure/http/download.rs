@@ -579,12 +579,10 @@ mod tests {
                 if path.is_dir() {
                     pending.push(path);
                 } else {
-                    out.push(
-                        path.strip_prefix(dir)
-                            .unwrap()
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
+                    // Written with `/` on every platform.
+                    out.push(crate::testing::forward_slashes(
+                        path.strip_prefix(dir).unwrap().to_string_lossy(),
+                    ));
                 }
             }
         }

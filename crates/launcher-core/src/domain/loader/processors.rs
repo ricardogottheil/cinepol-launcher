@@ -329,7 +329,7 @@ mod tests {
         let patched =
             "/data/libraries/net/minecraftforge/forge/26.2-65.1.5/forge-26.2-65.1.5-client.jar";
         assert_eq!(
-            patcher.args,
+            crate::testing::forward_slashes_all(&patcher.args),
             [
                 "--clean",
                 "/data/versions/26.2/26.2.jar",
@@ -384,7 +384,7 @@ mod tests {
         let data = BTreeMap::from([("MCP_VERSION".to_owned(), "'26.2-2'".to_owned())]);
         let planned = plan_processors(&processors, &data, &env()).unwrap();
         assert_eq!(
-            planned[0].args,
+            crate::testing::forward_slashes_all(&planned[0].args),
             [
                 "--side",
                 "client",

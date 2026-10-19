@@ -240,7 +240,12 @@ fn zip_symlink_probes() {
         &[Z::Link("l", "."), Z::File("l/ok", b"p")],
     );
     assert!(r.is_ok(), "{r:?}");
+    // Unix follows the link to the output folder itself. Windows creates no
+    // links (`link_or_copy`), so `l` is a plain folder inside the output.
+    #[cfg(unix)]
     assert!(sb.out().join("ok").is_file());
+    #[cfg(not(unix))]
+    assert!(sb.out().join("l").join("ok").is_file() && !sb.out().join("ok").exists());
     let (r, _) = zip_probe(
         "zip chain a->. a/b->..",
         &[
@@ -340,7 +345,10 @@ fn tar_probes() {
                 T::Sym("a/b", ".."),
                 T::File("a/b/pwn", b"p", 0o644),
             ],
-            false,
+            // Refused on Unix, where the chain escapes. Windows creates no
+            // links, so `a/b` are plain folders and the file stays inside
+            // (checked below).
+            !cfg!(unix),
         ),
         (
             "tar chain d/a->.. (inside), d/a/b->..",
@@ -478,6 +486,9 @@ fn tar_probes() {
     for (label, entries, ok) in cases {
         let (r, sb) = tar_probe(label, &entries);
         assert_eq!(r.is_ok(), ok, "{label}: {r:?}");
+        if cfg!(not(unix)) && label == "tar chain a->. a/b->.." {
+            assert!(sb.out().join("a").join("b").join("pwn").is_file());
+        }
         if label == "tar setuid file" {
             #[cfg(unix)]
             {

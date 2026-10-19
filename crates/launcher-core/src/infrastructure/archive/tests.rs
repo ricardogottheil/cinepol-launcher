@@ -187,10 +187,13 @@ fn tar_gz_rejects_a_link_chain_that_escapes_through_an_earlier_symlink() {
     let archive = sandbox.archive("chain.tar.gz");
     write_tar_gz(&archive, &[], &[("here", "."), ("here/up", "..")]);
 
-    assert_eq!(
-        extract_tar_gz(&archive, &sandbox.out()),
-        Err(ExtractError::UnsafeEntry("here/up".into()))
-    );
+    let result = extract_tar_gz(&archive, &sandbox.out());
+    #[cfg(unix)]
+    assert_eq!(result, Err(ExtractError::UnsafeEntry("here/up".into())));
+    // Windows creates no links (`link_or_copy`), so nothing can resolve outside.
+    #[cfg(not(unix))]
+    assert!(result.is_ok(), "{result:?}");
+    // On every platform nothing was written next to the destination.
     assert_eq!(sandbox.root_entries(), vec!["archives", "out"]);
 }
 

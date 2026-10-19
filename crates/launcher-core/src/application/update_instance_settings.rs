@@ -134,7 +134,11 @@ mod tests {
     use crate::domain::loader::LoaderSpec;
     use crate::testing::{FakeJavaProbe, InMemoryAccountRepository, InMemoryInstanceRepository};
 
+    /// An absolute path on the platform running the tests.
+    #[cfg(unix)]
     const JAVA: &str = "/opt/jdk-25/bin/java";
+    #[cfg(windows)]
+    const JAVA: &str = r"C:\jdk-25\bin\java.exe";
 
     struct World {
         instances: InMemoryInstanceRepository,

@@ -20,7 +20,7 @@ use crate::domain::loader::{
 };
 use crate::domain::ports::{HttpClient, HttpError, ProgressUpdate};
 use crate::infrastructure::loaders::LoaderInstallers;
-use crate::testing::{FakeHttpClient, RecordingReporter};
+use crate::testing::{FakeHttpClient, RecordingReporter, forward_slashes, forward_slashes_all};
 
 const FORGE_PROFILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -834,8 +834,8 @@ async fn forge_finish_runs_only_the_client_binarypatcher_and_verifies_its_output
     assert!(binpatch.starts_with(LauncherPaths::new(root).temp_dir()));
     assert!(binpatch.ends_with("data/client.lzma"));
     assert_eq!(
-        command.args,
-        [
+        forward_slashes_all(&command.args),
+        forward_slashes_all(&[
             "--clean",
             installed.client_jar.to_str().unwrap(),
             "--output",
@@ -847,7 +847,7 @@ async fn forge_finish_runs_only_the_client_binarypatcher_and_verifies_its_output
             "--store",
             "--marker",
             ".forge_patched_minecraft",
-        ]
+        ])
     );
     assert_eq!(std::fs::read(patched_path(root)).unwrap(), PATCHED);
     assert_eq!(
@@ -943,12 +943,17 @@ async fn neoforge_finish_runs_its_processor_once_per_plan() {
         ]
     );
     assert_eq!(
-        command.args[6],
-        libs.join("net/neoforged/minecraft-client-patched/26.2.0.93/minecraft-client-patched-26.2.0.93.jar")
-            .to_str()
-            .unwrap()
+        forward_slashes(&command.args[6]),
+        forward_slashes(
+            libs.join("net/neoforged/minecraft-client-patched/26.2.0.93/minecraft-client-patched-26.2.0.93.jar")
+                .to_str()
+                .unwrap()
+        )
     );
-    assert_eq!(command.args[8], root_libraries);
+    assert_eq!(
+        forward_slashes(&command.args[8]),
+        forward_slashes(&root_libraries)
+    );
 
     // The marker skips the second run.
     finish(&installed, &neoforge(), &runner).await.unwrap();

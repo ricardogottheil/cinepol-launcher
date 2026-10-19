@@ -61,6 +61,18 @@ impl ProgressReporter for RecordingReporter {
     }
 }
 
+/// `value` with every `\` turned into `/`. Paths the launcher builds use
+/// the OS separator (`RelativePath::under`); comparing both sides through this
+/// keeps an expectation exact on Unix and separator-agnostic on Windows.
+pub fn forward_slashes(value: impl AsRef<str>) -> String {
+    value.as_ref().replace('\\', "/")
+}
+
+/// [`forward_slashes`] for every argument of a command line.
+pub fn forward_slashes_all<S: AsRef<str>>(values: &[S]) -> Vec<String> {
+    values.iter().map(forward_slashes).collect()
+}
+
 /// Returns immediately and counts how often it was asked to wait.
 #[derive(Debug, Default)]
 pub struct InstantDelay {
