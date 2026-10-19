@@ -2,7 +2,7 @@ name: Release
 
 # Pushing a tag `vX.Y.Z` (matching `version` in src-tauri/tauri.conf.json)
 # builds every target, signs the updater artifacts and publishes them to the
-# public releases repository. The source repository stays private.
+# public releases repository, which holds only GitHub Releases.
 # Only the `publish` job touches the releases repository, so the release and
 # its latest.json appear together, once every target built.
 # See docs/release.md for the secrets, variables and the release checklist.

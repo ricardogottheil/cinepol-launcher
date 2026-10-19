@@ -6,16 +6,18 @@
 ## Context
 
 The launcher ships to Windows (x64, arm64), macOS (Apple Silicon, Intel) and
-Linux (x64, arm64), and must update itself with signed update manifests. The
-source repository is private, so its GitHub Releases cannot serve downloads to
-players without a token, and a token compiled into the app would leak to
-every player.
+Linux (x64, arm64), and must update itself with signed update manifests.
+Players need a stable, public place to download installers and a
+`latest.json` the launcher can fetch without credentials.
 
 ## Decision
 
 - **Releases repository:** installers and `latest.json` are published to a
-  separate public repository that holds only GitHub Releases. The source stays
-  private. CI publishes with a fine-grained token limited to that repository.
+  separate public repository that holds only GitHub Releases, so the download
+  page shows nothing but releases and the publishing token can be limited to
+  that repository (fine-grained, contents only). The choice was first made on
+  the mistaken belief that the source repository was private; it is public,
+  and the separate repository was kept for those two reasons.
 - **One publisher:** each matrix job builds and signs with the Tauri CLI
   directly (no third-party release action), then a tested helper
   (`scripts/release/bundles.mjs`) collects the bundles under fixed names with

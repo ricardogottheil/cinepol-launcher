@@ -3,8 +3,8 @@
 Releases are built by `.github/workflows/release.yml` when a tag `vX.Y.Z` is
 pushed, and published to the public repository
 [`ricardogottheil/cinepol-launcher-releases`](https://github.com/ricardogottheil/cinepol-launcher-releases).
-This source repository stays private; the releases repository holds only
-GitHub Releases. The repository never contains real secret values.
+The releases repository holds only GitHub Releases, so players get a page
+with nothing but downloads. This repository never contains real secret values.
 See [ADR 0009](adr/0009-packaging-and-updates.md) for the decisions.
 
 ## Targets
