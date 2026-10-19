@@ -3,7 +3,10 @@
 //!
 //! Syncing follows [`plan_sync`]: a file is the pack's to replace or delete
 //! only while it still matches what the pack installed, so mods the player
-//! added and configs the player changed are kept.
+//! added and configs the player changed are kept. Every pack format turns its
+//! files into [`PackEntry`]s and goes through [`sync_files`]: downloads and
+//! local copies land in a staging folder and are verified there, and only
+//! then are files moved into the game folder.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -12,11 +15,14 @@ use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
 use crate::domain::instance::InstanceId;
+use crate::domain::integrity::Checksum;
 use crate::domain::launch::{LauncherPaths, RelativePath};
-use crate::domain::modpack::mrpack::{MrpackError, MrpackFile, MrpackIndex};
-use crate::domain::modpack::sync::{IncomingFile, PackManifest, plan_sync};
+use crate::domain::modpack::mrpack::MrpackIndex;
+use crate::domain::modpack::sync::{
+    EntrySource, IncomingFile, ManualFile, PackEntry, PackManifest, plan_sync,
+};
 use crate::domain::modpack::{
-    ModpackFile, MrpackArchive, PackFileError, PackFiles, PackManifestStore, StagedFile,
+    ModpackFile, MrpackArchive, PackFileError, PackFiles, PackManifestStore,
 };
 use crate::domain::ports::{
     DownloadError, DownloadRequest, Downloader, FileSystem, FileSystemError, ProgressReporter,
@@ -31,6 +37,35 @@ pub struct PackSyncDeps<'a, A, D, F, P, M> {
     pub files: &'a P,
     pub manifests: &'a M,
     pub paths: &'a LauncherPaths,
+}
+
+impl<'a, A, D, F, P, M> PackSyncDeps<'a, A, D, F, P, M> {
+    /// The ports the shared file sync needs (all but the archive).
+    pub fn file_sync(&self) -> FileSyncDeps<'a, D, F, P, M> {
+        FileSyncDeps {
+            downloader: self.downloader,
+            fs: self.fs,
+            files: self.files,
+            manifests: self.manifests,
+            paths: self.paths,
+        }
+    }
+}
+
+/// The ports the shared file sync talks to.
+pub struct FileSyncDeps<'a, D, F, P, M> {
+    pub downloader: &'a D,
+    pub fs: &'a F,
+    pub files: &'a P,
+    pub manifests: &'a M,
+    pub paths: &'a LauncherPaths,
+}
+
+/// What a sync did, and the files still waiting for a manual download.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SyncedFiles {
+    pub summary: SyncSummary,
+    pub pending: Vec<ManualFile>,
 }
 
 /// How many pack files were written, already up to date, kept because the
@@ -111,12 +146,6 @@ pub(crate) async fn download_pack<D: Downloader, R: ProgressReporter>(
     Ok(archive)
 }
 
-/// Where the new content of a path comes from.
-enum Source<'p> {
-    Index(&'p MrpackFile),
-    Override(&'p StagedFile),
-}
-
 /// Syncs the pack in `archive` (whose checked index is `index`) into the
 /// instance's game folder, given the manifest of the previous install
 /// (empty for a fresh install). The new manifest is saved only once every
@@ -170,57 +199,210 @@ where
         return Err(PackSyncError::Cancelled);
     }
     deps.fs.create_dir_all(staging).await?;
-    let overrides_dir = staging.join("overrides");
-    let downloads_dir = staging.join("downloads");
     let staged = deps
         .archive
-        .extract_overrides(archive, &overrides_dir)
+        .extract_overrides(archive, &staging.join("overrides"))
         .await?;
 
+    // Index files are verified against their sha512 while downloading.
     // Overrides come last: one at the same path as an index file replaces it.
-    let mut sources: BTreeMap<&RelativePath, Source<'_>> = BTreeMap::new();
-    let mut incoming = Vec::new();
-    for file in index.client_files() {
-        incoming.push(IncomingFile {
+    let mut entries: Vec<PackEntry> = index
+        .client_files()
+        .map(|file| PackEntry {
             path: file.path.clone(),
-            sha1: file.sha1.value().to_owned(),
-        });
-        sources.insert(&file.path, Source::Index(file));
-    }
-    for file in &staged {
-        incoming.push(IncomingFile {
-            path: file.path.clone(),
-            sha1: file.sha1.clone(),
-        });
-        sources.insert(&file.path, Source::Override(file));
-    }
+            source: EntrySource::Download {
+                urls: file.downloads.clone(),
+                checksum: file.sha512.clone(),
+                size: Some(file.size),
+            },
+            preserve: false,
+        })
+        .collect();
+    entries.extend(staged.into_iter().map(|file| PackEntry {
+        path: file.path,
+        source: EntrySource::Staged {
+            path: file.staged,
+            sha1: file.sha1,
+        },
+        preserve: false,
+    }));
+    let synced = sync_into(
+        &deps.file_sync(),
+        instance,
+        &entries,
+        &[],
+        previous,
+        staging,
+        reporter,
+        cancel,
+    )
+    .await?;
+    Ok(synced.summary)
+}
 
+/// Syncs `entries` into the instance's game folder, given the manifest of the
+/// previous install (empty for a fresh install). `manual` files the player
+/// still has to download are recorded as pending, except those already in
+/// place with the right hash. The new manifest is saved only once every file
+/// was written and removed.
+#[allow(clippy::too_many_arguments)]
+pub async fn sync_files<D, F, P, M, R>(
+    deps: &FileSyncDeps<'_, D, F, P, M>,
+    instance: &InstanceId,
+    entries: &[PackEntry],
+    manual: &[ManualFile],
+    previous: &PackManifest,
+    reporter: &R,
+    cancel: &CancellationToken,
+) -> Result<SyncedFiles, PackSyncError>
+where
+    D: Downloader,
+    F: FileSystem,
+    P: PackFiles,
+    M: PackManifestStore,
+    R: ProgressReporter,
+{
+    let staging = scratch_dir(deps.paths, "staging");
+    let result = async {
+        if cancel.is_cancelled() {
+            return Err(PackSyncError::Cancelled);
+        }
+        deps.fs.create_dir_all(&staging).await?;
+        sync_into(
+            deps, instance, entries, manual, previous, &staging, reporter, cancel,
+        )
+        .await
+    }
+    .await;
+    release_dir(deps.fs, &staging).await;
+    result
+}
+
+/// Stands in for the sha1 of a file that is not on disk yet: it never matches
+/// a real sha1, so the planner writes the file unless the player changed it.
+const UNWRITTEN: &str = "unwritten";
+
+/// The shared pipeline; `staging` exists and is released by the caller.
+#[allow(clippy::too_many_arguments)]
+async fn sync_into<D, F, P, M, R>(
+    deps: &FileSyncDeps<'_, D, F, P, M>,
+    instance: &InstanceId,
+    entries: &[PackEntry],
+    manual: &[ManualFile],
+    previous: &PackManifest,
+    staging: &Path,
+    reporter: &R,
+    cancel: &CancellationToken,
+) -> Result<SyncedFiles, PackSyncError>
+where
+    D: Downloader,
+    F: FileSystem,
+    P: PackFiles,
+    M: PackManifestStore,
+    R: ProgressReporter,
+{
     let game_dir = deps.paths.game_dir(instance);
+    // A later entry for the same path wins.
+    let mut sources: BTreeMap<&RelativePath, &PackEntry> = BTreeMap::new();
+    for entry in entries {
+        sources.insert(&entry.path, entry);
+    }
+    let manual: Vec<&ManualFile> = manual
+        .iter()
+        .filter(|file| !sources.contains_key(&file.path))
+        .collect();
+
     let mut on_disk = BTreeMap::new();
-    for path in previous.files.keys().chain(sources.keys().copied()) {
+    let wanted = sources
+        .keys()
+        .copied()
+        .chain(manual.iter().map(|f| &f.path));
+    for path in previous.files.keys().chain(wanted) {
         if !on_disk.contains_key(path) {
             let sha1 = deps.files.sha1(&path.under(&game_dir)).await?;
             on_disk.insert(path.clone(), sha1);
         }
     }
+    let disk = |path: &RelativePath| on_disk.get(path).cloned().flatten();
+
+    let mut incoming = Vec::new();
+    for (path, entry) in &sources {
+        let target = path.under(&game_dir);
+        let recorded = previous.files.get(*path).map(String::as_str);
+        let sha1 = incoming_sha1(deps.files, entry, &target, disk(path), recorded).await?;
+        incoming.push(IncomingFile {
+            path: (*path).clone(),
+            sha1,
+        });
+    }
+    // A manual file already in place with the right hash is installed.
+    let mut pending = Vec::new();
+    for file in manual {
+        match disk(&file.path) {
+            Some(sha1)
+                if has_checksum(deps.files, &file.path.under(&game_dir), &file.checksum)
+                    .await? =>
+            {
+                incoming.push(IncomingFile {
+                    path: file.path.clone(),
+                    sha1,
+                })
+            }
+            _ => pending.push(file.clone()),
+        }
+    }
+
     let plan = plan_sync(previous, &incoming, &on_disk);
     if cancel.is_cancelled() {
         return Err(PackSyncError::Cancelled);
     }
 
-    // Everything is downloaded into staging first: an interrupted download
-    // leaves the game folder as it was, and only local moves follow.
+    // Everything is downloaded or copied into staging first and verified
+    // there: a failure leaves the game folder as it was, and only local moves
+    // follow.
+    let downloads_dir = staging.join("downloads");
+    let local_dir = staging.join("local");
     let mut downloads = Vec::new();
     let mut placements: Vec<(PathBuf, &RelativePath)> = Vec::new();
     for path in &plan.write {
-        match sources.get(path) {
-            Some(Source::Index(file)) => {
-                downloads.push(download_request(file, &downloads_dir)?);
-                placements.push((path.under(&downloads_dir), path));
+        // `plan_sync` only writes incoming paths; matched manual files are
+        // already current, so every written path has a source.
+        let Some(entry) = sources.get(path) else {
+            continue;
+        };
+        match &entry.source {
+            EntrySource::Download {
+                urls,
+                checksum,
+                size,
+            } => {
+                let url = urls
+                    .first()
+                    .ok_or_else(|| PackFileError::Source(format!("{path} has no download URL")))?;
+                let staged = path.under(&downloads_dir);
+                downloads.push(DownloadRequest {
+                    url: url.clone(),
+                    destination: staged.clone(),
+                    checksum: Some(checksum.clone()),
+                    size: *size,
+                });
+                placements.push((staged, path));
             }
-            Some(Source::Override(file)) => placements.push((file.staged.clone(), path)),
-            // `plan_sync` only writes incoming paths, which all have a source.
-            None => {}
+            EntrySource::Local {
+                path: from,
+                checksum,
+            } => {
+                let staged = path.under(&local_dir);
+                deps.files.place(from, &staged).await?;
+                if !has_checksum(deps.files, &staged, checksum).await? {
+                    return Err(PackFileError::Source(format!(
+                        "{path} does not match its declared hash"
+                    ))
+                    .into());
+                }
+                placements.push((staged, path));
+            }
+            EntrySource::Staged { path: from, .. } => placements.push((from.clone(), path)),
         }
     }
     deps.downloader
@@ -239,35 +421,69 @@ where
     for path in &plan.remove {
         deps.files.remove_file(&path.under(&game_dir)).await?;
     }
-    // Record what was actually written: downloads are verified against sha512
-    // only, and a wrong declared sha1 would make an intact file look changed.
+    // Record what was actually written: a declared sha1 may be wrong, and
+    // other sources declare none.
     let mut manifest = plan.manifest;
     for path in &plan.write {
-        if let Some(sha1) = deps.files.sha1(&path.under(&game_dir)).await? {
-            manifest.files.insert(path.clone(), sha1);
-        }
+        match deps.files.sha1(&path.under(&game_dir)).await? {
+            Some(sha1) => manifest.files.insert(path.clone(), sha1),
+            None => manifest.files.remove(path),
+        };
     }
+    manifest.pending = pending.clone();
     deps.manifests.save(instance, &manifest).await?;
-    Ok(SyncSummary {
-        written: plan.write.len(),
-        unchanged: plan.unchanged.len(),
-        kept: plan.kept.len(),
-        removed: plan.remove.len(),
+    Ok(SyncedFiles {
+        summary: SyncSummary {
+            written: plan.write.len(),
+            unchanged: plan.unchanged.len(),
+            kept: plan.kept.len(),
+            removed: plan.remove.len(),
+        },
+        pending,
     })
 }
 
-/// Index files are verified against their sha512 while downloading.
-fn download_request(file: &MrpackFile, game_dir: &Path) -> Result<DownloadRequest, PackFileError> {
-    let url = file
-        .downloads
-        .first()
-        .ok_or_else(|| MrpackError::NoDownload(file.path.to_string()))?;
-    Ok(DownloadRequest {
-        url: url.clone(),
-        destination: file.path.under(game_dir),
-        checksum: Some(file.sha512.clone()),
-        size: Some(file.size),
-    })
+/// The sha1 the planner compares the file on disk with: the disk's own when
+/// it already holds the entry's content (or, for a preserved entry, the
+/// intact copy the pack wrote before), so the plan leaves it alone.
+async fn incoming_sha1<P: PackFiles>(
+    files: &P,
+    entry: &PackEntry,
+    target: &Path,
+    disk: Option<String>,
+    recorded: Option<&str>,
+) -> Result<String, PackFileError> {
+    let declared = match &entry.source {
+        EntrySource::Staged { sha1, .. } => sha1.as_str(),
+        EntrySource::Download { .. } | EntrySource::Local { .. } => UNWRITTEN,
+    };
+    let Some(disk) = disk else {
+        return Ok(declared.to_owned());
+    };
+    let current = match &entry.source {
+        EntrySource::Staged { sha1, .. } => sha1.eq_ignore_ascii_case(&disk),
+        EntrySource::Download { checksum, .. } | EntrySource::Local { checksum, .. } => {
+            has_checksum(files, target, checksum).await?
+        }
+    };
+    let intact = recorded.is_some_and(|old| old.eq_ignore_ascii_case(&disk));
+    if current || (entry.preserve && intact) {
+        Ok(disk)
+    } else {
+        Ok(declared.to_owned())
+    }
+}
+
+/// Whether the file exists and matches `checksum`.
+async fn has_checksum<P: PackFiles>(
+    files: &P,
+    path: &Path,
+    checksum: &Checksum,
+) -> Result<bool, PackFileError> {
+    Ok(files
+        .digest(path, checksum.algorithm())
+        .await?
+        .is_some_and(|digest| checksum.matches(&digest)))
 }
 
 /// Shared test setup for the modpack use cases.
@@ -529,5 +745,288 @@ pub(crate) mod fixtures {
                 reason: "connection reset".into(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fixtures::*;
+    use super::*;
+    use crate::domain::integrity::{Checksum, HashAlgorithm, curseforge_fingerprint};
+    use crate::testing::{FakeDownloader, RecordingReporter, sha1_hex, sha512_hex};
+
+    const ID: &str = "pack";
+
+    fn id() -> InstanceId {
+        InstanceId::parse(ID).unwrap()
+    }
+
+    fn sha512(bytes: &[u8]) -> Checksum {
+        Checksum::parse(HashAlgorithm::Sha512, &sha512_hex(bytes)).unwrap()
+    }
+
+    fn cdn(path: &str) -> String {
+        format!("https://cdn.example.com/{path}")
+    }
+
+    /// A file downloaded from [`cdn`] whose content is `bytes`.
+    fn remote(path: &str, bytes: &[u8]) -> PackEntry {
+        PackEntry {
+            path: rel(path),
+            source: EntrySource::Download {
+                urls: vec![cdn(path)],
+                checksum: sha512(bytes),
+                size: Some(bytes.len() as u64),
+            },
+            preserve: false,
+        }
+    }
+
+    fn serving(files: &[(&str, &[u8])]) -> FakeDownloader {
+        FakeDownloader::with(
+            files
+                .iter()
+                .map(|(path, bytes)| (cdn(path), bytes.to_vec())),
+        )
+    }
+
+    fn manual(path: &str, bytes: &[u8]) -> ManualFile {
+        ManualFile {
+            path: rel(path),
+            name: "Just Enough Items".into(),
+            filename: path.rsplit('/').next().unwrap().into(),
+            checksum: Checksum::parse(
+                HashAlgorithm::Murmur2,
+                &curseforge_fingerprint(bytes).to_string(),
+            )
+            .unwrap(),
+            project_id: 238_222,
+            file_id: 1,
+        }
+    }
+
+    async fn sync<D: Downloader>(
+        world: &World,
+        downloader: &D,
+        entries: &[PackEntry],
+        manual: &[ManualFile],
+        cancel: &CancellationToken,
+    ) -> Result<SyncedFiles, PackSyncError> {
+        let deps = FileSyncDeps {
+            downloader,
+            fs: &world.fs,
+            files: &world.files,
+            manifests: &world.manifests,
+            paths: &world.paths,
+        };
+        let previous = world.manifests.load(&id()).await.unwrap();
+        sync_files(
+            &deps,
+            &id(),
+            entries,
+            manual,
+            &previous,
+            &RecordingReporter::default(),
+            cancel,
+        )
+        .await
+    }
+
+    async fn run<D: Downloader>(
+        world: &World,
+        downloader: &D,
+        entries: &[PackEntry],
+        manual: &[ManualFile],
+    ) -> Result<SyncedFiles, PackSyncError> {
+        sync(
+            world,
+            downloader,
+            entries,
+            manual,
+            &CancellationToken::new(),
+        )
+        .await
+    }
+
+    fn recorded(world: &World) -> Vec<(String, String)> {
+        let manifests = world.manifests.manifests.lock().unwrap();
+        manifests[&id()]
+            .files
+            .iter()
+            .map(|(path, sha1)| (path.to_string(), sha1.clone()))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn downloads_into_staging_then_places_and_records_the_written_files() {
+        let world = World::new(vec![]);
+        let downloader = serving(&[("mods/a.jar", b"a"), ("config/b.toml", b"b")]);
+        let entries = [remote("mods/a.jar", b"a"), remote("config/b.toml", b"b")];
+
+        let synced = run(&world, &downloader, &entries, &[]).await.unwrap();
+
+        assert_eq!(
+            synced.summary,
+            SyncSummary {
+                written: 2,
+                ..Default::default()
+            }
+        );
+        let requests = downloader.requests();
+        assert_eq!(requests.len(), 2);
+        for request in &requests {
+            assert!(request.destination.starts_with(world.paths.temp_dir()));
+        }
+        let a = requests
+            .iter()
+            .find(|r| r.url == cdn("mods/a.jar"))
+            .unwrap();
+        assert_eq!(a.checksum, Some(sha512(b"a")));
+        assert_eq!(a.size, Some(1));
+        assert_eq!(world.read_game_file(ID, "mods/a.jar").unwrap(), b"a");
+        assert_eq!(world.read_game_file(ID, "config/b.toml").unwrap(), b"b");
+        assert_eq!(
+            recorded(&world),
+            [
+                ("config/b.toml".into(), sha1_hex(b"b")),
+                ("mods/a.jar".into(), sha1_hex(b"a")),
+            ]
+        );
+
+        // A second sync finds both files current and downloads nothing.
+        let again = run(&world, &downloader, &entries, &[]).await.unwrap();
+        assert_eq!(again.summary.unchanged, 2);
+        assert_eq!(again.summary.written, 0);
+        assert_eq!(downloader.requests().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn copies_local_files_after_verifying_them_and_refuses_a_mismatch() {
+        let world = World::new(vec![]);
+        let pack = world.paths.temp_dir().join("local-pack");
+        std::fs::create_dir_all(&pack).unwrap();
+        std::fs::write(pack.join("good.toml"), b"good").unwrap();
+        std::fs::write(pack.join("bad.toml"), b"tampered").unwrap();
+        let local = |path: &str, file: &str, declared: &[u8]| PackEntry {
+            path: rel(path),
+            source: EntrySource::Local {
+                path: pack.join(file),
+                checksum: Checksum::parse(HashAlgorithm::Sha1, &sha1_hex(declared)).unwrap(),
+            },
+            preserve: false,
+        };
+
+        let good = [local("config/good.toml", "good.toml", b"good")];
+        run(&world, &FakeDownloader::default(), &good, &[])
+            .await
+            .unwrap();
+        assert_eq!(
+            world.read_game_file(ID, "config/good.toml").unwrap(),
+            b"good"
+        );
+        assert!(pack.join("good.toml").exists(), "the source is copied");
+
+        let world = World::new(vec![]);
+        let bad = [local("config/bad.toml", "bad.toml", b"original")];
+        let result = run(&world, &FakeDownloader::default(), &bad, &[]).await;
+        assert!(
+            matches!(result, Err(PackSyncError::Files(PackFileError::Source(_)))),
+            "{result:?}"
+        );
+        assert!(world.read_game_file(ID, "config/bad.toml").is_none());
+        assert!(world.manifests.manifests.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn preserved_files_are_written_once_and_never_replaced() {
+        let world = World::new(vec![]);
+        let preserved = |bytes: &[u8]| PackEntry {
+            preserve: true,
+            ..remote("config/options.toml", bytes)
+        };
+        let v1 = serving(&[("config/options.toml", b"v1")]);
+        run(&world, &v1, &[preserved(b"v1")], &[]).await.unwrap();
+        assert_eq!(
+            world.read_game_file(ID, "config/options.toml").unwrap(),
+            b"v1"
+        );
+
+        // The pack ships a new version: the intact file stays as it is.
+        let v2 = serving(&[("config/options.toml", b"v2")]);
+        let synced = run(&world, &v2, &[preserved(b"v2")], &[]).await.unwrap();
+        assert!(v2.requests().is_empty());
+        assert_eq!(synced.summary.written, 0);
+        assert_eq!(
+            world.read_game_file(ID, "config/options.toml").unwrap(),
+            b"v1"
+        );
+
+        // Nor is a copy the player changed.
+        world.write_game_file(ID, "config/options.toml", b"player");
+        let synced = run(&world, &v2, &[preserved(b"v2")], &[]).await.unwrap();
+        assert_eq!(synced.summary.kept, 1);
+        assert_eq!(
+            world.read_game_file(ID, "config/options.toml").unwrap(),
+            b"player"
+        );
+    }
+
+    #[tokio::test]
+    async fn manual_files_stay_pending_unless_already_on_disk() {
+        let world = World::new(vec![]);
+        world.write_game_file(ID, "mods/have.jar", b"have it");
+        let have = manual("mods/have.jar", b"have it");
+        let missing = manual("mods/jei.jar", b"jei");
+
+        let synced = run(
+            &world,
+            &FakeDownloader::default(),
+            &[],
+            &[have.clone(), missing.clone()],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(synced.pending, std::slice::from_ref(&missing));
+        let manifests = world.manifests.manifests.lock().unwrap();
+        assert_eq!(manifests[&id()].pending, [missing]);
+        assert_eq!(
+            manifests[&id()].files.get(&rel("mods/have.jar")),
+            Some(&sha1_hex(b"have it"))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_sync_saves_no_manifest_and_writes_nothing() {
+        let world = World::new(vec![]);
+        let result = run(
+            &world,
+            &FailingDownloader,
+            &[remote("mods/a.jar", b"a")],
+            &[manual("mods/jei.jar", b"jei")],
+        )
+        .await;
+        assert!(matches!(result, Err(PackSyncError::Download(_))));
+        assert!(world.manifests.manifests.lock().unwrap().is_empty());
+        assert!(world.read_game_file(ID, "mods/a.jar").is_none());
+    }
+
+    #[tokio::test]
+    async fn cancellation_stops_before_downloading() {
+        let world = World::new(vec![]);
+        let downloader = serving(&[("mods/a.jar", b"a")]);
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        let result = sync(
+            &world,
+            &downloader,
+            &[remote("mods/a.jar", b"a")],
+            &[],
+            &cancel,
+        )
+        .await;
+        assert_eq!(result, Err(PackSyncError::Cancelled));
+        assert!(downloader.requests().is_empty());
+        assert!(world.manifests.manifests.lock().unwrap().is_empty());
     }
 }
