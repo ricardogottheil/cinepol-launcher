@@ -56,10 +56,12 @@ pub struct LaunchRequest {
     pub join_server: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LaunchOutcome {
     pub exit: GameExit,
     pub played_secs: u64,
+    /// The crash report the game wrote, when it exited with an error.
+    pub crash_report: Option<PathBuf>,
 }
 
 /// Everything the launcher talks to.
@@ -231,6 +233,7 @@ where
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
 
+    let crash_reports = game_dir.join(CRASH_REPORTS_DIR);
     let started = deps.clock.now();
     let exit = deps
         .runner
@@ -258,8 +261,32 @@ where
     latest.record_playtime(played_secs);
     deps.instances.save(&latest).await?;
 
-    Ok(LaunchOutcome { exit, played_secs })
+    // A crash is a failed exit plus a report written during this session.
+    let crash_report = if exit.success() || exit.killed_by_launcher {
+        None
+    } else {
+        let since = started.checked_sub(CLOCK_SKEW).unwrap_or(started);
+        match deps.fs.newest_file_since(&crash_reports, since).await {
+            Ok(report) => report,
+            Err(error) => {
+                tracing::warn!(%error, "could not look for a crash report");
+                None
+            }
+        }
+    };
+
+    Ok(LaunchOutcome {
+        exit,
+        played_secs,
+        crash_report,
+    })
 }
+
+/// Where the game writes crash reports, inside the game folder.
+pub const CRASH_REPORTS_DIR: &str = "crash-reports";
+
+/// File times and the launcher clock may disagree by a moment.
+const CLOCK_SKEW: Duration = Duration::from_secs(2);
 
 #[cfg(test)]
 mod tests {
@@ -277,6 +304,7 @@ mod tests {
         FixedClock, InMemoryAccountRepository, InMemoryInstanceRepository, RecordingLogSink,
         RecordingNativesExtractor, sample_asset_index, sample_profile, sample_version_spec,
     };
+    use std::time::SystemTime;
 
     struct World {
         instances: InMemoryInstanceRepository,
@@ -397,6 +425,57 @@ mod tests {
             account: None,
             join_server: None,
         }
+    }
+
+    fn crash_dir() -> PathBuf {
+        PathBuf::from("/data/instances/cinepol/minecraft/crash-reports")
+    }
+
+    async fn launch_exiting(world: &World) -> LaunchOutcome {
+        launch_instance(
+            &request(),
+            &world.deps(),
+            RecordingLogSink::default(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_failed_exit_with_a_new_crash_report_is_a_crash() {
+        let mut world = World::installed().await;
+        world.runner = FakeGameProcess::exiting_with(-1);
+        // The world's clock reads 1000 s since the epoch when the game starts.
+        world.fs.add_file_at(
+            crash_dir().join("crash-old-client.txt"),
+            SystemTime::UNIX_EPOCH + Duration::from_secs(10),
+        );
+        world.fs.add_file_at(
+            crash_dir().join("crash-2026-10-19_12.00.00-client.txt"),
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_005),
+        );
+        let outcome = launch_exiting(&world).await;
+        assert_eq!(
+            outcome.crash_report,
+            Some(crash_dir().join("crash-2026-10-19_12.00.00-client.txt"))
+        );
+    }
+
+    #[tokio::test]
+    async fn only_new_reports_after_a_failed_exit_count_as_crashes() {
+        let old = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
+        let new = SystemTime::UNIX_EPOCH + Duration::from_secs(1_005);
+
+        let mut stale = World::installed().await;
+        stale.runner = FakeGameProcess::exiting_with(1);
+        stale.fs.add_file_at(crash_dir().join("crash-old.txt"), old);
+        assert_eq!(launch_exiting(&stale).await.crash_report, None);
+
+        let mut clean = World::installed().await;
+        clean.runner = FakeGameProcess::exiting_with(0);
+        clean.fs.add_file_at(crash_dir().join("crash-new.txt"), new);
+        assert_eq!(launch_exiting(&clean).await.crash_report, None);
     }
 
     #[tokio::test]

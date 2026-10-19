@@ -60,6 +60,7 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::instances::install_instance,
             commands::instances::launch_instance,
             commands::instances::kill_instance,
+            commands::instances::open_crash_report,
             commands::instance_management::delete_instance,
             commands::instance_management::duplicate_instance,
             commands::instance_management::get_instance_settings,

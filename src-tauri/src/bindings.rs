@@ -331,6 +331,11 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             ManualDownloadsDto::name(cfg),
         ),
         command(
+            "open_crash_report",
+            vec![("instanceId", string()), ("fileName", string())],
+            "null".to_owned(),
+        ),
+        command(
             "list_servers",
             vec![("instanceId", string())],
             ServerListDto::name(cfg),
@@ -449,6 +454,7 @@ mod tests {
             "import_mrpack",
             "update_modpack",
             "export_mrpack",
+            "open_crash_report",
             "list_servers",
             "edit_server_list",
             "install_packwiz",

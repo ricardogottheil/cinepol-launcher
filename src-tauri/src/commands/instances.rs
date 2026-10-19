@@ -141,3 +141,55 @@ fn parse_loader(kind: &str, version: Option<&str>) -> Result<LoaderSpec, AppErro
         .map_err(|error| AppError::invalid_input(error.to_string()))?;
     LoaderSpec::new(kind, version).map_err(|error| AppError::invalid_input(error.to_string()))
 }
+
+/// Opens one of the instance's crash reports with the system's default app.
+/// Only a plain file name inside the instance's `crash-reports` folder is accepted.
+#[tauri::command]
+pub fn open_crash_report(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    instance_id: String,
+    file_name: String,
+) -> Result<(), AppError> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let id = parse_instance_id(&instance_id)?;
+    let single = is_report_name(&file_name);
+    if !single {
+        return Err(AppError::invalid_input("not a crash report name"));
+    }
+    let path = state
+        .paths
+        .game_dir(&id)
+        .join(launcher_core::application::launch_instance::CRASH_REPORTS_DIR)
+        .join(&file_name);
+    if !path.is_file() {
+        return Err(AppError::new(
+            ErrorCode::NotFound,
+            format!("{file_name} was not found"),
+        ));
+    }
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))
+}
+
+/// A plain file name: no separators, drive letters, NUL or dot segments.
+fn is_report_name(name: &str) -> bool {
+    !name.is_empty() && !name.contains(['/', '\\', ':', '\0']) && name != "." && name != ".."
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_report_name;
+
+    #[test]
+    fn crash_report_names_are_plain_file_names() {
+        assert!(is_report_name("crash-2026-10-19_12.00.00-client.txt"));
+        for bad in [
+            "", ".", "..", "../x.txt", "a/b.txt", "a\\b.txt", "C:x.txt", "a\0b",
+        ] {
+            assert!(!is_report_name(bad), "{bad:?}");
+        }
+    }
+}

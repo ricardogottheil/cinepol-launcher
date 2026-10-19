@@ -280,7 +280,9 @@
       "error": "Errors only",
       "search": "Search the log",
       "count": "{{shown}} of {{total}} lines"
-    }
+    },
+    "crashed": "The game closed because of an error.",
+    "openCrashReport": "Open crash report"
   },
   "settings": {
     "title": "Settings",

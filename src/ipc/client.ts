@@ -319,6 +319,11 @@ export function killInstance(instanceId: string): Promise<boolean> {
   return call("kill_instance", { instanceId });
 }
 
+/** Opens one of the instance's crash reports with the system's default app. */
+export async function openCrashReport(instanceId: string, fileName: string): Promise<void> {
+  await call("open_crash_report", { instanceId, fileName });
+}
+
 /** Deletes an instance and its whole folder, worlds included. */
 export async function deleteInstance(instanceId: string): Promise<void> {
   await call("delete_instance", { instanceId });

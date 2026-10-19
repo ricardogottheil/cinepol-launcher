@@ -32,6 +32,20 @@ impl FileSystem for TokioFileSystem {
         }
     }
 
+    async fn newest_file_since(
+        &self,
+        dir: &Path,
+        since: std::time::SystemTime,
+    ) -> Result<Option<std::path::PathBuf>, FileSystemError> {
+        let owned = dir.to_path_buf();
+        tokio::task::spawn_blocking(move || newest(&owned, since))
+            .await
+            .map_err(|e| FileSystemError {
+                path: String::new(),
+                reason: e.to_string(),
+            })?
+    }
+
     async fn copy_dir_all(&self, from: &Path, to: &Path) -> Result<(), FileSystemError> {
         let (from, to) = (from.to_path_buf(), to.to_path_buf());
         tokio::task::spawn_blocking(move || copy_tree(&from, &to))
@@ -41,6 +55,31 @@ impl FileSystem for TokioFileSystem {
                 reason: e.to_string(),
             })?
     }
+}
+
+fn newest(
+    dir: &Path,
+    since: std::time::SystemTime,
+) -> Result<Option<std::path::PathBuf>, FileSystemError> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(error(dir, &e)),
+    };
+    let mut best: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+    for entry in entries {
+        let entry = entry.map_err(|e| error(dir, &e))?;
+        // `metadata` from the entry does not follow symlinks.
+        let metadata = entry.metadata().map_err(|e| error(&entry.path(), &e))?;
+        if !metadata.is_file() {
+            continue;
+        }
+        let modified = metadata.modified().map_err(|e| error(&entry.path(), &e))?;
+        if modified >= since && best.as_ref().is_none_or(|(time, _)| modified > *time) {
+            best = Some((modified, entry.path()));
+        }
+    }
+    Ok(best.map(|(_, path)| path))
 }
 
 /// `to` is created with `create_dir` (not `create_dir_all`) so an existing
@@ -154,5 +193,28 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn finds_the_newest_file_written_since_a_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let fs = TokioFileSystem;
+        let reports = dir.path().join("crash-reports");
+        assert_eq!(
+            fs.newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH)
+                .await
+                .unwrap(),
+            None
+        );
+        std::fs::create_dir(&reports).unwrap();
+        let before = std::time::SystemTime::now() - std::time::Duration::from_secs(60);
+        std::fs::write(reports.join("crash-a.txt"), b"a").unwrap();
+        std::fs::create_dir(reports.join("folder")).unwrap();
+        assert_eq!(
+            fs.newest_file_since(&reports, before).await.unwrap(),
+            Some(reports.join("crash-a.txt"))
+        );
+        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
+        assert_eq!(fs.newest_file_since(&reports, later).await.unwrap(), None);
     }
 }

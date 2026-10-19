@@ -79,7 +79,11 @@ export type LogLineDto = { stream: LogStreamDto, line: string,
  */
 level: LogLevelDto | null, thread: string | null, logger: string | null, };
 
-export type LaunchOutcomeDto = { instanceId: string, exitCode: number | null, killed: boolean, playedSecs: number, };
+export type LaunchOutcomeDto = { instanceId: string, exitCode: number | null, killed: boolean, playedSecs: number, 
+/**
+ * File name of the crash report the game wrote, when it crashed.
+ */
+crashReport: string | null, };
 
 export type CommunityLinksDto = { website: string, twitch: string, discord: string, };
 
@@ -208,6 +212,7 @@ export interface Commands {
   import_packwiz: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto | null };
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
+  open_crash_report: { args: { instanceId: string; fileName: string }; result: null };
   list_servers: { args: { instanceId: string }; result: ServerListDto };
   edit_server_list: { args: { instanceId: string; change: ServerEditDto }; result: ServerListDto };
   export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };

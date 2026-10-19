@@ -206,6 +206,7 @@ pub struct FakeFileSystem {
     removed: Mutex<Vec<PathBuf>>,
     copies: Mutex<Vec<(PathBuf, PathBuf)>>,
     fail_copies: std::sync::atomic::AtomicBool,
+    modified: Mutex<Vec<(PathBuf, std::time::SystemTime)>>,
 }
 
 impl FakeFileSystem {
@@ -215,6 +216,7 @@ impl FakeFileSystem {
             removed: Mutex::default(),
             copies: Mutex::default(),
             fail_copies: Default::default(),
+            modified: Mutex::default(),
         }
     }
 
@@ -224,6 +226,12 @@ impl FakeFileSystem {
 
     pub fn removed(&self) -> Vec<PathBuf> {
         self.removed.lock().unwrap().clone()
+    }
+
+    /// A file with its modification time, for `newest_file_since`.
+    pub fn add_file_at(&self, path: PathBuf, modified: std::time::SystemTime) {
+        self.add(path.clone());
+        self.modified.lock().unwrap().push((path, modified));
     }
 
     /// Makes every later `copy_dir_all` fail (leaving nothing behind, as the port promises).
@@ -259,6 +267,21 @@ impl FileSystem for FakeFileSystem {
             .retain(|existing| !existing.starts_with(path));
         self.removed.lock().unwrap().push(path.to_path_buf());
         Ok(())
+    }
+
+    async fn newest_file_since(
+        &self,
+        dir: &Path,
+        since: std::time::SystemTime,
+    ) -> Result<Option<PathBuf>, FileSystemError> {
+        Ok(self
+            .modified
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(path, modified)| path.parent() == Some(dir) && *modified >= since)
+            .max_by_key(|(_, modified)| *modified)
+            .map(|(path, _)| path.clone()))
     }
 
     async fn copy_dir_all(&self, from: &Path, to: &Path) -> Result<(), FileSystemError> {

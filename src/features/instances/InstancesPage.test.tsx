@@ -27,6 +27,7 @@ const client = vi.hoisted(() => ({
   checkManualDownloads: vi.fn(),
   listServers: vi.fn(),
   editServerList: vi.fn(),
+  openCrashReport: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -56,7 +57,13 @@ const stored = {
   env: {},
   updatePackOnLaunch: false,
 } as const;
-const outcome = { instanceId: "survival", exitCode: 0, killed: false, playedSecs: 60 };
+const outcome = {
+  instanceId: "survival",
+  exitCode: 0,
+  killed: false,
+  playedSecs: 60,
+  crashReport: null as string | null,
+};
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
@@ -783,5 +790,24 @@ describe("InstancesPage", () => {
       fireEvent.click(within(row).getByRole("button", { name: serverLabels.remove }));
       expect(await within(panel).findByText(esCommon.errors.already_running)).toBeInTheDocument();
     });
+  });
+
+  it("reports a crash and opens its report", async () => {
+    const report = "crash-2026-10-19_12.00.00-client.txt";
+    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, crashReport: report });
+    client.openCrashReport.mockResolvedValue(undefined);
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    expect(await screen.findByText(labels.crashed)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: labels.openCrashReport }));
+    expect(client.openCrashReport).toHaveBeenCalledWith("survival", report);
+  });
+
+  it("keeps the plain exit message when the game failed without a report", async () => {
+    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1 });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    expect(await screen.findByText(labels.exited.replace("{{code}}", "1"))).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.openCrashReport })).not.toBeInTheDocument();
   });
 });

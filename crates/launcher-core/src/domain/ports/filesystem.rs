@@ -28,6 +28,14 @@ pub trait FileSystem: Send + Sync {
     /// `to` is an error, never merged or replaced. When the copy fails after
     /// `to` was created, `to` is removed again, and only then: a folder that
     /// existed before is never touched.
+    /// The newest regular file directly inside `dir` modified at or after
+    /// `since` (crash reports written during a launch); `None` when there is
+    /// none or the folder is missing.
+    fn newest_file_since(
+        &self,
+        dir: &Path,
+        since: std::time::SystemTime,
+    ) -> impl Future<Output = Result<Option<std::path::PathBuf>, FileSystemError>> + Send;
     fn copy_dir_all(
         &self,
         from: &Path,
