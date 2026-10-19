@@ -97,14 +97,14 @@ pub async fn login_microsoft(
     Ok(AccountDto::from(&result?))
 }
 
-/// Removes an account and its tokens.
+/// Removes an account and its tokens; instances pinned to it use the active account.
 #[tauri::command]
 pub async fn remove_account(
     state: State<'_, AppState>,
     account_id: String,
 ) -> Result<(), AppError> {
     let id = parse_account_id(&account_id)?;
-    Ok(remove(id, &state.accounts, &state.secrets).await?)
+    Ok(remove(id, &state.accounts, &state.secrets, &state.instances).await?)
 }
 
 /// The account's skin for the 3D preview; `null` when it has none.

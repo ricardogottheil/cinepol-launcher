@@ -166,7 +166,7 @@ where
 async fn update_from<I, C, A, D, F, P, M, R>(
     archive: &Path,
     origin: InstanceOrigin,
-    mut instance: Instance,
+    instance: Instance,
     deps: &UpdateModpackDeps<'_, I, C, A, D, F, P, M>,
     reporter: &R,
     cancel: &CancellationToken,
@@ -193,6 +193,8 @@ where
     )
     .await?;
 
+    // Re-read: the player may have edited the settings during the sync.
+    let mut instance = deps.instances.get(&instance.id).await?;
     let before = instance.clone();
     instance.game_version = index.game_version;
     instance.loader = index.loader;
@@ -606,6 +608,62 @@ mod tests {
                 .game_version
                 .as_str(),
             "26.2"
+        );
+    }
+
+    /// Saves a settings edit (a rename) while the first file batch downloads.
+    struct EditingDownloader<'a> {
+        inner: &'a crate::testing::FakeDownloader,
+        instances: &'a InMemoryInstanceRepository,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::domain::ports::Downloader for EditingDownloader<'_> {
+        async fn download_all<R: crate::domain::ports::ProgressReporter>(
+            &self,
+            requests: Vec<crate::domain::ports::DownloadRequest>,
+            reporter: &R,
+            cancel: &CancellationToken,
+        ) -> Result<crate::domain::ports::DownloadSummary, crate::domain::ports::DownloadError>
+        {
+            if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+                let id = InstanceId::parse(ID).unwrap();
+                let mut instance = self.instances.get(&id).await.unwrap();
+                instance.name = crate::domain::instance::InstanceName::parse("Renamed").unwrap();
+                self.instances.save(&instance).await.unwrap();
+            }
+            self.inner.download_all(requests, reporter, cancel).await
+        }
+    }
+
+    #[tokio::test]
+    async fn a_settings_edit_saved_during_an_update_is_kept() {
+        let world = world();
+        install_catalog(&world, "v1").await;
+        let id = InstanceId::parse(ID).unwrap();
+        let downloader = EditingDownloader {
+            inner: &world.downloader,
+            instances: &world.instances,
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        };
+        let result = update_modpack(
+            &id,
+            newest(),
+            &deps(&world, &downloader),
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert!(
+            matches!(result, Ok(UpdateOutcome::Updated { .. })),
+            "{result:?}"
+        );
+        let stored = world.instances.get(&id).await.unwrap();
+        assert_eq!(stored.game_version.as_str(), "26.3");
+        assert_eq!(
+            stored.name.as_str(),
+            "Renamed",
+            "the update overwrote the settings edit"
         );
     }
 }

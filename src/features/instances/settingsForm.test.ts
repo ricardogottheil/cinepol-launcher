@@ -76,4 +76,16 @@ describe("settingsForm", () => {
     expect(copy.length).toBe(64);
     expect(copy.endsWith(" (copy)")).toBe(true);
   });
+
+  it("cuts copy names on whole characters, counted like the backend", () => {
+    const es = (name: string) => `${name} (copia)`;
+    const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    for (const name of [`${"A".repeat(55)}😀`, "😀".repeat(64), "\u00f1".repeat(64)]) {
+      const copy = copyName(name, es);
+      expect(copy).not.toMatch(loneSurrogate);
+      expect(Array.from(copy).length).toBeLessThanOrEqual(64);
+      expect(copy.endsWith(" (copia)")).toBe(true);
+    }
+    expect(Array.from(copyName("😀".repeat(64), es)).length).toBe(64);
+  });
 });

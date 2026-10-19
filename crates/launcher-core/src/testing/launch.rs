@@ -205,6 +205,7 @@ pub struct FakeFileSystem {
     paths: Mutex<HashSet<PathBuf>>,
     removed: Mutex<Vec<PathBuf>>,
     copies: Mutex<Vec<(PathBuf, PathBuf)>>,
+    fail_copies: std::sync::atomic::AtomicBool,
 }
 
 impl FakeFileSystem {
@@ -213,6 +214,7 @@ impl FakeFileSystem {
             paths: Mutex::new(paths.into_iter().collect()),
             removed: Mutex::default(),
             copies: Mutex::default(),
+            fail_copies: Default::default(),
         }
     }
 
@@ -222,6 +224,12 @@ impl FakeFileSystem {
 
     pub fn removed(&self) -> Vec<PathBuf> {
         self.removed.lock().unwrap().clone()
+    }
+
+    /// Makes every later `copy_dir_all` fail after creating its target.
+    pub fn fail_copies(&self) {
+        self.fail_copies
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Every `copy_dir_all` call, as (from, to).
@@ -254,6 +262,13 @@ impl FileSystem for FakeFileSystem {
     }
 
     async fn copy_dir_all(&self, from: &Path, to: &Path) -> Result<(), FileSystemError> {
+        if self.fail_copies.load(std::sync::atomic::Ordering::SeqCst) {
+            self.paths.lock().unwrap().insert(to.to_path_buf());
+            return Err(FileSystemError {
+                path: to.display().to_string(),
+                reason: "permission denied".into(),
+            });
+        }
         let mut paths = self.paths.lock().unwrap();
         if paths.iter().any(|existing| existing.starts_with(to)) {
             return Err(FileSystemError {

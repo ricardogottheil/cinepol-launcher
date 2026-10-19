@@ -99,9 +99,20 @@ export function toSettings(values: SettingsFormValues): SettingsFormResult {
   };
 }
 
-/** A copy's name from a localized template, shortening the original to fit. */
+/**
+ * A copy's name from a localized template, shortening the original to fit.
+ * Lengths count code points, like the backend (`chars().count()`): cutting
+ * UTF-16 units could split an emoji, and the backend refuses a lone half.
+ */
 export function copyName(name: string, template: (name: string) => string): string {
-  const overflow = template(name).length - MAX_INSTANCE_NAME;
-  if (overflow <= 0) return template(name);
-  return template(name.slice(0, Math.max(1, name.length - overflow)).trimEnd());
+  const full = template(name);
+  const overflow = Array.from(full).length - MAX_INSTANCE_NAME;
+  if (overflow <= 0) return full;
+  const chars = Array.from(name);
+  return template(
+    chars
+      .slice(0, Math.max(1, chars.length - overflow))
+      .join("")
+      .trimEnd(),
+  );
 }

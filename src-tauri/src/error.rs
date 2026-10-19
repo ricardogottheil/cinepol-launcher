@@ -319,7 +319,9 @@ impl From<RemoveAccountError> for AppError {
     fn from(error: RemoveAccountError) -> Self {
         let code = match &error {
             RemoveAccountError::NotFound => ErrorCode::NotFound,
-            RemoveAccountError::Storage(_) => ErrorCode::Internal,
+            RemoveAccountError::Storage(_) | RemoveAccountError::Instances(_) => {
+                ErrorCode::Internal
+            }
             RemoveAccountError::Keychain(_) => ErrorCode::KeychainUnavailable,
         };
         Self::new(code, error.to_string())
