@@ -1,9 +1,12 @@
 import { create } from "zustand";
 import {
   type ClientErrorCode,
+  type InstanceDto,
   importMrpack,
+  importPackwiz,
   installModpack,
-  type ModpackInstallDto,
+  installPackwiz,
+  type ManualFileDto,
   type ProgressEvent,
   type ProgressStageDto,
   type ProgressUnitDto,
@@ -25,22 +28,35 @@ export type ModpackJob =
       cancel: () => Promise<boolean>;
     };
 
+/** The last pack installed, and how many of its files wait for a manual download. */
+export interface InstalledPack {
+  instance: InstanceDto;
+  pending: number;
+}
+
 interface ModpackJobState {
   job: ModpackJob;
   error: ClientErrorCode | null;
-  /** The last instance a pack was installed into. */
-  installed: ModpackInstallDto | null;
+  installed: InstalledPack | null;
   installVersion: (project: string, version: string, title: string) => Promise<void>;
   importFile: () => Promise<void>;
+  /** Installs the packwiz pack at an https `pack.toml` URL. */
+  installPackwizUrl: (url: string) => Promise<void>;
+  /** Asks for a local `pack.toml` and installs it. */
+  importPackwizFile: () => Promise<void>;
+}
+
+/** What every install command resolves with (the packwiz ones add `pending`). */
+interface InstallResult {
+  instance: InstanceDto;
+  pending?: ManualFileDto[];
 }
 
 /** Client-only state of modpack installs, kept across page changes. */
 export const useModpackJobStore = create<ModpackJobState>((set) => {
   const run = async (
     title: string | null,
-    start: (
-      onProgress: (event: ProgressEvent) => void,
-    ) => RunningOperation<ModpackInstallDto | null>,
+    start: (onProgress: (event: ProgressEvent) => void) => RunningOperation<InstallResult | null>,
   ) => {
     const operation = start((event) =>
       set({
@@ -69,8 +85,13 @@ export const useModpackJobStore = create<ModpackJobState>((set) => {
       installed: null,
     });
     try {
-      const installed = await operation.done;
-      set({ job: { kind: "idle" }, installed });
+      const result = await operation.done;
+      set({
+        job: { kind: "idle" },
+        installed: result
+          ? { instance: result.instance, pending: result.pending?.length ?? 0 }
+          : null,
+      });
     } catch (error) {
       set({ job: { kind: "idle" }, error: toIpcError(error).code });
     }
@@ -83,5 +104,7 @@ export const useModpackJobStore = create<ModpackJobState>((set) => {
     installVersion: (project, version, title) =>
       run(title, (onProgress) => installModpack(project, version, onProgress)),
     importFile: () => run(null, (onProgress) => importMrpack(onProgress)),
+    installPackwizUrl: (url) => run(url, (onProgress) => installPackwiz(url, onProgress)),
+    importPackwizFile: () => run(null, (onProgress) => importPackwiz(onProgress)),
   };
 });

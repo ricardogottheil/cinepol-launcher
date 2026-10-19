@@ -11,6 +11,8 @@ const client = vi.hoisted(() => ({
   getModpack: vi.fn(),
   installModpack: vi.fn(),
   importMrpack: vi.fn(),
+  installPackwiz: vi.fn(),
+  importPackwiz: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -166,5 +168,52 @@ describe("ModpacksPage", () => {
     client.searchModpacks.mockRejectedValue(new IpcError("rate_limited", "slow down"));
     renderWithQuery(<ModpacksPage />);
     expect(await screen.findByText(esCommon.errors.rate_limited)).toBeInTheDocument();
+  });
+});
+
+describe("ModpacksPage packwiz", () => {
+  const packwiz = esCommon.modpacks.packwiz;
+  const jei = {
+    name: "Just Enough Items (JEI)",
+    filename: "jei-1.20.1-forge-15.20.0.133.jar",
+    pageUrl: "https://www.curseforge.com/projects/238222",
+  };
+
+  it("installs a pack from its pack.toml URL and says what is left to download", async () => {
+    client.installPackwiz.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({ ...installed, pending: [jei] }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<ModpacksPage />);
+    const url = "https://example.com/pack/pack.toml";
+    fireEvent.change(await screen.findByLabelText(packwiz.urlLabel), {
+      target: { value: ` ${url} ` },
+    });
+    fireEvent.click(screen.getByRole("button", { name: packwiz.install }));
+    expect(client.installPackwiz).toHaveBeenCalledWith(url, expect.any(Function));
+    expect(
+      await screen.findByText(
+        labels.installedPending_one.replace("{{name}}", instance.name).replace("{{count}}", "1"),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not install without a URL", async () => {
+    renderWithQuery(<ModpacksPage />);
+    expect(await screen.findByRole("button", { name: packwiz.install })).toBeDisabled();
+  });
+
+  it("opens a local pack.toml with the picker", async () => {
+    client.importPackwiz.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({ ...installed, pending: [] }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<ModpacksPage />);
+    fireEvent.click(await screen.findByRole("button", { name: packwiz.import }));
+    expect(
+      await screen.findByText(labels.installed.replace("{{name}}", instance.name)),
+    ).toBeInTheDocument();
   });
 });

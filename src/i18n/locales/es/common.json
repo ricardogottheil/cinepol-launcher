@@ -240,7 +240,17 @@
       "deleteBody": "Se borra su carpeta con los mundos, los mods y la configuración. No se puede deshacer.",
       "deleteConfirm": "Eliminar",
       "jvmArgsHint": "No se permiten opciones que cargan código (agentes de Java, -XX:OnError).",
-      "envHint": "No se permiten variables que cargan código (JAVA_TOOL_OPTIONS, LD_PRELOAD, DYLD_*)."
+      "envHint": "No se permiten variables que cargan código (JAVA_TOOL_OPTIONS, LD_PRELOAD, DYLD_*).",
+      "updateOnLaunch": "Actualizar el pack antes de cada inicio"
+    },
+    "manual": {
+      "title": "Descargas manuales requeridas",
+      "body": "CurseForge no deja que el launcher descargue estos archivos. Descarga cada uno desde su página; el launcher lo toma de tu carpeta de Descargas y lo verifica.",
+      "open": "Abrir página",
+      "check": "Buscar ahora",
+      "done": "Todos los archivos están instalados.",
+      "waiting_one": "Falta {{count}} archivo",
+      "waiting_other": "Faltan {{count}} archivos"
     }
   },
   "settings": {
@@ -292,6 +302,16 @@
     "installing": "Instalando {{name}}",
     "importing": "Importando el modpack",
     "cancel": "Cancelar",
-    "installed": "{{name}} está listo en Instancias."
+    "installed": "{{name}} está listo en Instancias.",
+    "packwiz": {
+      "title": "packwiz",
+      "source": "Desde un pack.toml",
+      "urlLabel": "URL del pack.toml",
+      "urlHint": "Un enlace https a un pack.toml de packwiz",
+      "install": "Instalar pack",
+      "import": "Abrir pack.toml"
+    },
+    "installedPending_one": "{{name}} necesita {{count}} archivo que descargas a mano. Termínalo en Instancias.",
+    "installedPending_other": "{{name}} necesita {{count}} archivos que descargas a mano. Termínalo en Instancias."
   }
 }

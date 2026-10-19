@@ -8,8 +8,9 @@ import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "./activi
 import { splitPlaytime } from "./formatPlaytime";
 import { InstanceSettingsPanel } from "./InstanceSettingsPanel";
 import { LogPanel } from "./LogPanel";
+import { ManualDownloadsPanel } from "./ManualDownloadsPanel";
 import { ProgressMeter } from "./ProgressMeter";
-import { instancesKey } from "./useInstances";
+import { instancesKey, useManualDownloads } from "./useInstances";
 
 export function InstanceRow({ instance }: { instance: InstanceDto }) {
   const { t } = useTranslation();
@@ -21,6 +22,13 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
       ? cinepolSession
       : own;
   const { install, play, stop, updatePack, exportPack } = useActivityStore();
+  const packSource =
+    instance.modpackSource === "modrinth" || instance.modpackSource === "packwiz"
+      ? instance.modpackSource
+      : null;
+  const isPackwiz = packSource === "packwiz";
+  const manual = useManualDownloads(instance.id, isPackwiz);
+  const waitingForFiles = (manual.data?.remaining.length ?? 0) > 0;
   const busy = activity.kind !== "idle";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -55,8 +63,8 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
             <Button onClick={() => void stop(instance.id)}>{t("instances.stop")}</Button>
           ) : (
             <>
-              {instance.origin === "modpack" ? (
-                <Button onClick={() => void updatePack(instance.id)} disabled={busy}>
+              {packSource ? (
+                <Button onClick={() => void updatePack(instance.id, packSource)} disabled={busy}>
                   {t("instances.update")}
                 </Button>
               ) : null}
@@ -66,7 +74,12 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
               <Button onClick={() => void install(instance.id)} disabled={busy}>
                 {t("instances.install")}
               </Button>
-              <Button onClick={() => void play(instance.id)} disabled={busy}>
+              <Button
+                onClick={() =>
+                  void play(instance.id, { syncPack: isPackwiz && instance.updatePackOnLaunch })
+                }
+                disabled={busy || waitingForFiles}
+              >
                 {t("instances.play")}
               </Button>
             </>
@@ -113,6 +126,15 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
           </span>
         ) : null}
       </p>
+
+      {isPackwiz && manual.data && (waitingForFiles || manual.data.resolved.length > 0) ? (
+        <ManualDownloadsPanel
+          downloads={manual.data}
+          error={manual.error}
+          checking={manual.isFetching}
+          onCheck={() => void manual.refetch()}
+        />
+      ) : null}
 
       {settingsOpen ? <InstanceSettingsPanel instance={instance} busy={busy} /> : null}
 

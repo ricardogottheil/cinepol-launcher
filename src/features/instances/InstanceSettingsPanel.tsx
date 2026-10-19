@@ -51,14 +51,27 @@ export function InstanceSettingsPanel({
       ) : settings.isError ? (
         <p className="m-0 text-stale">{t(`errors.${toIpcError(settings.error).code}`)}</p>
       ) : (
-        <SettingsForm instanceId={instance.id} stored={settings.data} />
+        <SettingsForm
+          instanceId={instance.id}
+          stored={settings.data}
+          packwiz={instance.modpackSource === "packwiz"}
+        />
       )}
       <Management instance={instance} busy={busy} />
     </section>
   );
 }
 
-function SettingsForm({ instanceId, stored }: { instanceId: string; stored: InstanceSettingsDto }) {
+function SettingsForm({
+  instanceId,
+  stored,
+  packwiz,
+}: {
+  instanceId: string;
+  stored: InstanceSettingsDto;
+  /** Only packwiz instances can sync their pack before launching. */
+  packwiz: boolean;
+}) {
   const { t } = useTranslation();
   const [values, setValues] = useState<SettingsFormValues>(() => toFormValues(stored));
   const [invalid, setInvalid] = useState<{ field: SettingsField; line?: number } | null>(null);
@@ -169,6 +182,17 @@ function SettingsForm({ instanceId, stored }: { instanceId: string; stored: Inst
           onChange={(event) => set({ maxMemory: event.target.value })}
         />
       </div>
+
+      {packwiz ? (
+        <label className="flex items-center gap-3 text-silk-dim">
+          <input
+            type="checkbox"
+            checked={values.updatePackOnLaunch}
+            onChange={(event) => set({ updatePackOnLaunch: event.target.checked })}
+          />
+          {t("instances.settings.updateOnLaunch")}
+        </label>
+      ) : null}
 
       <div className="flex flex-col gap-4">
         <label className="flex items-center gap-3 text-silk-dim">

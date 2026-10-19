@@ -37,7 +37,9 @@ export function ModpacksPage() {
     page,
     pageSize: MODPACK_PAGE_SIZE,
   });
-  const { job, error, installed, importFile } = useModpackJobStore();
+  const { job, error, installed, importFile, installPackwizUrl, importPackwizFile } =
+    useModpackJobStore();
+  const [packUrl, setPackUrl] = useState("");
   const busy = job.kind !== "idle";
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -93,12 +95,48 @@ export function ModpacksPage() {
           <span className="text-stale">{t(`errors.${error}`)}</span>
         ) : installed ? (
           <span className="text-silk-dim">
-            {t("modpacks.installed", { name: installed.instance.name })}
+            {installed.pending > 0
+              ? t("modpacks.installedPending", {
+                  name: installed.instance.name,
+                  count: installed.pending,
+                })
+              : t("modpacks.installed", { name: installed.instance.name })}
           </span>
         ) : null}
       </p>
 
-      <div className="flex flex-wrap items-start gap-4">
+      <section
+        aria-label={t("modpacks.packwiz.title")}
+        className="flex flex-col gap-4 border-t border-hairline pt-6"
+      >
+        <span className="plate text-engrave">{t("modpacks.packwiz.source")}</span>
+        <form
+          className="flex flex-wrap items-end gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void installPackwizUrl(packUrl.trim());
+          }}
+        >
+          <TextField
+            label={t("modpacks.packwiz.urlLabel")}
+            hint={t("modpacks.packwiz.urlHint")}
+            type="url"
+            inputMode="url"
+            placeholder="https://"
+            value={packUrl}
+            className="min-w-[320px] flex-1"
+            onChange={(event) => setPackUrl(event.target.value)}
+          />
+          <Button type="submit" disabled={busy || packUrl.trim() === ""}>
+            {t("modpacks.packwiz.install")}
+          </Button>
+          <Button onClick={() => void importPackwizFile()} disabled={busy}>
+            {t("modpacks.packwiz.import")}
+          </Button>
+        </form>
+      </section>
+
+      <div className="flex flex-wrap items-start gap-4 border-t border-hairline pt-6">
         <TextField
           label={t("modpacks.searchLabel")}
           placeholder={t("modpacks.searchPlaceholder")}

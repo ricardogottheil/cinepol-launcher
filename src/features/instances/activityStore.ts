@@ -8,11 +8,13 @@ import {
   type LaunchOutcomeDto,
   type LogLineDto,
   launchInstance,
+  type ProgressEvent,
   type ProgressStageDto,
   type ProgressUnitDto,
   playOnCinepol,
   toIpcError,
   updateModpack,
+  updatePackwiz,
 } from "../../ipc/client";
 
 /** Store key of the "Play on CINEPOL" session (instance ids never contain a colon). */
@@ -39,6 +41,9 @@ export type Activity =
       cancel?: () => Promise<boolean>;
     };
 
+/** The catalogs an instance can be updated from. */
+export type PackSource = "modrinth" | "packwiz";
+
 /** The outcome of the last modpack update or export, shown under the row. */
 export type ActivityNotice =
   | { kind: "updated"; kept: number }
@@ -56,10 +61,12 @@ export interface InstanceActivity {
 interface ActivityState {
   byInstance: Record<string, InstanceActivity>;
   install: (instanceId: string) => Promise<InstallSummaryDto | null>;
-  play: (instanceId: string) => Promise<LaunchOutcomeDto | null>;
+  /** `syncPack` updates a packwiz instance first, and plays only if that worked. */
+  play: (instanceId: string, options?: { syncPack?: boolean }) => Promise<LaunchOutcomeDto | null>;
   stop: (instanceId: string) => Promise<void>;
   /** Updates a modpack instance in place, keeping the player's changes. */
-  updatePack: (instanceId: string) => Promise<void>;
+  /** Resolves `true` when the update finished. */
+  updatePack: (instanceId: string, source?: PackSource) => Promise<boolean>;
   /** Asks where to save and exports the instance as a `.mrpack`. */
   exportPack: (instanceId: string) => Promise<void>;
   playCinepol: () => Promise<LaunchOutcomeDto | null>;
@@ -116,8 +123,8 @@ export const useActivityStore = create<ActivityState>((set) => {
     }
   };
 
-  const updatePack = async (instanceId: string) => {
-    const operation = updateModpack(instanceId, (event) =>
+  const updatePack = async (instanceId: string, source: PackSource = "modrinth") => {
+    const onProgress = (event: ProgressEvent) =>
       update(instanceId, {
         activity: {
           kind: "installing",
@@ -127,8 +134,11 @@ export const useActivityStore = create<ActivityState>((set) => {
           unit: event.unit,
           cancel: operation.cancel,
         },
-      }),
-    );
+      });
+    const operation =
+      source === "packwiz"
+        ? updatePackwiz(instanceId, onProgress)
+        : updateModpack(instanceId, onProgress);
     update(instanceId, {
       activity: {
         kind: "installing",
@@ -143,14 +153,15 @@ export const useActivityStore = create<ActivityState>((set) => {
     });
     try {
       const outcome = await operation.done;
-      update(instanceId, {
-        activity: { kind: "idle" },
-        notice: outcome.upToDate
+      const notice: ActivityNotice =
+        "upToDate" in outcome && outcome.upToDate
           ? { kind: "upToDate" }
-          : { kind: "updated", kept: outcome.files?.kept ?? 0 },
-      });
+          : { kind: "updated", kept: outcome.files?.kept ?? 0 };
+      update(instanceId, { activity: { kind: "idle" }, notice });
+      return true;
     } catch (error) {
       update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
+      return false;
     }
   };
 
@@ -167,7 +178,11 @@ export const useActivityStore = create<ActivityState>((set) => {
     }
   };
 
-  const play = async (instanceId: string): Promise<LaunchOutcomeDto | null> => {
+  const play = async (
+    instanceId: string,
+    options: { syncPack?: boolean } = {},
+  ): Promise<LaunchOutcomeDto | null> => {
+    if (options.syncPack && !(await updatePack(instanceId, "packwiz"))) return null;
     const appendLine = (line: LogLineDto) =>
       set((state) => {
         const current = state.byInstance[instanceId] ?? IDLE;

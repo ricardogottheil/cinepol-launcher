@@ -23,6 +23,8 @@ const client = vi.hoisted(() => ({
   duplicateInstance: vi.fn(),
   deleteInstance: vi.fn(),
   listAccounts: vi.fn(),
+  updatePackwiz: vi.fn(),
+  checkManualDownloads: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -301,13 +303,25 @@ describe("InstancesPage", () => {
   it("offers modpack updates only on modpack instances and reports kept changes", async () => {
     client.listInstances.mockResolvedValue([
       instance,
-      { ...instance, id: "fo", name: "Fabulously Optimized", origin: "modpack" },
+      {
+        ...instance,
+        id: "fo",
+        name: "Fabulously Optimized",
+        origin: "modpack",
+        modpackSource: "modrinth",
+      },
     ]);
     client.updateModpack.mockReturnValue({
       operationId: "op",
       done: Promise.resolve({
         upToDate: false,
-        instance: { ...instance, id: "fo", name: "Fabulously Optimized", origin: "modpack" },
+        instance: {
+          ...instance,
+          id: "fo",
+          name: "Fabulously Optimized",
+          origin: "modpack",
+          modpackSource: "modrinth",
+        },
         files: { written: 3, unchanged: 40, kept: 2, removed: 1 },
       }),
       cancel: vi.fn(),
@@ -327,7 +341,9 @@ describe("InstancesPage", () => {
   });
 
   it("says when a modpack is already up to date", async () => {
-    client.listInstances.mockResolvedValue([{ ...instance, origin: "modpack" }]);
+    client.listInstances.mockResolvedValue([
+      { ...instance, origin: "modpack", modpackSource: "modrinth" },
+    ]);
     client.updateModpack.mockReturnValue({
       operationId: "op",
       done: Promise.resolve({ upToDate: true, instance: null, files: null }),
@@ -372,7 +388,9 @@ describe("InstancesPage", () => {
   });
 
   it("shows why an update failed and frees the row", async () => {
-    client.listInstances.mockResolvedValue([{ ...instance, origin: "modpack" }]);
+    client.listInstances.mockResolvedValue([
+      { ...instance, origin: "modpack", modpackSource: "modrinth" },
+    ]);
     client.updateModpack.mockImplementation(() => ({
       operationId: "op",
       done: Promise.reject(new IpcError("network", "offline")),
@@ -516,5 +534,106 @@ describe("InstancesPage", () => {
       }),
     );
     expect(await within(panel).findByText(esCommon.errors.already_running)).toBeInTheDocument();
+  });
+
+  const packwizInstance = {
+    ...instance,
+    id: "gto",
+    name: "GregTech Odyssey",
+    origin: "modpack",
+    modpackSource: "packwiz",
+    updatePackOnLaunch: false,
+  } as const;
+  const jei = {
+    name: "Just Enough Items (JEI)",
+    filename: "jei-1.20.1-forge-15.20.0.133.jar",
+    pageUrl: "https://www.curseforge.com/projects/238222",
+  };
+  const manual = esCommon.instances.manual;
+
+  it("updates packwiz instances from their pack", async () => {
+    client.listInstances.mockResolvedValue([packwizInstance]);
+    client.checkManualDownloads.mockResolvedValue({ resolved: [], remaining: [] });
+    client.updatePackwiz.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({
+        instance: packwizInstance,
+        files: { written: 1, unchanged: 3, kept: 0, removed: 0 },
+        pending: [],
+      }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.update }));
+    expect(client.updatePackwiz).toHaveBeenCalledWith("gto", expect.any(Function));
+    expect(client.updateModpack).not.toHaveBeenCalled();
+    expect(await screen.findByText(labels.updated)).toBeInTheDocument();
+  });
+
+  it("lists manual downloads, links their pages and finishes when they arrive", async () => {
+    client.listInstances.mockResolvedValue([packwizInstance]);
+    client.checkManualDownloads
+      .mockResolvedValueOnce({ resolved: [], remaining: [jei] })
+      .mockResolvedValue({ resolved: [jei], remaining: [] });
+    renderWithQuery(<InstancesPage />);
+    const panel = await screen.findByRole("region", { name: manual.title });
+    expect(within(panel).getByText(jei.name)).toBeInTheDocument();
+    expect(within(panel).getByText(jei.filename)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.play })).toBeDisabled();
+    fireEvent.click(within(panel).getByRole("button", { name: manual.open }));
+    expect(client.openExternal).toHaveBeenCalledWith(jei.pageUrl);
+
+    fireEvent.click(within(panel).getByRole("button", { name: manual.check }));
+    expect(await screen.findByText(manual.done)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.play })).toBeEnabled();
+  });
+
+  it("syncs the pack before playing when the instance asks for it", async () => {
+    client.listInstances.mockResolvedValue([{ ...packwizInstance, updatePackOnLaunch: true }]);
+    client.checkManualDownloads.mockResolvedValue({ resolved: [], remaining: [] });
+    client.updatePackwiz.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({
+        instance: packwizInstance,
+        files: { written: 0, unchanged: 4, kept: 0, removed: 0 },
+        pending: [],
+      }),
+      cancel: vi.fn(),
+    });
+    client.launchInstance.mockResolvedValue({ ...outcome, instanceId: "gto" });
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    await waitFor(() => expect(client.launchInstance).toHaveBeenCalled());
+    expect(client.updatePackwiz).toHaveBeenCalledWith("gto", expect.any(Function));
+    expect(client.updatePackwiz.mock.invocationCallOrder[0]).toBeLessThan(
+      client.launchInstance.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it("offers the update-on-launch option only for packwiz instances", async () => {
+    client.listInstances.mockResolvedValue([packwizInstance]);
+    client.checkManualDownloads.mockResolvedValue({ resolved: [], remaining: [] });
+    client.updateInstanceSettings.mockImplementation((_id: string, settings: unknown) =>
+      Promise.resolve(settings),
+    );
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: settingsLabels.open }));
+    const panel = await screen.findByRole("region", { name: settingsLabels.title });
+    fireEvent.click(await within(panel).findByLabelText(settingsLabels.updateOnLaunch));
+    fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.save }));
+    await waitFor(() =>
+      expect(client.updateInstanceSettings).toHaveBeenCalledWith(
+        "gto",
+        expect.objectContaining({ updatePackOnLaunch: true }),
+      ),
+    );
+  });
+
+  it("does not show the update-on-launch option for other instances", async () => {
+    renderWithQuery(<InstancesPage />);
+    fireEvent.click(await screen.findByRole("button", { name: settingsLabels.open }));
+    const panel = await screen.findByRole("region", { name: settingsLabels.title });
+    await within(panel).findByLabelText(labels.nameLabel);
+    expect(within(panel).queryByLabelText(settingsLabels.updateOnLaunch)).not.toBeInTheDocument();
   });
 });

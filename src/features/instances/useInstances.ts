@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  checkManualDownloads,
   createInstance,
   deleteInstance,
   duplicateInstance,
@@ -79,5 +80,19 @@ export function useDeleteInstance(instanceId: string) {
   return useMutation({
     mutationFn: () => deleteInstance(instanceId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: instancesKey }),
+  });
+}
+
+/** While files wait for a manual download, the Downloads folder is checked this often. */
+export const MANUAL_DOWNLOADS_POLL_MS = 3000;
+
+/** A packwiz instance's pending manual downloads; checking also installs the ones found. */
+export function useManualDownloads(instanceId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["manual-downloads", instanceId],
+    queryFn: () => checkManualDownloads(instanceId),
+    enabled,
+    refetchInterval: (query) =>
+      (query.state.data?.remaining.length ?? 0) > 0 ? MANUAL_DOWNLOADS_POLL_MS : false,
   });
 }

@@ -240,7 +240,17 @@
       "deleteBody": "This deletes its folder with its worlds, mods and settings. It cannot be undone.",
       "deleteConfirm": "Delete",
       "jvmArgsHint": "Flags that load code (Java agents, -XX:OnError) are not allowed.",
-      "envHint": "Variables that load code (JAVA_TOOL_OPTIONS, LD_PRELOAD, DYLD_*) are not allowed."
+      "envHint": "Variables that load code (JAVA_TOOL_OPTIONS, LD_PRELOAD, DYLD_*) are not allowed.",
+      "updateOnLaunch": "Update the pack before every launch"
+    },
+    "manual": {
+      "title": "Manual downloads required",
+      "body": "CurseForge does not let the launcher download these files. Download each one from its page; the launcher picks it up from your Downloads folder and checks it.",
+      "open": "Open page",
+      "check": "Check now",
+      "done": "All files are installed.",
+      "waiting_one": "Waiting for {{count}} file",
+      "waiting_other": "Waiting for {{count}} files"
     }
   },
   "settings": {
@@ -292,6 +302,16 @@
     "installing": "Installing {{name}}",
     "importing": "Importing the modpack",
     "cancel": "Cancel",
-    "installed": "{{name}} is ready in Instances."
+    "installed": "{{name}} is ready in Instances.",
+    "packwiz": {
+      "title": "packwiz",
+      "source": "From a pack.toml",
+      "urlLabel": "pack.toml URL",
+      "urlHint": "An https link to a packwiz pack.toml",
+      "install": "Install pack",
+      "import": "Open pack.toml"
+    },
+    "installedPending_one": "{{name}} needs {{count}} file you download by hand. Finish it in Instances.",
+    "installedPending_other": "{{name}} needs {{count}} files you download by hand. Finish it in Instances."
   }
 }
