@@ -23,7 +23,9 @@ game rewrites `servers.dat` when it exits, and writes a crash report into
   decoder in the domain. log4j events (also when split across lines, with
   split CDATA sections and escaped attributes) become entries with a level,
   thread, logger and message, the throwable appended to the message. Other
-  lines pass through as plain entries. Sinks that only show text receive the
+  lines pass through as plain entries, also when they are printed while an
+  event is still open (outside its CDATA, log4j writes only its own tags).
+  Sinks that only show text receive the
   message (`LogSink::entry` defaults to `line`).
 - **Log viewer:** the instance log shows the thread and level of log4j lines,
   filters by minimum level (plain stdout counts as info, plain stderr as an

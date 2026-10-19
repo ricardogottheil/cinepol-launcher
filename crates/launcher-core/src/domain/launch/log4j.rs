@@ -81,6 +81,31 @@ struct Partial {
     text: String,
     /// The original lines, shown as plain text if the event never closes.
     raw: Vec<String>,
+    /// Whether the text so far ends inside an unclosed CDATA section.
+    in_cdata: bool,
+}
+
+/// Whether `line` ends inside a CDATA section, given whether it started in one.
+fn ends_in_cdata(mut in_cdata: bool, mut line: &str) -> bool {
+    loop {
+        let (marker, next) = if in_cdata {
+            ("]]>", false)
+        } else {
+            ("<![CDATA[", true)
+        };
+        let Some(at) = line.find(marker) else {
+            return in_cdata;
+        };
+        line = &line[at + marker.len()..];
+        in_cdata = next;
+    }
+}
+
+/// log4j writes only its own tags (and indentation) outside CDATA; any other
+/// line there was printed by someone else while the event was being written.
+fn is_markup(line: &str) -> bool {
+    let line = line.trim();
+    line.is_empty() || line.starts_with("<log4j:") || line.starts_with("</log4j:")
 }
 
 /// An event longer than this is not log4j output after all (or never closes):
@@ -104,16 +129,22 @@ impl Log4jDecoder {
                 timestamp_ms: attribute(header, "timestamp").and_then(|ts| ts.parse().ok()),
                 text: String::new(),
                 raw: vec![line.to_owned()],
+                in_cdata: false,
             };
             partial
                 .text
                 .push_str(rest.get(header_end + 1..).unwrap_or_default());
+            partial.in_cdata = ends_in_cdata(false, &partial.text);
             if partial.text.contains(EVENT_END) {
                 return vec![partial.finish(stream)];
             }
             self.event = Some(partial);
             return Vec::new();
         };
+        if !event.in_cdata && !is_markup(line) {
+            return vec![LogEntry::plain(stream, line.to_owned())];
+        }
+        event.in_cdata = ends_in_cdata(event.in_cdata, line);
         event.text.push('\n');
         event.text.push_str(line);
         event.raw.push(line.to_owned());
@@ -347,6 +378,25 @@ mod tests {
     }
 
     #[test]
+    fn a_plain_line_printed_inside_an_open_event_is_not_lost() {
+        let entries = decode(&[
+            r#"<log4j:Event logger="x" timestamp="4" level="INFO" thread="t">"#,
+            "<log4j:Message><![CDATA[first",
+            "still the message]]></log4j:Message>",
+            "System.out from a mod",
+            "",
+            "</log4j:Event>",
+        ]);
+        let messages: Vec<&str> = entries.iter().map(|e| e.message.as_str()).collect();
+        assert_eq!(
+            messages,
+            ["System.out from a mod", "first\nstill the message"]
+        );
+        assert_eq!(entries[0].level, None);
+        assert_eq!(entries[1].level, Some(LogLevel::Info));
+    }
+
+    #[test]
     fn an_unknown_level_is_kept_as_none() {
         let entries = decode(&[
             r#"<log4j:Event logger="x" timestamp="nope" level="NOTICE" thread="t">"#,
@@ -395,7 +445,9 @@ mod tests {
             LogStream::Stdout,
             r#"<log4j:Event logger="x" timestamp="5" level="INFO" thread="t">"#,
         );
-        for n in 0..MAX_EVENT_LINES {
+        // A message whose CDATA never closes holds every following line.
+        entries.extend(decoder.feed(LogStream::Stdout, "<log4j:Message><![CDATA[start"));
+        for n in 0..MAX_EVENT_LINES - 1 {
             entries.extend(decoder.feed(LogStream::Stdout, &format!("line {n}")));
         }
         // Nothing is held back forever: the raw lines come out as plain text.
@@ -403,7 +455,7 @@ mod tests {
         assert!(entries.iter().all(|entry| entry.level.is_none()));
         assert_eq!(
             entries.last().unwrap().message,
-            format!("line {}", MAX_EVENT_LINES - 1)
+            format!("line {}", MAX_EVENT_LINES - 2)
         );
         let next = decoder.feed(LogStream::Stdout, "after");
         assert_eq!(next[0].message, "after");
