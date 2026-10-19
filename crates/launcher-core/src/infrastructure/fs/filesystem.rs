@@ -69,16 +69,25 @@ fn newest(
     let mut best: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
     // An entry that cannot be read (removed meanwhile, no permission) is
     // skipped: it must not hide a report that can be read.
-    for entry in entries.flatten() {
-        // `metadata` from the entry does not follow symlinks.
-        let Ok(metadata) = entry.metadata() else {
-            continue;
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                tracing::debug!(dir = %dir.display(), %error, "skipping an unreadable entry");
+                continue;
+            }
         };
-        if !metadata.is_file() {
-            continue;
-        }
-        let Ok(modified) = metadata.modified() else {
-            continue;
+        // `metadata` from the entry does not follow symlinks.
+        let modified = match entry
+            .metadata()
+            .and_then(|metadata| Ok((metadata.is_file(), metadata.modified()?)))
+        {
+            Ok((true, modified)) => modified,
+            Ok((false, _)) => continue,
+            Err(error) => {
+                tracing::debug!(path = %entry.path().display(), %error, "skipping an unreadable entry");
+                continue;
+            }
         };
         if modified >= since && best.as_ref().is_none_or(|(time, _)| modified > *time) {
             best = Some((modified, entry.path()));
@@ -233,6 +242,11 @@ mod tests {
         std::fs::write(reports.join("crash-a.txt"), b"a").unwrap();
         // Without the execute bit the names can be listed but not stat'ed.
         std::fs::set_permissions(&reports, std::fs::Permissions::from_mode(0o644)).unwrap();
+        if std::fs::metadata(reports.join("crash-a.txt")).is_ok() {
+            // Running as root: permissions do not stop it, so nothing to test.
+            std::fs::set_permissions(&reports, std::fs::Permissions::from_mode(0o755)).unwrap();
+            return;
+        }
 
         let result = TokioFileSystem
             .newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH)
