@@ -53,16 +53,18 @@ impl ReqwestHttpClient {
         &self.client
     }
 
-    /// Sends a GET, or a JSON POST when `json` is set, with retries.
+    /// Sends a GET, or a JSON POST when `json` is set, with retries; a body
+    /// over `limit` is refused as soon as it is known to be too large.
     async fn send_with_retries(
         &self,
         url: &str,
         json: Option<&[u8]>,
+        limit: Option<usize>,
     ) -> Result<Vec<u8>, HttpError> {
         let mut backoff = self.initial_backoff;
         let mut attempt = 1;
         loop {
-            match self.attempt(url, json).await {
+            match self.attempt(url, json, limit).await {
                 Attempt::Done(result) => return result,
                 Attempt::Retry(error, _) if attempt >= MAX_ATTEMPTS => return Err(error),
                 Attempt::Retry(error, retry_after) => {
@@ -75,7 +77,7 @@ impl ReqwestHttpClient {
         }
     }
 
-    async fn attempt(&self, url: &str, json: Option<&[u8]>) -> Attempt {
+    async fn attempt(&self, url: &str, json: Option<&[u8]>, limit: Option<usize>) -> Attempt {
         let network = |error: reqwest::Error| HttpError::Network {
             url: url.to_owned(),
             reason: error.without_url().to_string(),
@@ -95,10 +97,7 @@ impl ReqwestHttpClient {
         };
         let status = response.status();
         if status.is_success() {
-            return match response.bytes().await {
-                Ok(body) => Attempt::Done(Ok(body.to_vec())),
-                Err(error) => Attempt::Retry(network(error), None),
-            };
+            return read_body(response, url, limit).await;
         }
         if status == StatusCode::NOT_FOUND {
             return Attempt::Done(Err(HttpError::NotFound(url.to_owned())));
@@ -128,6 +127,44 @@ impl ReqwestHttpClient {
     }
 }
 
+/// Reads a successful answer; past `limit` it stops reading and refuses it.
+async fn read_body(mut response: reqwest::Response, url: &str, limit: Option<usize>) -> Attempt {
+    let too_large = |limit| {
+        Attempt::Done(Err(HttpError::TooLarge {
+            url: url.to_owned(),
+            limit,
+        }))
+    };
+    if let Some(limit) = limit
+        && response
+            .content_length()
+            .is_some_and(|length| length > limit as u64)
+    {
+        return too_large(limit);
+    }
+    let mut body = Vec::new();
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) => {
+                if let Some(limit) = limit
+                    && body.len() + chunk.len() > limit
+                {
+                    return too_large(limit);
+                }
+                body.extend_from_slice(&chunk);
+            }
+            Ok(None) => return Attempt::Done(Ok(body)),
+            Err(error) => {
+                let error = HttpError::Network {
+                    url: url.to_owned(),
+                    reason: error.without_url().to_string(),
+                };
+                return Attempt::Retry(error, None);
+            }
+        }
+    }
+}
+
 /// The outcome of one request: final, or retryable after an optional delay.
 enum Attempt {
     Done(Result<Vec<u8>, HttpError>),
@@ -136,11 +173,15 @@ enum Attempt {
 
 impl HttpClient for ReqwestHttpClient {
     async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, HttpError> {
-        self.send_with_retries(url, None).await
+        self.send_with_retries(url, None, None).await
+    }
+
+    async fn get_bytes_limited(&self, url: &str, limit: usize) -> Result<Vec<u8>, HttpError> {
+        self.send_with_retries(url, None, Some(limit)).await
     }
 
     async fn post_json(&self, url: &str, body: Vec<u8>) -> Result<Vec<u8>, HttpError> {
-        self.send_with_retries(url, Some(&body)).await
+        self.send_with_retries(url, Some(&body), None).await
     }
 }
 
@@ -491,6 +532,46 @@ mod tests {
         let result = client().send(HttpRequest::get(server.url("/big"))).await;
         assert!(
             matches!(result, Err(HttpError::Network { .. })),
+            "{result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_capped_get_refuses_a_larger_body_without_retrying() {
+        let server = TestServer::start(vec![
+            ("/big", vec![Reply::ok("0123456789")]),
+            ("/fits", vec![Reply::ok("0123456789")]),
+        ])
+        .await;
+        let result = client().get_bytes_limited(&server.url("/big"), 9).await;
+        assert_eq!(
+            result,
+            Err(HttpError::TooLarge {
+                url: server.url("/big"),
+                limit: 9
+            })
+        );
+        assert_eq!(server.hits("/big"), 1);
+        assert_eq!(
+            client().get_bytes_limited(&server.url("/fits"), 10).await,
+            Ok(b"0123456789".to_vec())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_capped_get_stops_reading_a_body_without_a_length_at_the_cap() {
+        // The server sends past the cap and then never finishes the body: a
+        // read that buffered everything before checking would hang.
+        let reply = Reply::stalling(vec![b'a'; 64], 32).without_length();
+        let server = TestServer::start(vec![("/endless", vec![reply])]).await;
+        let result = tokio::time::timeout(
+            Duration::from_secs(5),
+            client().get_bytes_limited(&server.url("/endless"), 16),
+        )
+        .await
+        .expect("the capped read must not wait for the whole body");
+        assert!(
+            matches!(result, Err(HttpError::TooLarge { limit: 16, .. })),
             "{result:?}"
         );
     }

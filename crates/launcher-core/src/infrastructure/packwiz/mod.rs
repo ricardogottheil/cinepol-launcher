@@ -18,7 +18,7 @@ use crate::domain::integrity::{Checksum, HashAlgorithm, curseforge_fingerprint};
 use crate::domain::launch::RelativePath;
 use crate::domain::modpack::packwiz::{PackwizError, RawMetafile, RawPackIndex, RawPackToml};
 use crate::domain::modpack::{PackFileError, PackFileLocation, PackLocation, PackwizSource};
-use crate::domain::ports::HttpClient;
+use crate::domain::ports::{HttpClient, HttpError};
 
 pub use wire::{parse_index, parse_metafile, parse_pack};
 
@@ -79,15 +79,14 @@ impl<H: HttpClient> PackwizFiles<H> {
     }
 
     async fn get(&self, url: &str, name: &str, limit: usize) -> Result<Vec<u8>, PackFileError> {
-        let bytes = self
-            .http
-            .get_bytes(url)
+        // The cap is applied while reading, so a huge answer is never buffered.
+        self.http
+            .get_bytes_limited(url, limit)
             .await
-            .map_err(|error| PackFileError::Source(error.to_string()))?;
-        if bytes.len() > limit {
-            return Err(PackFileError::TooLarge(name.to_owned()));
-        }
-        Ok(bytes)
+            .map_err(|error| match error {
+                HttpError::TooLarge { .. } => PackFileError::TooLarge(name.to_owned()),
+                other => PackFileError::Source(other.to_string()),
+            })
     }
 }
 

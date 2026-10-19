@@ -17,6 +17,8 @@ pub struct Reply {
     headers: Vec<(String, String)>,
     /// Sends only this many body bytes, then stalls without closing.
     stall_after: Option<usize>,
+    /// Leaves out `Content-Length`: the body ends when the connection closes.
+    without_length: bool,
 }
 
 impl Reply {
@@ -26,6 +28,7 @@ impl Reply {
             body: body.into(),
             headers: vec![],
             stall_after: None,
+            without_length: false,
         }
     }
 
@@ -35,6 +38,7 @@ impl Reply {
             body: format!("status {status}").into_bytes(),
             headers: vec![],
             stall_after: None,
+            without_length: false,
         }
     }
 
@@ -45,6 +49,11 @@ impl Reply {
 
     pub fn with_header(mut self, name: &str, value: &str) -> Self {
         self.headers.push((name.to_owned(), value.to_owned()));
+        self
+    }
+
+    pub fn without_length(mut self) -> Self {
+        self.without_length = true;
         self
     }
 
@@ -157,11 +166,10 @@ async fn handle(socket: TcpStream, state: Arc<Mutex<State>>) {
         }
     };
     let mut socket = reader.into_inner();
-    let mut head = format!(
-        "HTTP/1.1 {} Test\r\nContent-Length: {}\r\nConnection: close\r\n",
-        reply.status,
-        reply.body.len()
-    );
+    let mut head = format!("HTTP/1.1 {} Test\r\nConnection: close\r\n", reply.status);
+    if !reply.without_length {
+        head.push_str(&format!("Content-Length: {}\r\n", reply.body.len()));
+    }
     for (name, value) in &reply.headers {
         head.push_str(&format!("{name}: {value}\r\n"));
     }

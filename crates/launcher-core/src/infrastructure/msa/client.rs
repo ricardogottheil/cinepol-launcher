@@ -109,6 +109,9 @@ fn transport(step: Step, error: HttpError) -> AuthError {
         HttpError::Status { status, .. } => unexpected(step, status),
         HttpError::NotFound(_) => unexpected(step, 404),
         HttpError::RateLimited { .. } => unexpected(step, 429),
+        HttpError::TooLarge { .. } => {
+            AuthError::Network(format!("{} answered too much data", step.name()))
+        }
     }
 }
 

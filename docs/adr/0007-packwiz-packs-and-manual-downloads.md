@@ -26,7 +26,9 @@ current API key cannot use (it reads search results but not files).
   metafiles that declare only murmur2 are refused (`WeakHash`).
 - **Verified reads:** the packwiz source verifies the index and every metafile
   against the hash their parent declares before parsing them, and caps their
-  size (1 MiB for `pack.toml` and metafiles, 16 MiB for the index). Local
+  size (1 MiB for `pack.toml` and metafiles, 16 MiB for the index) while
+  reading, so a larger answer is never buffered (`HttpClient::get_bytes_limited`
+  stops at the cap and is never retried). Local
   packs never resolve outside their folder, symlinks included.
 - **One sync pipeline:** mrpack and packwiz share planning, staging,
   placement, removal and the manifest. Downloads land in staging first; local

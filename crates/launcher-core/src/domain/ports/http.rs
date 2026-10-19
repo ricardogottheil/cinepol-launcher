@@ -14,6 +14,8 @@ pub enum HttpError {
     RateLimited { url: String, retry_after_secs: u64 },
     #[error("request to {url} failed: {reason}")]
     Network { url: String, reason: String },
+    #[error("{url} answered more than {limit} bytes")]
+    TooLarge { url: String, limit: usize },
 }
 
 /// Small metadata requests (JSON manifests). Large files go through `Downloader`.
@@ -21,6 +23,26 @@ pub enum HttpError {
 /// transient failures.
 pub trait HttpClient: Send + Sync {
     fn get_bytes(&self, url: &str) -> impl Future<Output = Result<Vec<u8>, HttpError>> + Send;
+
+    /// Like [`HttpClient::get_bytes`], but refuses a body larger than `limit`
+    /// with [`HttpError::TooLarge`] (never retried). Network clients stop
+    /// reading at the cap; the default checks the buffered body, for fakes.
+    fn get_bytes_limited(
+        &self,
+        url: &str,
+        limit: usize,
+    ) -> impl Future<Output = Result<Vec<u8>, HttpError>> + Send {
+        async move {
+            let bytes = self.get_bytes(url).await?;
+            if bytes.len() > limit {
+                return Err(HttpError::TooLarge {
+                    url: url.to_owned(),
+                    limit,
+                });
+            }
+            Ok(bytes)
+        }
+    }
 
     /// POSTs a JSON document (`application/json`) and returns the answer body,
     /// with the same User-Agent, retries and rate-limit handling as

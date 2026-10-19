@@ -277,9 +277,9 @@ fn source_error(error: HttpError, subject: &str) -> ModpackSourceError {
         HttpError::RateLimited {
             retry_after_secs, ..
         } => ModpackSourceError::RateLimited { retry_after_secs },
-        other @ (HttpError::Status { .. } | HttpError::Network { .. }) => {
-            ModpackSourceError::Network(other.to_string())
-        }
+        other @ (HttpError::Status { .. }
+        | HttpError::Network { .. }
+        | HttpError::TooLarge { .. }) => ModpackSourceError::Network(other.to_string()),
     }
 }
 
