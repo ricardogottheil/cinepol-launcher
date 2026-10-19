@@ -4,6 +4,7 @@
 //! `infrastructure` (enforced by `tests/architecture.rs`).
 
 pub mod account_skin;
+pub mod check_app_update;
 pub mod check_premium_name;
 pub mod check_server_status;
 pub mod create_instance;
@@ -14,6 +15,7 @@ pub mod edit_server_list;
 pub mod export_mrpack;
 pub mod get_modpack_details;
 pub mod get_settings;
+pub mod install_app_update;
 pub mod install_instance;
 pub mod install_modpack;
 pub mod install_packwiz;

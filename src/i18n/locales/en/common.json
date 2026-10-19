@@ -121,7 +121,10 @@
     "loader_unavailable": "That loader is not available for this Minecraft version",
     "unverified_file": "A file has no checksum, so the launcher will not use it",
     "rate_limited": "Modrinth asked us to slow down. Try again in a moment",
-    "invalid_modpack": "This modpack is damaged, unsafe or not supported"
+    "invalid_modpack": "This modpack is damaged, unsafe or not supported",
+    "updates_not_configured": "This build cannot update itself",
+    "update_changed": "The update changed; check again",
+    "update_failed": "The update could not be installed"
   },
   "stages": {
     "metadata": "Reading the version",
@@ -344,5 +347,12 @@
     },
     "installedPending_one": "{{name}} needs {{count}} file you download by hand. Finish it in Instances.",
     "installedPending_other": "{{name}} needs {{count}} files you download by hand. Finish it in Instances."
+  },
+  "updates": {
+    "title": "Launcher update",
+    "available": "Cinepol Launcher {{version}} is available",
+    "install": "Install and restart",
+    "downloading": "Downloading the update",
+    "closeTheGame": "Close the game first: installing restarts the launcher."
   }
 }

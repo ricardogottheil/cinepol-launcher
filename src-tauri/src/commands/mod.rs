@@ -13,6 +13,7 @@ pub mod modpacks;
 pub mod packwiz;
 pub mod server;
 pub mod servers;
+pub mod updates;
 pub mod versions;
 
 use launcher_core::domain::account::AccountId;

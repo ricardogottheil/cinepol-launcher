@@ -68,6 +68,12 @@ pub enum ErrorCode {
     RateLimited,
     /// A modpack archive or index is broken, unsafe or unsupported.
     InvalidModpack,
+    /// This build cannot update itself (no signing key).
+    UpdatesNotConfigured,
+    /// The update shown is no longer the one available; check again.
+    UpdateChanged,
+    /// The update did not download, verify or install.
+    UpdateFailed,
     Internal,
 }
 
@@ -519,6 +525,21 @@ impl From<EditServerListError> for AppError {
             }
             EditServerListError::OutOfRange(_) => ErrorCode::NotFound,
             EditServerListError::Storage(_) => ErrorCode::Internal,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<launcher_core::domain::update::AppUpdateError> for AppError {
+    fn from(error: launcher_core::domain::update::AppUpdateError) -> Self {
+        use launcher_core::domain::update::AppUpdateError;
+        let code = match &error {
+            AppUpdateError::NotConfigured => ErrorCode::UpdatesNotConfigured,
+            AppUpdateError::Check(_) => ErrorCode::Network,
+            AppUpdateError::Changed(_) => ErrorCode::UpdateChanged,
+            AppUpdateError::Download(_) | AppUpdateError::Install(_) => ErrorCode::UpdateFailed,
+            AppUpdateError::GameRunning => ErrorCode::AlreadyRunning,
+            AppUpdateError::Cancelled => ErrorCode::Cancelled,
         };
         Self::new(code, error.to_string())
     }

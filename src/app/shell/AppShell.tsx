@@ -1,5 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { UpdateNotice } from "../../features/system/UpdateNotice";
 import { detectPlatform } from "../../ipc/window";
 import { Sidebar } from "./Sidebar";
 import { TitleBar } from "./TitleBar";
@@ -13,6 +14,7 @@ export function AppShell() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-y-auto">
+          <UpdateNotice />
           <Outlet />
         </main>
       </div>

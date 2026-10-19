@@ -5,6 +5,8 @@ import type { Channel } from "@tauri-apps/api/core";
 
 export type AppInfo = { name: string, version: string, };
 
+export type AppUpdateStatusDto = { "kind": "notConfigured" } | { "kind": "upToDate" } | { "kind": "available", version: string, currentVersion: string, notes?: string, };
+
 export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "loader" | "modpack" | "natives" | "launching";
 
 export type ProgressUnitDto = "steps" | "bytes";
@@ -15,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "updates_not_configured" | "update_changed" | "update_failed" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -178,6 +180,8 @@ updatePackOnLaunch: boolean, };
 /** Every backend command: its arguments and its success result. */
 export interface Commands {
   get_app_info: { args: Record<string, never>; result: AppInfo };
+  check_app_update: { args: Record<string, never>; result: AppUpdateStatusDto };
+  install_app_update: { args: { operationId: string; version: string; onProgress: Channel<ProgressEvent> }; result: null };
   run_progress_demo: { args: { operationId: string; steps: number; intervalMs: number; onProgress: Channel<ProgressEvent> }; result: null };
   cancel_operation: { args: { operationId: string }; result: boolean };
   list_accounts: { args: Record<string, never>; result: AccountsDto };

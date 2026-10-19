@@ -9,15 +9,15 @@
 use ts_rs::{Config, TS};
 
 use crate::dto::{
-    AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, CommunityLinksDto,
-    ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto, InstallSummaryDto,
-    InstanceDto, InstanceOriginDto, InstanceSettingsDto, JavaChoiceDto, JavaKindDto,
-    LaunchOutcomeDto, LoaderReleaseDto, LogLevelDto, LogLineDto, LogStreamDto, ManualDownloadsDto,
-    ManualFileDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto,
-    ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto,
-    PackwizUpdateDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
-    ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto, ServerListDto, ServerStatusDto,
-    SettingsDto, SkinDto, WindowSizeDto,
+    AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, AppUpdateStatusDto,
+    CommunityLinksDto, ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto,
+    InstallSummaryDto, InstanceDto, InstanceOriginDto, InstanceSettingsDto, JavaChoiceDto,
+    JavaKindDto, LaunchOutcomeDto, LoaderReleaseDto, LogLevelDto, LogLineDto, LogStreamDto,
+    ManualDownloadsDto, ManualFileDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto,
+    ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto,
+    PackwizInstallDto, PackwizUpdateDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
+    ProgressUnitDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto, ServerListDto,
+    ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -39,6 +39,7 @@ struct CommandSpec {
 fn declarations(cfg: &Config) -> Vec<String> {
     vec![
         AppInfo::decl(cfg),
+        AppUpdateStatusDto::decl(cfg),
         ProgressStageDto::decl(cfg),
         ProgressUnitDto::decl(cfg),
         ProgressEvent::decl(cfg),
@@ -97,6 +98,19 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
     let string = || String::name(cfg);
     vec![
         command("get_app_info", vec![], AppInfo::name(cfg)),
+        command("check_app_update", vec![], AppUpdateStatusDto::name(cfg)),
+        command(
+            "install_app_update",
+            vec![
+                ("operationId", string()),
+                ("version", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            "null".to_owned(),
+        ),
         command(
             "run_progress_demo",
             vec![
@@ -426,6 +440,8 @@ mod tests {
         let rendered = render();
         for name in [
             "get_app_info",
+            "check_app_update",
+            "install_app_update",
             "run_progress_demo",
             "cancel_operation",
             "list_accounts",

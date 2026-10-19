@@ -31,6 +31,38 @@ pub struct AppInfo {
     pub version: String,
 }
 
+/// What a launcher update check found.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum AppUpdateStatusDto {
+    /// This build has no update key (development builds).
+    NotConfigured,
+    UpToDate,
+    #[serde(rename_all = "camelCase")]
+    Available {
+        version: String,
+        current_version: String,
+        #[ts(optional)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        notes: Option<String>,
+    },
+}
+
+impl From<launcher_core::domain::update::UpdateStatus> for AppUpdateStatusDto {
+    fn from(status: launcher_core::domain::update::UpdateStatus) -> Self {
+        use launcher_core::domain::update::UpdateStatus;
+        match status {
+            UpdateStatus::NotConfigured => Self::NotConfigured,
+            UpdateStatus::UpToDate => Self::UpToDate,
+            UpdateStatus::Available(update) => Self::Available {
+                version: update.version,
+                current_version: update.current_version,
+                notes: update.notes,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProgressStageDto {

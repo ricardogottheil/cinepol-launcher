@@ -29,6 +29,7 @@ mod auth;
 mod launch;
 mod modpack;
 mod server;
+mod update;
 
 pub use auth::{FakeMicrosoftAuth, FakeSessions, sample_profile, tokens};
 pub use launch::{
@@ -40,6 +41,7 @@ pub use modpack::{
     sha1_hex, sha512_hex,
 };
 pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySettingsRepository};
+pub use update::{FakeAppUpdater, update};
 
 /// Records every progress update.
 #[derive(Debug, Default)]

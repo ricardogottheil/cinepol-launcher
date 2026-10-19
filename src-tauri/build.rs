@@ -6,6 +6,7 @@ use std::path::Path;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=MSA_CLIENT_ID");
+    println!("cargo:rerun-if-env-changed=CINEPOL_UPDATER_PUBKEY");
     let env_file = Path::new("../.env");
     println!("cargo:rerun-if-changed={}", env_file.display());
     if std::env::var_os("MSA_CLIENT_ID").is_none()

@@ -120,4 +120,6 @@ pub trait RunningGames: Send + Sync {
     fn claim(&self, instance: &InstanceId, kill: &CancellationToken) -> bool;
     /// Marks `instance` as free again.
     fn release(&self, instance: &InstanceId);
+    /// Whether any instance is busy.
+    fn any_busy(&self) -> bool;
 }

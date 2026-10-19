@@ -14,6 +14,7 @@ mod operations;
 mod progress;
 mod redact;
 mod state;
+mod updater;
 
 use tauri::Manager;
 
@@ -34,15 +35,19 @@ pub fn run() -> Result<(), tauri::Error> {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = app.path().data_dir()?.join(DATA_DIR_NAME);
             let version = app.package_info().version.to_string();
             let state = state::AppState::new(data_dir, &version).map_err(|error| error.message)?;
             app.manage(state);
+            app.manage(updater::TauriAppUpdater::new(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::app::get_app_info,
+            commands::updates::check_app_update,
+            commands::updates::install_app_update,
             commands::demo::run_progress_demo,
             commands::demo::cancel_operation,
             commands::accounts::list_accounts,

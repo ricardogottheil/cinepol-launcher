@@ -431,4 +431,8 @@ impl RunningGames for InMemoryRunningGames {
     fn release(&self, instance: &InstanceId) {
         self.busy.lock().unwrap().remove(instance);
     }
+
+    fn any_busy(&self) -> bool {
+        !self.busy.lock().unwrap().is_empty()
+    }
 }

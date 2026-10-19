@@ -85,6 +85,14 @@ impl RunningGames for OperationRegistry {
     fn release(&self, instance: &InstanceId) {
         self.finish(instance.as_str());
     }
+
+    fn any_busy(&self) -> bool {
+        !self
+            .running
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_empty()
+    }
 }
 
 /// Lets one session of a kind run at a time (one Play on CINEPOL, so two
@@ -178,6 +186,17 @@ mod tests {
         assert!(session.is_cancelled());
         games.release(&id);
         assert!(games.start("cinepol").is_ok());
+    }
+
+    #[test]
+    fn any_busy_follows_the_claimed_instances() {
+        let games = OperationRegistry::default();
+        let id = InstanceId::parse("survival").unwrap();
+        assert!(!games.any_busy());
+        assert!(games.claim(&id, &CancellationToken::new()));
+        assert!(games.any_busy());
+        games.release(&id);
+        assert!(!games.any_busy());
     }
 
     #[test]

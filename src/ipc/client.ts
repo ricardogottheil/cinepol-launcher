@@ -7,6 +7,7 @@ import type {
   AccountsDto,
   AppError,
   AppInfo,
+  AppUpdateStatusDto,
   Commands,
   DeviceCodeDto,
   ErrorCode,
@@ -56,6 +57,7 @@ export type {
   AccountPolicyDto,
   AccountsDto,
   AppInfo,
+  AppUpdateStatusDto,
   DeviceCodeDto,
   ErrorCode,
   GameVersionsDto,
@@ -118,6 +120,9 @@ const BACKEND_CODES = {
   unverified_file: true,
   rate_limited: true,
   invalid_modpack: true,
+  updates_not_configured: true,
+  update_changed: true,
+  update_failed: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -180,6 +185,11 @@ export function getAppInfo(): Promise<AppInfo> {
   return call("get_app_info");
 }
 
+/** Whether a newer launcher release is available. */
+export function checkAppUpdate(): Promise<AppUpdateStatusDto> {
+  return call("check_app_update");
+}
+
 /** A long operation started from the UI. */
 export interface RunningOperation<T = void> {
   operationId: string;
@@ -217,6 +227,23 @@ export function runProgressDemo({
       operationId,
       steps,
       intervalMs,
+      onProgress: channel(onProgress),
+    }).then(() => undefined),
+  );
+}
+
+/**
+ * Downloads, verifies and installs `version`, then restarts the launcher.
+ * Refused (`already_running`) while a game installs or runs.
+ */
+export function installAppUpdate(
+  version: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation {
+  return startOperation("install_app_update", (operationId) =>
+    call("install_app_update", {
+      operationId,
+      version,
       onProgress: channel(onProgress),
     }).then(() => undefined),
   );
