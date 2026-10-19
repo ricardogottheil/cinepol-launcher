@@ -475,7 +475,7 @@ async fn incoming_sha1<P: PackFiles>(
 }
 
 /// Whether the file exists and matches `checksum`.
-async fn has_checksum<P: PackFiles>(
+pub(crate) async fn has_checksum<P: PackFiles>(
     files: &P,
     path: &Path,
     checksum: &Checksum,

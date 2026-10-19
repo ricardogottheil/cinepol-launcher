@@ -28,6 +28,7 @@ pub mod play_on_cinepol;
 pub mod prepare_cinepol_instance;
 pub mod refresh_session;
 pub mod remove_account;
+pub mod resolve_manual_downloads;
 pub mod run_progress_demo;
 pub mod search_modpacks;
 pub mod select_account;
