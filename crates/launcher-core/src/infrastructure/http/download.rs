@@ -1,5 +1,6 @@
 //! Parallel download manager: bounded concurrency, retries with backoff,
-//! streaming verification, atomic writes and reuse of valid files.
+//! streaming verification (murmur2 once the file is written), atomic writes
+//! and reuse of valid files.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -12,7 +13,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
 
 use super::ReqwestHttpClient;
-use crate::domain::integrity::{Checksum, HashAlgorithm};
+use crate::domain::integrity::{Checksum, HashAlgorithm, curseforge_fingerprint};
 use crate::domain::ports::{
     DownloadError, DownloadRequest, DownloadSummary, Downloader, ProgressReporter, ProgressUpdate,
 };
@@ -78,16 +79,6 @@ impl DownloadManager {
     ) -> Result<Fetched, DownloadError> {
         if cancel.is_cancelled() {
             return Err(DownloadError::Cancelled);
-        }
-        if request
-            .checksum
-            .as_ref()
-            .is_some_and(|c| c.algorithm() == HashAlgorithm::Murmur2)
-        {
-            return Err(io_error(
-                &request.destination,
-                "murmur2 checksums are not supported by the downloader",
-            ));
         }
         if is_valid(&request.destination, request).await {
             if let Some(size) = request.size {
@@ -205,8 +196,15 @@ impl DownloadManager {
         {
             return Err(http(format!("expected {size} bytes, got {written}"), true));
         }
-        if let (Some(checksum), Some(hasher)) = (&request.checksum, hasher) {
-            let actual = hasher.finish();
+        if let Some(checksum) = &request.checksum {
+            let actual = match hasher {
+                Some(hasher) => hasher.finish(),
+                // murmur2 seeds with the whitespace-stripped length, so it
+                // cannot be streamed: the written file is read back instead.
+                None => fingerprint_file(temp.to_path_buf())
+                    .await
+                    .map_err(|e| Failure::fatal(io_error(temp, &e.to_string())))?,
+            };
             if !checksum.matches(&actual) {
                 return Err(Failure {
                     error: DownloadError::ChecksumMismatch {
@@ -455,7 +453,9 @@ async fn is_valid(path: &Path, request: &DownloadRequest) -> bool {
 }
 
 async fn hash_file(path: &Path, checksum: &Checksum) -> Option<String> {
-    let mut hasher = StreamHasher::new(checksum)?;
+    let Some(mut hasher) = StreamHasher::new(checksum) else {
+        return fingerprint_file(path.to_path_buf()).await.ok();
+    };
     let mut file = tokio::fs::File::open(path).await.ok()?;
     let mut buffer = vec![0u8; READ_BUFFER];
     loop {
@@ -465,6 +465,17 @@ async fn hash_file(path: &Path, checksum: &Checksum) -> Option<String> {
         }
         hasher.update(&buffer[..read]);
     }
+}
+
+/// The CurseForge fingerprint (murmur2, decimal) of a whole file. The file
+/// is read into memory off the async runtime, since the hash needs the
+/// whitespace-stripped length before it starts.
+async fn fingerprint_file(path: PathBuf) -> std::io::Result<String> {
+    tokio::task::spawn_blocking(move || {
+        std::fs::read(&path).map(|bytes| curseforge_fingerprint(&bytes).to_string())
+    })
+    .await
+    .map_err(std::io::Error::other)?
 }
 
 /// A unique `.part` file next to the destination, so the rename stays on one volume.
@@ -842,23 +853,78 @@ mod tests {
         assert!(updates.iter().all(|u| u.unit == ProgressUnit::Bytes));
     }
 
-    #[tokio::test]
-    async fn murmur2_checksums_are_rejected_with_a_clear_reason() {
-        let server = TestServer::start(vec![("/mod.jar", vec![Reply::ok("mod")])]).await;
-        let dir = tempfile::tempdir().unwrap();
-        let error = run(vec![DownloadRequest {
+    fn murmur2_of(body: &[u8]) -> Checksum {
+        let fingerprint = crate::domain::integrity::curseforge_fingerprint(body);
+        Checksum::parse(HashAlgorithm::Murmur2, &fingerprint.to_string()).unwrap()
+    }
+
+    fn murmur2_request(server: &TestServer, destination: PathBuf, body: &[u8]) -> DownloadRequest {
+        DownloadRequest {
             url: server.url("/mod.jar"),
-            destination: dir.path().join("mod.jar"),
-            checksum: Some(Checksum::parse(HashAlgorithm::Murmur2, "123").unwrap()),
+            destination,
+            checksum: Some(murmur2_of(body)),
             size: None,
-        }])
+        }
+    }
+
+    #[tokio::test]
+    async fn murmur2_checksums_are_verified_once_the_file_is_written() {
+        let body = b"mod bytes\n with\twhitespace";
+        let server = TestServer::start(vec![("/mod.jar", vec![Reply::ok(body.to_vec())])]).await;
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("mods/mod.jar");
+        let summary = run(vec![murmur2_request(&server, destination.clone(), body)])
+            .await
+            .unwrap();
+        assert_eq!(summary.downloaded, 1);
+        assert_eq!(std::fs::read(&destination).unwrap(), body);
+        assert_eq!(files_in(dir.path()), ["mods/mod.jar"]);
+    }
+
+    #[tokio::test]
+    async fn murmur2_mismatches_fail_after_retries_and_leave_nothing_behind() {
+        let server = TestServer::start(vec![("/mod.jar", vec![Reply::ok("tampered")])]).await;
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("mods/mod.jar");
+        let error = run(vec![murmur2_request(
+            &server,
+            destination.clone(),
+            b"original",
+        )])
         .await
         .unwrap_err();
-        assert!(
-            matches!(&error, DownloadError::Io { reason, .. } if reason.contains("murmur2")),
-            "{error:?}"
+        assert_eq!(
+            error,
+            DownloadError::ChecksumMismatch {
+                url: server.url("/mod.jar"),
+                expected: murmur2_of(b"original").value().to_owned(),
+                actual: murmur2_of(b"tampered").value().to_owned(),
+            }
         );
-        assert!(server.requests().is_empty());
+        assert_eq!(server.hits("/mod.jar"), 3);
+        assert!(!destination.exists());
+        assert!(files_in(dir.path()).is_empty());
+    }
+
+    #[tokio::test]
+    async fn murmur2_files_are_reused_only_when_they_still_match() {
+        let server = TestServer::start(vec![("/mod.jar", vec![Reply::ok("original")])]).await;
+        let dir = tempfile::tempdir().unwrap();
+        let valid = dir.path().join("valid.jar");
+        // Whitespace does not count in a CurseForge fingerprint.
+        std::fs::write(&valid, b"orig inal").unwrap();
+        let corrupt = dir.path().join("corrupt.jar");
+        std::fs::write(&corrupt, b"originaX").unwrap();
+        let summary = run(vec![
+            murmur2_request(&server, valid.clone(), b"original"),
+            murmur2_request(&server, corrupt.clone(), b"original"),
+        ])
+        .await
+        .unwrap();
+        assert_eq!((summary.reused, summary.downloaded), (1, 1));
+        assert_eq!(std::fs::read(&valid).unwrap(), b"orig inal");
+        assert_eq!(std::fs::read(&corrupt).unwrap(), b"original");
+        assert_eq!(server.hits("/mod.jar"), 1);
     }
 
     #[test]
