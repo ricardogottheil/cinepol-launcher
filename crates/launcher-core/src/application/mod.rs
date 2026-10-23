@@ -3,7 +3,9 @@
 //! Use cases depend only on `domain` (entities and ports). They never import
 //! `infrastructure` (enforced by `tests/architecture.rs`).
 
+pub mod account_capes;
 pub mod account_skin;
+pub mod change_skin;
 pub mod check_app_update;
 pub mod check_premium_name;
 pub mod check_server_status;
@@ -36,6 +38,7 @@ pub mod resolve_manual_downloads;
 pub mod run_progress_demo;
 pub mod search_modpacks;
 pub mod select_account;
+pub mod set_cape;
 pub mod update_curseforge;
 pub mod update_instance_settings;
 pub mod update_modpack;

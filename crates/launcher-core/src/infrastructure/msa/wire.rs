@@ -86,6 +86,17 @@ pub struct ProfileResponse {
     pub name: String,
     #[serde(default)]
     pub skins: Vec<ProfileSkin>,
+    #[serde(default)]
+    pub capes: Vec<ProfileCape>,
+}
+
+/// Lenient like `ProfileSkin`: an unreadable cape is left out.
+#[derive(Deserialize)]
+pub struct ProfileCape {
+    pub id: Option<String>,
+    pub state: Option<String>,
+    pub url: Option<String>,
+    pub alias: Option<String>,
 }
 
 /// Lenient on purpose: a skin the launcher cannot read is dropped instead of

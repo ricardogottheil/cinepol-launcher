@@ -7,14 +7,16 @@ use uuid::Uuid;
 
 use super::wire::{
     DeviceCodeResponse, EntitlementsResponse, MinecraftLoginResponse, OAuthErrorResponse,
-    ProfileResponse, ProfileSkin, TokenResponse, XboxTokenResponse, XboxUserClaims,
+    ProfileCape, ProfileResponse, ProfileSkin, TokenResponse, XboxTokenResponse, XboxUserClaims,
     XstsErrorResponse,
 };
 use crate::domain::account::{
-    AuthError, DeviceCode, DevicePoll, MicrosoftAuth, MinecraftLogin, MinecraftProfile,
-    MinecraftToken, MsaTokens, Skin, SkinUrl, SkinVariant, Username,
+    AuthError, Cape, CapeId, DeviceCode, DevicePoll, MicrosoftAuth, MinecraftLogin,
+    MinecraftProfile, MinecraftToken, MsaTokens, Skin, SkinPng, SkinUrl, SkinVariant, Username,
 };
-use crate::domain::ports::{HttpBody, HttpError, HttpRequest, HttpRequester, HttpResponse, Secret};
+use crate::domain::ports::{
+    HttpBody, HttpError, HttpRequest, HttpRequester, HttpResponse, MultipartPart, Secret,
+};
 
 pub const DEVICE_CODE_URL: &str =
     "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
@@ -25,6 +27,9 @@ pub const LOGIN_WITH_XBOX_URL: &str =
     "https://api.minecraftservices.com/authentication/login_with_xbox";
 pub const ENTITLEMENTS_URL: &str = "https://api.minecraftservices.com/entitlements/mcstore";
 pub const PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
+pub const SKINS_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins";
+pub const ACTIVE_CAPE_URL: &str =
+    "https://api.minecraftservices.com/minecraft/profile/capes/active";
 
 const SCOPE: &str = "XboxLive.signin offline_access";
 const DEVICE_CODE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
@@ -74,6 +79,8 @@ enum Step {
     Entitlements,
     Profile,
     Skin,
+    SkinUpload,
+    Cape,
 }
 
 impl Step {
@@ -89,6 +96,8 @@ impl Step {
             Self::Entitlements => "entitlements check",
             Self::Profile => "profile request",
             Self::Skin => "skin download",
+            Self::SkinUpload => "skin upload",
+            Self::Cape => "cape change",
         }
     }
 }
@@ -215,6 +224,44 @@ fn active_skin(skins: Vec<ProfileSkin>) -> Option<Skin> {
     };
     let url = SkinUrl::parse(skin.url.as_deref()?).ok()?;
     Some(Skin { url, variant })
+}
+
+fn owned_capes(capes: Vec<ProfileCape>) -> Vec<Cape> {
+    capes
+        .into_iter()
+        .filter_map(|cape| {
+            Some(Cape {
+                id: CapeId::parse(cape.id.as_deref()?).ok()?,
+                alias: cape.alias.filter(|alias| alias.len() <= 64)?,
+                url: SkinUrl::parse(cape.url.as_deref()?).ok()?,
+                active: cape.state.as_deref() == Some("ACTIVE"),
+            })
+        })
+        .collect()
+}
+
+/// A profile answer from the profile, skin and cape endpoints.
+fn read_profile(step: Step, response: &HttpResponse) -> Result<MinecraftProfile, AuthError> {
+    let profile: ProfileResponse = parse(step, response)?;
+    let id = profile_id(&profile.id).ok_or_else(|| unexpected(step, response.status))?;
+    let name = Username::parse(&profile.name).map_err(|_| unexpected(step, response.status))?;
+    Ok(MinecraftProfile {
+        id,
+        name,
+        skin: active_skin(profile.skins),
+        capes: owned_capes(profile.capes),
+    })
+}
+
+/// A skin or cape change Mojang did not apply. `refused` is what a 400 means
+/// for this change; 401 means the token is no longer valid.
+fn change_error(step: Step, status: u16, refused: AuthError) -> AuthError {
+    match status {
+        400 => refused,
+        401 => AuthError::SessionExpired,
+        429 => AuthError::TooManyRequests,
+        _ => unexpected(step, status),
+    }
 }
 
 /// Mojang ids are 32 hex digits without dashes.
@@ -466,14 +513,7 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
         if !response.is_success() {
             return Err(unexpected(step, response.status));
         }
-        let profile: ProfileResponse = parse(step, &response)?;
-        let id = profile_id(&profile.id).ok_or_else(|| unexpected(step, response.status))?;
-        let name = Username::parse(&profile.name).map_err(|_| unexpected(step, response.status))?;
-        Ok(MinecraftProfile {
-            id,
-            name,
-            skin: active_skin(profile.skins),
-        })
+        read_profile(step, &response)
     }
 
     async fn skin_texture(&self, url: &SkinUrl) -> Result<Vec<u8>, AuthError> {
@@ -484,5 +524,50 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
             return Err(unexpected(step, response.status));
         }
         Ok(response.body)
+    }
+
+    async fn upload_skin(
+        &self,
+        minecraft_token: &Secret,
+        skin: &SkinPng,
+        variant: SkinVariant,
+    ) -> Result<MinecraftProfile, AuthError> {
+        let step = Step::SkinUpload;
+        let variant = match variant {
+            SkinVariant::Classic => "classic",
+            SkinVariant::Slim => "slim",
+        };
+        let form = HttpBody::Multipart(vec![
+            MultipartPart::text("variant", variant),
+            MultipartPart::file("file", "skin.png", "image/png", skin.as_bytes().to_vec()),
+        ]);
+        let request = HttpRequest::post(SKINS_URL, form).with_bearer(minecraft_token);
+        let response = self.send(step, request).await?;
+        if !response.is_success() {
+            return Err(change_error(step, response.status, AuthError::SkinRejected));
+        }
+        read_profile(step, &response)
+    }
+
+    async fn set_cape(
+        &self,
+        minecraft_token: &Secret,
+        cape: Option<&CapeId>,
+    ) -> Result<MinecraftProfile, AuthError> {
+        let step = Step::Cape;
+        let request = match cape {
+            Some(cape) => HttpRequest::put(
+                ACTIVE_CAPE_URL,
+                HttpBody::Json(Secret::new(json!({ "capeId": cape.as_str() }).to_string())),
+            ),
+            None => HttpRequest::delete(ACTIVE_CAPE_URL),
+        };
+        let response = self
+            .send(step, request.with_bearer(minecraft_token))
+            .await?;
+        if !response.is_success() {
+            return Err(change_error(step, response.status, AuthError::CapeNotOwned));
+        }
+        read_profile(step, &response)
     }
 }

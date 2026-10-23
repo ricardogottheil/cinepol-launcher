@@ -7,6 +7,7 @@ mod offline_uuid;
 mod policy;
 mod ports;
 mod username;
+mod wardrobe;
 
 pub use microsoft::{
     AuthError, DeviceCode, DevicePoll, MicrosoftAccount, MicrosoftAuth, MinecraftLogin,
@@ -17,6 +18,7 @@ pub use offline_uuid::offline_uuid;
 pub use policy::{OfflinePolicy, OfflinePolicyError};
 pub use ports::{AccountRepository, AccountRepositoryError, PremiumNameLookupError, PremiumNames};
 pub use username::{Username, UsernameError};
+pub use wardrobe::{Cape, CapeId, CapeIdError, MAX_SKIN_PNG_BYTES, SkinPng, SkinPngError};
 
 use uuid::Uuid;
 

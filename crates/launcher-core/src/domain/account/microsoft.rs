@@ -10,7 +10,7 @@ use std::future::Future;
 use thiserror::Error;
 use uuid::Uuid;
 
-use super::{AccountId, Username};
+use super::{AccountId, Cape, CapeId, SkinPng, Username};
 use crate::domain::ports::{Secret, SecretKey};
 
 /// Mojang serves skins from this host only.
@@ -129,6 +129,8 @@ pub struct MinecraftProfile {
     pub id: Uuid,
     pub name: Username,
     pub skin: Option<Skin>,
+    /// The capes the profile owns; never stored, read again when shown.
+    pub capes: Vec<Cape>,
 }
 
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
@@ -151,6 +153,12 @@ pub enum AuthError {
     NotEntitled,
     #[error("this account has no Minecraft: Java Edition profile yet")]
     NoProfile,
+    #[error("Minecraft refused this skin")]
+    SkinRejected,
+    #[error("this profile does not own that cape")]
+    CapeNotOwned,
+    #[error("too many changes in a short time; wait a few minutes")]
+    TooManyRequests,
     #[error("the sign-in service is unreachable: {0}")]
     Network(String),
     #[error("the sign-in service answered unexpectedly: {0}")]
@@ -181,11 +189,25 @@ pub trait MicrosoftAuth: Send + Sync {
         &self,
         minecraft_token: &Secret,
     ) -> impl Future<Output = Result<MinecraftProfile, AuthError>> + Send;
-    /// The PNG bytes of a skin texture.
+    /// The PNG bytes of a skin or cape texture.
     fn skin_texture(
         &self,
         url: &SkinUrl,
     ) -> impl Future<Output = Result<Vec<u8>, AuthError>> + Send;
+    /// Uploads a skin; answers the profile as it is now. Sent once: Mojang
+    /// may suspend accounts that hit its rate limit while uploading.
+    fn upload_skin(
+        &self,
+        minecraft_token: &Secret,
+        skin: &SkinPng,
+        variant: SkinVariant,
+    ) -> impl Future<Output = Result<MinecraftProfile, AuthError>> + Send;
+    /// Wears an owned cape, or none; answers the profile as it is now.
+    fn set_cape(
+        &self,
+        minecraft_token: &Secret,
+        cape: Option<&CapeId>,
+    ) -> impl Future<Output = Result<MinecraftProfile, AuthError>> + Send;
 }
 
 /// Keychain entry of an account's Microsoft refresh token.

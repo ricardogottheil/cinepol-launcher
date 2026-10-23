@@ -6,8 +6,8 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::domain::account::{
-    AuthError, DeviceCode, DevicePoll, MicrosoftAuth, MinecraftLogin, MinecraftProfile,
-    MinecraftToken, MsaTokens, Skin, SkinUrl, SkinVariant, Username,
+    AuthError, CapeId, DeviceCode, DevicePoll, MicrosoftAuth, MinecraftLogin, MinecraftProfile,
+    MinecraftToken, MsaTokens, Skin, SkinPng, SkinUrl, SkinVariant, Username,
 };
 use crate::domain::ports::Secret;
 
@@ -22,6 +22,8 @@ pub struct FakeMicrosoftAuth {
     pub owns_game: Result<bool, AuthError>,
     pub profile: Result<MinecraftProfile, AuthError>,
     pub skin: Result<Vec<u8>, AuthError>,
+    /// The answer of a skin upload and of a cape change.
+    pub change: Result<MinecraftProfile, AuthError>,
     calls: Mutex<Vec<String>>,
 }
 
@@ -33,6 +35,7 @@ pub fn sample_profile() -> MinecraftProfile {
             url: SkinUrl::parse("http://textures.minecraft.net/texture/abc123").unwrap(),
             variant: SkinVariant::Classic,
         }),
+        capes: Vec::new(),
     }
 }
 
@@ -67,6 +70,7 @@ impl FakeMicrosoftAuth {
             owns_game: Ok(true),
             profile: Ok(sample_profile()),
             skin: Ok(b"\x89PNG".to_vec()),
+            change: Ok(sample_profile()),
             calls: Mutex::default(),
         }
     }
@@ -127,6 +131,30 @@ impl MicrosoftAuth for FakeMicrosoftAuth {
     async fn skin_texture(&self, url: &SkinUrl) -> Result<Vec<u8>, AuthError> {
         self.record(format!("skin:{}", url.as_str()));
         self.skin.clone()
+    }
+
+    async fn upload_skin(
+        &self,
+        minecraft_token: &Secret,
+        skin: &SkinPng,
+        variant: SkinVariant,
+    ) -> Result<MinecraftProfile, AuthError> {
+        self.record(format!(
+            "upload:{}:{variant:?}:{}",
+            minecraft_token.expose(),
+            skin.as_bytes().len()
+        ));
+        self.change.clone()
+    }
+
+    async fn set_cape(
+        &self,
+        minecraft_token: &Secret,
+        cape: Option<&CapeId>,
+    ) -> Result<MinecraftProfile, AuthError> {
+        let cape = cape.map_or("none", CapeId::as_str);
+        self.record(format!("cape:{}:{cape}", minecraft_token.expose()));
+        self.change.clone()
     }
 }
 

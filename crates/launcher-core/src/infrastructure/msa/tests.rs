@@ -4,14 +4,15 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::client::{
-    DEVICE_CODE_URL, ENTITLEMENTS_URL, LOGIN_WITH_XBOX_URL, PROFILE_URL, TOKEN_URL, XBOX_LIVE_URL,
-    XSTS_URL,
+    ACTIVE_CAPE_URL, DEVICE_CODE_URL, ENTITLEMENTS_URL, LOGIN_WITH_XBOX_URL, PROFILE_URL,
+    SKINS_URL, TOKEN_URL, XBOX_LIVE_URL, XSTS_URL,
 };
 use super::*;
 use crate::domain::account::{
-    AuthError, DevicePoll, MicrosoftAuth, MsaTokens, SkinUrl, SkinVariant, Username,
+    AuthError, CapeId, DevicePoll, MicrosoftAuth, MsaTokens, SkinPng, SkinUrl, SkinVariant,
+    Username,
 };
-use crate::domain::ports::{HttpBody, HttpMethod, HttpRequest, Secret};
+use crate::domain::ports::{HttpBody, HttpMethod, HttpRequest, MultipartPart, Secret};
 use crate::testing::FakeHttpRequester;
 
 const CLIENT_ID: &str = "00000000-0000-0000-0000-00000000c1d0";
@@ -717,4 +718,133 @@ async fn an_oauth_failure_names_its_error_and_aadsts_codes_but_not_the_descripti
         !message.contains("Trace ID"),
         "the free-text description stays out: {message}"
     );
+}
+
+// --- Skins and capes -----------------------------------------------------
+
+const MIGRATOR: &str = "1981aad3-73bd-4d8b-a8d5-4dd0f5bc8e1c";
+
+fn skin_png() -> SkinPng {
+    let mut bytes = vec![0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n'];
+    bytes.extend_from_slice(&13u32.to_be_bytes());
+    bytes.extend_from_slice(b"IHDR");
+    bytes.extend_from_slice(&64u32.to_be_bytes());
+    bytes.extend_from_slice(&64u32.to_be_bytes());
+    bytes.extend_from_slice(&[8, 6, 0, 0, 0]);
+    SkinPng::parse(bytes).unwrap()
+}
+
+fn profile_with(skins: &str, capes: &str) -> String {
+    format!(
+        r#"{{"id":"0123456789abcdef0123456789abcdef","name":"Steve","skins":{skins},"capes":{capes}}}"#
+    )
+}
+
+const SLIM_SKIN: &str = r#"[{"state":"ACTIVE","url":"http://textures.minecraft.net/texture/3b60a1f6d562f52aaebbf1434f1de147933a3affe0e764fa49ea057536623cd3","variant":"SLIM"}]"#;
+
+#[tokio::test]
+async fn reads_the_capes_a_profile_owns() {
+    let capes = format!(
+        r#"[{{"id":"{MIGRATOR}","state":"ACTIVE","url":"http://textures.minecraft.net/texture/2340c0e03dd24a11b15a8b33c2a7e9e32abb2051b2481d0ba7defd635ca7a933","alias":"Migrator"}},
+           {{"id":"bad\"","state":"INACTIVE","url":"http://textures.minecraft.net/texture/aa","alias":"Broken"}},
+           {{"id":"5786fe99-be37-7720-4ef6-1a0b0e8f3e2a","state":"INACTIVE","url":"https://evil.example/texture/aa","alias":"Elsewhere"}},
+           {{"id":"2340c0e0-3a3b-4a2c-8c36-0a1b7d1c6c4f","state":"INACTIVE","url":"http://textures.minecraft.net/texture/bb","alias":"Pan"}}]"#
+    );
+    let http = FakeHttpRequester::default().reply(PROFILE_URL, 200, profile_with("[]", &capes));
+    let profile = client(http)
+        .profile(&secret("FAKE-minecraft-access-token"))
+        .await
+        .unwrap();
+    let worn: Vec<(&str, &str, bool)> = profile
+        .capes
+        .iter()
+        .map(|cape| (cape.id.as_str(), cape.alias.as_str(), cape.active))
+        .collect();
+    assert_eq!(
+        worn,
+        [
+            (MIGRATOR, "Migrator", true),
+            ("2340c0e0-3a3b-4a2c-8c36-0a1b7d1c6c4f", "Pan", false)
+        ]
+    );
+    assert_eq!(
+        profile.capes[1].url.as_str(),
+        "https://textures.minecraft.net/texture/bb"
+    );
+}
+
+#[tokio::test]
+async fn uploads_a_skin_as_a_multipart_form() {
+    let http = FakeHttpRequester::default().reply(SKINS_URL, 200, profile_with(SLIM_SKIN, "[]"));
+    let msa = client(http);
+    let token = secret("FAKE-minecraft-access-token");
+    let png = skin_png();
+    let profile = msa
+        .upload_skin(&token, &png, SkinVariant::Slim)
+        .await
+        .unwrap();
+    assert_eq!(profile.skin.unwrap().variant, SkinVariant::Slim);
+    let request = &msa.http().requests()[0];
+    assert_eq!(request.method, HttpMethod::Post);
+    assert_eq!(request.url, SKINS_URL);
+    assert_eq!(request.bearer, Some(token));
+    assert_eq!(
+        request.body,
+        Some(HttpBody::Multipart(vec![
+            MultipartPart::text("variant", "slim"),
+            MultipartPart::file("file", "skin.png", "image/png", png.as_bytes().to_vec()),
+        ]))
+    );
+}
+
+#[tokio::test]
+async fn wears_a_cape_and_hides_it() {
+    let http = FakeHttpRequester::default()
+        .reply(ACTIVE_CAPE_URL, 200, profile_with("[]", "[]"))
+        .reply(ACTIVE_CAPE_URL, 200, profile_with("[]", "[]"));
+    let msa = client(http);
+    let token = secret("FAKE-minecraft-access-token");
+    let migrator = CapeId::parse(MIGRATOR).unwrap();
+    msa.set_cape(&token, Some(&migrator)).await.unwrap();
+    msa.set_cape(&token, None).await.unwrap();
+    let requests = msa.http().requests();
+    assert_eq!(requests[0].method, HttpMethod::Put);
+    let Some(HttpBody::Json(body)) = &requests[0].body else {
+        panic!("a JSON body: {:?}", requests[0].body);
+    };
+    assert_eq!(
+        serde_json::from_str::<Value>(body.expose()).unwrap(),
+        json!({ "capeId": MIGRATOR })
+    );
+    assert_eq!(requests[0].bearer, Some(token.clone()));
+    assert_eq!(requests[1].method, HttpMethod::Delete);
+    assert_eq!(requests[1].body, None);
+    assert_eq!(requests[1].bearer, Some(token));
+}
+
+#[tokio::test]
+async fn skin_and_cape_changes_say_why_they_failed() {
+    let token = secret("FAKE-minecraft-access-token");
+    let migrator = CapeId::parse(MIGRATOR).unwrap();
+    for (status, upload, cape) in [
+        (400, AuthError::SkinRejected, AuthError::CapeNotOwned),
+        (401, AuthError::SessionExpired, AuthError::SessionExpired),
+        (429, AuthError::TooManyRequests, AuthError::TooManyRequests),
+    ] {
+        let http = FakeHttpRequester::default()
+            .reply(SKINS_URL, status, "")
+            .reply(ACTIVE_CAPE_URL, status, "");
+        let msa = client(http);
+        assert_eq!(
+            msa.upload_skin(&token, &skin_png(), SkinVariant::Classic)
+                .await,
+            Err(upload),
+            "{status}"
+        );
+        assert_eq!(
+            msa.set_cape(&token, Some(&migrator)).await,
+            Err(cape),
+            "{status}"
+        );
+    }
 }

@@ -252,6 +252,7 @@ mod tests {
                 url: SkinUrl::parse("http://textures.minecraft.net/texture/abc123").unwrap(),
                 variant: SkinVariant::Slim,
             }),
+            capes: Vec::new(),
         };
         let premium = Account::microsoft(AccountId::new_random(), &profile, "2535428");
         let repo = JsonAccountRepository::new(&file);
