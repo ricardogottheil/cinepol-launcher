@@ -1,16 +1,20 @@
+use launcher_core::application::account_capes::account_capes as capes;
 use launcher_core::application::account_skin::account_skin as skin;
+use launcher_core::application::change_skin::change_skin as upload;
 use launcher_core::application::check_premium_name::check_premium_name as check;
 use launcher_core::application::create_offline_profile::create_offline_profile;
 use launcher_core::application::list_accounts::list_accounts as list;
 use launcher_core::application::login_microsoft::{LoginDeps, login_microsoft as login};
 use launcher_core::application::remove_account::remove_account as remove;
 use launcher_core::application::select_account::{SelectAccountError, select_account};
+use launcher_core::application::set_cape::set_cape as wear;
+use launcher_core::domain::account::{CapeId, MAX_SKIN_PNG_BYTES, SkinVariant};
 use tauri::State;
 use tauri::ipc::Channel;
 
 use super::parse_account_id;
 use crate::dto::{
-    AccountDto, AccountPolicyDto, AccountsDto, DeviceCodeDto, PremiumNameDto, SkinDto,
+    AccountDto, AccountPolicyDto, AccountsDto, CapeDto, DeviceCodeDto, PremiumNameDto, SkinDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::state::AppState;
@@ -121,6 +125,69 @@ pub async fn get_account_skin(
         .await?
         .as_ref()
         .map(SkinDto::from))
+}
+
+/// Uploads a skin (`pngBase64`, `variant` "classic" or "slim") for a Microsoft
+/// account. Sent once: never retried.
+#[tauri::command]
+pub async fn change_account_skin(
+    state: State<'_, AppState>,
+    account_id: String,
+    png_base64: String,
+    variant: String,
+) -> Result<(), AppError> {
+    use base64::Engine;
+    let id = parse_account_id(&account_id)?;
+    let variant = match variant.as_str() {
+        "classic" => SkinVariant::Classic,
+        "slim" => SkinVariant::Slim,
+        _ => {
+            return Err(AppError::new(
+                ErrorCode::InvalidInput,
+                "unknown skin variant",
+            ));
+        }
+    };
+    // Base64 grows data by 4/3; refuse anything that cannot decode to a skin.
+    if png_base64.len() > MAX_SKIN_PNG_BYTES / 3 * 4 + 4 {
+        return Err(AppError::new(
+            ErrorCode::InvalidSkin,
+            "the image is too large",
+        ));
+    }
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(png_base64.as_bytes())
+        .map_err(|_| AppError::new(ErrorCode::InvalidSkin, "the image is not valid base64"))?;
+    let auth = state.msa.as_ref().ok_or_else(not_configured)?;
+    Ok(upload(id, png, variant, &state.accounts, &state.sessions(), auth).await?)
+}
+
+/// The capes a Microsoft account owns, read live from Mojang.
+#[tauri::command]
+pub async fn list_account_capes(
+    state: State<'_, AppState>,
+    account_id: String,
+) -> Result<Vec<CapeDto>, AppError> {
+    let id = parse_account_id(&account_id)?;
+    let auth = state.msa.as_ref().ok_or_else(not_configured)?;
+    let capes = capes(id, &state.accounts, &state.sessions(), auth).await?;
+    Ok(capes.iter().map(CapeDto::from).collect())
+}
+
+/// Wears an owned cape (`capeId`), or none for `null`.
+#[tauri::command]
+pub async fn set_account_cape(
+    state: State<'_, AppState>,
+    account_id: String,
+    cape_id: Option<String>,
+) -> Result<(), AppError> {
+    let id = parse_account_id(&account_id)?;
+    let cape = cape_id
+        .map(|raw| CapeId::parse(&raw))
+        .transpose()
+        .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))?;
+    let auth = state.msa.as_ref().ok_or_else(not_configured)?;
+    Ok(wear(id, cape, &state.accounts, &state.sessions(), auth).await?)
 }
 
 fn not_configured() -> AppError {

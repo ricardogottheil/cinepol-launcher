@@ -17,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -42,6 +42,8 @@ requirePremiumForOffline: boolean, };
 export type DeviceCodeDto = { userCode: string, verificationUri: string, expiresInSecs: number, };
 
 export type SkinDto = { dataUrl: string, slim: boolean, };
+
+export type CapeDto = { id: string, alias: string, active: boolean, dataUrl: string | null, };
 
 export type GameVersionDto = { id: string, 
 /**
@@ -209,6 +211,9 @@ export interface Commands {
   login_microsoft: { args: { operationId: string; onCode: Channel<DeviceCodeDto> }; result: AccountDto };
   remove_account: { args: { accountId: string }; result: null };
   get_account_skin: { args: { accountId: string }; result: SkinDto | null };
+  change_account_skin: { args: { accountId: string; pngBase64: string; variant: string }; result: null };
+  list_account_capes: { args: { accountId: string }; result: CapeDto[] };
+  set_account_cape: { args: { accountId: string; capeId: string | null }; result: null };
   set_active_account: { args: { accountId: string }; result: null };
   list_game_versions: { args: { includeSnapshots: boolean }; result: GameVersionsDto };
   list_instances: { args: Record<string, never>; result: Array<InstanceDto> };

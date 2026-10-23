@@ -2,6 +2,7 @@
 //!
 //! Every DTO exported to TypeScript is registered in `crate::bindings`.
 
+use launcher_core::application::account_capes::CapeTexture;
 use launcher_core::application::account_skin::SkinTexture;
 use launcher_core::application::check_premium_name::PremiumNameCheck;
 use launcher_core::application::export_mrpack::ExportSummary;
@@ -196,15 +197,40 @@ pub struct SkinDto {
     pub slim: bool,
 }
 
+fn png_data_url(png: &[u8]) -> String {
+    use base64::Engine;
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png)
+    )
+}
+
 impl From<&SkinTexture> for SkinDto {
     fn from(skin: &SkinTexture) -> Self {
-        use base64::Engine;
         Self {
-            data_url: format!(
-                "data:image/png;base64,{}",
-                base64::engine::general_purpose::STANDARD.encode(&skin.png)
-            ),
+            data_url: png_data_url(&skin.png),
             slim: skin.variant == SkinVariant::Slim,
+        }
+    }
+}
+
+/// A cape the profile owns; `dataUrl` is `null` when its texture did not load.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CapeDto {
+    pub id: String,
+    pub alias: String,
+    pub active: bool,
+    pub data_url: Option<String>,
+}
+
+impl From<&CapeTexture> for CapeDto {
+    fn from(cape: &CapeTexture) -> Self {
+        Self {
+            id: cape.id.as_str().to_owned(),
+            alias: cape.alias.clone(),
+            active: cape.active,
+            data_url: cape.png.as_deref().map(png_data_url),
         }
     }
 }

@@ -1,7 +1,9 @@
 //! The serializable error every command returns. The frontend switches on
 //! `code`; `message` is for logs and developers, never parsed.
 
+use launcher_core::application::account_capes::AccountCapesError;
 use launcher_core::application::account_skin::AccountSkinError;
+use launcher_core::application::change_skin::ChangeSkinError;
 use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
 use launcher_core::application::duplicate_instance::DuplicateInstanceError;
@@ -58,6 +60,14 @@ pub enum ErrorCode {
     NotEntitled,
     /// The launcher's Azure app is not approved for Minecraft Services yet.
     AppNotApproved,
+    /// The picked image is not a 64x64 or 64x32 PNG skin.
+    InvalidSkin,
+    /// Minecraft refused the uploaded skin.
+    SkinRejected,
+    /// The profile does not own that cape.
+    CapeNotOwned,
+    /// Minecraft limits profile changes in a row; wait a few minutes.
+    TooManyChanges,
     /// The OS keychain is missing or refused access.
     KeychainUnavailable,
     /// This build has no `MSA_CLIENT_ID`, so it cannot sign in with Microsoft.
@@ -260,6 +270,9 @@ pub fn auth_code(error: &AuthError) -> ErrorCode {
         | AuthError::ChildAccount => ErrorCode::SignInRefused,
         AuthError::NotEntitled | AuthError::NoProfile => ErrorCode::NotEntitled,
         AuthError::AppNotApproved => ErrorCode::AppNotApproved,
+        AuthError::SkinRejected => ErrorCode::SkinRejected,
+        AuthError::CapeNotOwned => ErrorCode::CapeNotOwned,
+        AuthError::TooManyRequests => ErrorCode::TooManyChanges,
         AuthError::Network(_) => ErrorCode::Network,
         AuthError::Unexpected(_) => ErrorCode::Internal,
     }
@@ -349,6 +362,31 @@ impl From<AccountSkinError> for AppError {
             AccountSkinError::NotFound => ErrorCode::NotFound,
             AccountSkinError::Storage(_) => ErrorCode::Internal,
             AccountSkinError::Auth(auth) => auth_code(auth),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<ChangeSkinError> for AppError {
+    fn from(error: ChangeSkinError) -> Self {
+        let code = match &error {
+            ChangeSkinError::NotFound => ErrorCode::NotFound,
+            ChangeSkinError::NotMicrosoft => ErrorCode::InvalidInput,
+            ChangeSkinError::InvalidSkin(_) => ErrorCode::InvalidSkin,
+            ChangeSkinError::Session(session) => session_code(session),
+            ChangeSkinError::Storage(_) => ErrorCode::Internal,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<AccountCapesError> for AppError {
+    fn from(error: AccountCapesError) -> Self {
+        let code = match &error {
+            AccountCapesError::NotFound => ErrorCode::NotFound,
+            AccountCapesError::NotMicrosoft => ErrorCode::InvalidInput,
+            AccountCapesError::Session(session) => session_code(session),
+            AccountCapesError::Storage(_) => ErrorCode::Internal,
         };
         Self::new(code, error.to_string())
     }

@@ -10,7 +10,7 @@ use ts_rs::{Config, TS};
 
 use crate::dto::{
     AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, AppUpdateStatusDto,
-    CommunityLinksDto, ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto,
+    CapeDto, CommunityLinksDto, ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto,
     InstallSummaryDto, InstanceDto, InstanceOriginDto, InstanceSettingsDto, JavaChoiceDto,
     JavaKindDto, LaunchOutcomeDto, LoaderReleaseDto, LogLevelDto, LogLineDto, LogStreamDto,
     ManualDownloadsDto, ManualFileDto, ModpackCatalogsDto, ModpackDetailsDto, ModpackExportDto,
@@ -52,6 +52,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         AccountPolicyDto::decl(cfg),
         DeviceCodeDto::decl(cfg),
         SkinDto::decl(cfg),
+        CapeDto::decl(cfg),
         GameVersionDto::decl(cfg),
         GameVersionsDto::decl(cfg),
         LoaderReleaseDto::decl(cfg),
@@ -159,6 +160,28 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             "get_account_skin",
             vec![("accountId", string())],
             format!("{} | null", SkinDto::name(cfg)),
+        ),
+        command(
+            "change_account_skin",
+            vec![
+                ("accountId", string()),
+                ("pngBase64", string()),
+                ("variant", string()),
+            ],
+            "null".to_owned(),
+        ),
+        command(
+            "list_account_capes",
+            vec![("accountId", string())],
+            format!("{}[]", CapeDto::name(cfg)),
+        ),
+        command(
+            "set_account_cape",
+            vec![
+                ("accountId", string()),
+                ("capeId", format!("{} | null", string())),
+            ],
+            "null".to_owned(),
         ),
         command(
             "set_active_account",
@@ -473,6 +496,9 @@ mod tests {
             "login_microsoft",
             "remove_account",
             "get_account_skin",
+            "change_account_skin",
+            "list_account_capes",
+            "set_account_cape",
             "set_active_account",
             "list_game_versions",
             "list_loader_versions",
