@@ -27,12 +27,14 @@ use crate::domain::server_list::{ServerList, ServerListStore, ServerListStoreErr
 use tokio_util::sync::CancellationToken;
 
 mod auth;
+mod curseforge;
 mod launch;
 mod modpack;
 mod server;
 mod update;
 
 pub use auth::{FakeMicrosoftAuth, FakeSessions, sample_profile, tokens};
+pub use curseforge::{FakeCurseForge, FakeCurseForgeArchive};
 pub use launch::{
     FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, InMemoryRunningGames,
     RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,

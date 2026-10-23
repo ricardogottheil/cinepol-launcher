@@ -284,7 +284,7 @@ const UNWRITTEN: &str = "unwritten";
 
 /// The shared pipeline; `staging` exists and is released by the caller.
 #[allow(clippy::too_many_arguments)]
-async fn sync_into<D, F, P, M, R>(
+pub(crate) async fn sync_into<D, F, P, M, R>(
     deps: &FileSyncDeps<'_, D, F, P, M>,
     instance: &InstanceId,
     entries: &[PackEntry],

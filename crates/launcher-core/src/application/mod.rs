@@ -16,6 +16,7 @@ pub mod export_mrpack;
 pub mod get_modpack_details;
 pub mod get_settings;
 pub mod install_app_update;
+pub mod install_curseforge;
 pub mod install_instance;
 pub mod install_modpack;
 pub mod install_packwiz;
