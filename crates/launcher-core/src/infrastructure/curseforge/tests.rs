@@ -98,6 +98,18 @@ async fn reads_a_modpack_and_its_installable_versions_newest_first() {
 }
 
 #[tokio::test]
+async fn a_project_that_is_not_a_modpack_is_not_found() {
+    let modpack = String::from_utf8(fixture("mod-modpack.json")).unwrap();
+    let a_mod = modpack.replace("\"classId\":4471", "\"classId\":6");
+    assert_ne!(a_mod, modpack);
+    let cf = source(vec![(format!("{BASE}/v1/mods/{FO}"), a_mod.into_bytes())]);
+    assert_eq!(
+        cf.project(FO).await,
+        Err(ModpackSourceError::NotFound(FO.into()))
+    );
+}
+
+#[tokio::test]
 async fn refuses_ids_that_are_not_numbers_without_asking() {
     let cf = source(vec![]);
     for bad in ["../x", "abc", "", "0", "1234567890123"] {
