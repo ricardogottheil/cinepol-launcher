@@ -15,6 +15,7 @@ use launcher_core::domain::ports::Secret;
 use launcher_core::domain::server::ServerConfig;
 use launcher_core::infrastructure::archive::{ZipMrpackArchive, ZipNativesExtractor};
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
+use launcher_core::infrastructure::curseforge::CurseForgeSource;
 use launcher_core::infrastructure::fs::{
     JsonAccountRepository, JsonInstanceRepository, JsonPackManifestStore, JsonSettingsRepository,
     StdPackFiles, TokioFileSystem,
@@ -52,6 +53,17 @@ fn msa_client_id() -> Option<String> {
         .or_else(|| option_env!("MSA_CLIENT_ID").map(str::to_owned))
         .map(|id| id.trim().to_owned())
         .filter(|id| !id.is_empty())
+}
+
+/// The CurseForge API key: `CURSEFORGE_API_KEY` at run time (development) or
+/// at build time (`build.rs` reads it from `.env`; CI passes a secret).
+/// `None` builds a launcher without CurseForge.
+fn curseforge_api_key() -> Option<String> {
+    std::env::var("CURSEFORGE_API_KEY")
+        .ok()
+        .or_else(|| option_env!("CURSEFORGE_API_KEY").map(str::to_owned))
+        .map(|key| key.trim().to_owned())
+        .filter(|key| !key.is_empty())
 }
 
 /// The keychain service name: the app identifier, so entries are easy to find.
@@ -115,6 +127,7 @@ pub struct AppState {
     pub config_source: HttpServerConfigSource<ReqwestHttpClient>,
     /// The Modrinth catalog (modpack search, versions, file lookups).
     pub modrinth: ModrinthSource<ReqwestHttpClient>,
+    pub curseforge: CurseForgeSource<ReqwestHttpClient>,
     pub mrpack: ZipMrpackArchive,
     /// packwiz packs over HTTP or from a local folder.
     pub packwiz: PackwizFiles<ReqwestHttpClient>,
@@ -225,6 +238,7 @@ impl AppState {
             versions: MojangVersionSource::new(http.clone(), paths.clone()),
             config_source: HttpServerConfigSource::new(http.clone()),
             modrinth: ModrinthSource::new(http.clone()),
+            curseforge: CurseForgeSource::new(http.clone(), curseforge_api_key().as_deref()),
             mrpack: ZipMrpackArchive::new(),
             packwiz: PackwizFiles::new(http.clone()),
             pack_files: StdPackFiles,

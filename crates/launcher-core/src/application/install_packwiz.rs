@@ -16,13 +16,14 @@ use crate::application::install_modpack::{ClaimInstance, discard_instance};
 use crate::application::modpack_files::{FileSyncDeps, PackSyncError, SyncSummary, sync_files};
 use crate::domain::instance::{Instance, InstanceId, InstanceOrigin, InstanceRepository};
 use crate::domain::launch::RelativePath;
+use crate::domain::modpack::curseforge::is_allowed_download;
 use crate::domain::modpack::packwiz::{
     Metafile, MetafileSource, PackwizError, PackwizIndex, PackwizPack,
 };
 use crate::domain::modpack::sync::{EntrySource, ManualFile, PackEntry, PackManifest};
 use crate::domain::modpack::{
-    ModpackRef, ModpackSourceKind, PackFileError, PackFileLocation, PackFiles, PackLocation,
-    PackManifestStore, PackwizSource,
+    CurseForgeLookup, ModpackRef, ModpackSourceError, ModpackSourceKind, PackFileError,
+    PackFileLocation, PackFiles, PackLocation, PackManifestStore, PackwizSource,
 };
 use crate::domain::ports::{Downloader, FileSystem, ProgressReporter};
 use crate::domain::server_list::{ServerEntry, ServerListStore};
@@ -63,10 +64,12 @@ pub struct InstallPackwizRequest<'a> {
 }
 
 /// Everything the packwiz installer talks to.
-pub struct InstallPackwizDeps<'a, I, S, W, D, F, P, M> {
+pub struct InstallPackwizDeps<'a, I, S, W, L, D, F, P, M> {
     pub instances: &'a I,
     pub servers: &'a S,
     pub source: &'a W,
+    /// Resolves CurseForge-mode files; without a key they stay manual.
+    pub curseforge: &'a L,
     pub files: FileSyncDeps<'a, D, F, P, M>,
 }
 
@@ -81,9 +84,9 @@ pub struct InstalledPackwiz {
 /// The new instance gets a [`InstanceOrigin::Modpack`] origin pointing at the
 /// pack's location, so it can be updated later. When writing the pack's
 /// files fails, the new instance is deleted again (metadata and folder).
-pub async fn install_packwiz<I, S, W, D, F, P, M, R>(
+pub async fn install_packwiz<I, S, W, L, D, F, P, M, R>(
     request: InstallPackwizRequest<'_>,
-    deps: &InstallPackwizDeps<'_, I, S, W, D, F, P, M>,
+    deps: &InstallPackwizDeps<'_, I, S, W, L, D, F, P, M>,
     reporter: &R,
     cancel: &CancellationToken,
 ) -> Result<InstalledPackwiz, InstallPackwizError>
@@ -91,13 +94,15 @@ where
     I: InstanceRepository,
     S: ServerListStore,
     W: PackwizSource,
+    L: CurseForgeLookup,
     D: Downloader,
     F: FileSystem,
     P: PackFiles,
     M: PackManifestStore,
     R: ProgressReporter,
 {
-    let contents = read_packwiz(deps.source, request.pack, cancel).await?;
+    let mut contents = read_packwiz(deps.source, request.pack, cancel).await?;
+    download_curseforge_files(deps.curseforge, &mut contents).await?;
     if cancel.is_cancelled() {
         return Err(InstallPackwizError::Cancelled);
     }
@@ -146,6 +151,51 @@ where
             Err(error.into())
         }
     }
+}
+
+/// Turns the pack's CurseForge-mode files into downloads when CurseForge
+/// gives a download URL for them; files whose author forbids third-party
+/// distribution (and every file, without a key) stay manual. Downloads are
+/// verified with the hash the pack declares, not the one CurseForge reports.
+pub(crate) async fn download_curseforge_files<L: CurseForgeLookup>(
+    lookup: &L,
+    contents: &mut PackwizContents,
+) -> Result<(), PackSyncError> {
+    if contents.manual.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<u64> = contents.manual.iter().map(|file| file.file_id).collect();
+    let known = match lookup.files(&ids).await {
+        Ok(known) => known,
+        Err(ModpackSourceError::NotConfigured(_)) => return Ok(()),
+        Err(error) => {
+            return Err(PackSyncError::Files(PackFileError::Source(
+                error.to_string(),
+            )));
+        }
+    };
+    let mut manual = Vec::new();
+    for file in std::mem::take(&mut contents.manual) {
+        let download = known
+            .iter()
+            .find(|known| known.id == file.file_id && known.project_id == file.project_id)
+            .and_then(|known| Some((known.download_url.clone()?, known.length)))
+            .filter(|(url, _)| is_allowed_download(url));
+        match download {
+            Some((url, size)) => contents.entries.push(PackEntry {
+                path: file.path,
+                source: EntrySource::Download {
+                    urls: vec![url],
+                    checksum: file.checksum,
+                    size,
+                },
+                preserve: false,
+            }),
+            None => manual.push(file),
+        }
+    }
+    contents.manual = manual;
+    Ok(())
 }
 
 /// The origin of an instance installed from `pack` at `location`.
@@ -454,9 +504,9 @@ mod tests {
     use crate::domain::loader::LoaderKind;
     use crate::domain::modpack::packwiz::RawIndexEntry;
     use crate::testing::{
-        FakeDownloader, FakeFileSystem, FakePackFiles, FakePackwizSource,
+        FakeCurseForge, FakeDownloader, FakeFileSystem, FakePackFiles, FakePackwizSource,
         InMemoryInstanceRepository, InMemoryPackManifestStore, InMemoryServerListStore,
-        RecordingReporter, sha1_hex,
+        RecordingReporter, no_curseforge, sha1_hex,
     };
 
     const ID: &str = "cinepol-pack";
@@ -466,6 +516,7 @@ mod tests {
         InMemoryInstanceRepository,
         InMemoryServerListStore,
         W,
+        FakeCurseForge,
         D,
         FakeFileSystem,
         FakePackFiles,
@@ -477,6 +528,7 @@ mod tests {
             instances: &world.instances,
             servers: &world.servers,
             source,
+            curseforge: no_curseforge(),
             files: file_deps(world, downloader),
         }
     }
@@ -504,6 +556,17 @@ mod tests {
             cancel,
         )
         .await
+    }
+
+    fn downloader_bodies() -> Vec<(String, Vec<u8>)> {
+        vec![
+            (
+                format!("{BASE}config/sodium.toml"),
+                b"quality = 'high'".to_vec(),
+            ),
+            (cdn("sodium.jar"), b"sodium".to_vec()),
+            (cdn("server-only.jar"), b"server".to_vec()),
+        ]
     }
 
     fn url_pack() -> (FakePackwizSource, FakeDownloader) {
@@ -690,6 +753,112 @@ mod tests {
             .unwrap();
         assert!(manifest.files.contains_key(&rel("options.txt")));
         assert!(manifest.files.contains_key(&rel("mods/renamed-sodium.jar")));
+    }
+
+    fn jei_on_curseforge(downloadable: bool) -> FakeCurseForge {
+        FakeCurseForge {
+            files: vec![crate::domain::modpack::curseforge::CurseForgeFile {
+                id: 5_101_366,
+                project_id: 238_222,
+                file_name: "jei.jar".into(),
+                length: Some(3),
+                sha1: Some(sha1_hex(b"jei")),
+                download_url: downloadable
+                    .then(|| "https://edge.forgecdn.net/files/5101/366/jei.jar".into()),
+            }],
+            ..FakeCurseForge::default()
+        }
+    }
+
+    async fn install_with(
+        world: &World,
+        curseforge: &FakeCurseForge,
+        downloader: &FakeDownloader,
+    ) -> Result<InstalledPackwiz, InstallPackwizError> {
+        let (source, _) = url_pack();
+        let deps = InstallPackwizDeps {
+            curseforge,
+            ..deps(world, &source, downloader)
+        };
+        install_packwiz(
+            request(&location()),
+            &deps,
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn a_curseforge_file_downloads_when_curseforge_gives_its_url() {
+        let world = World::new(vec![]);
+        let downloader = FakeDownloader::with(downloader_bodies().into_iter().chain([(
+            "https://edge.forgecdn.net/files/5101/366/jei.jar".to_owned(),
+            b"jei".to_vec(),
+        )]));
+        let curseforge = jei_on_curseforge(true);
+        let installed = install_with(&world, &curseforge, &downloader)
+            .await
+            .unwrap();
+
+        assert!(installed.pending.is_empty());
+        assert_eq!(world.read_game_file(ID, "mods/jei.jar").unwrap(), b"jei");
+        assert_eq!(curseforge.file_lookups(), [vec![5_101_366]]);
+        // Verified with the fingerprint the pack declares, not CurseForge's sha1.
+        let jei = downloader
+            .requests()
+            .into_iter()
+            .find(|r| r.url.ends_with("/jei.jar"))
+            .unwrap();
+        assert_eq!(jei.checksum.unwrap().algorithm(), HashAlgorithm::Murmur2);
+        assert_eq!(jei.size, Some(3));
+        assert!(
+            world
+                .manifests
+                .load(&installed.instance.id)
+                .await
+                .unwrap()
+                .pending
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn curseforge_files_stay_manual_when_not_distributable_or_without_a_key() {
+        let (_, downloader) = url_pack();
+        for curseforge in [
+            jei_on_curseforge(false),
+            FakeCurseForge {
+                failure: Some(ModpackSourceError::NotConfigured(
+                    ModpackSourceKind::CurseForge,
+                )),
+                ..jei_on_curseforge(true)
+            },
+        ] {
+            let world = World::new(vec![]);
+            let installed = install_with(&world, &curseforge, &downloader)
+                .await
+                .unwrap();
+            assert_eq!(installed.pending.len(), 1);
+            assert_eq!(installed.pending[0].path, rel("mods/jei.jar"));
+            assert!(world.read_game_file(ID, "mods/jei.jar").is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_curseforge_fails_the_install() {
+        let world = World::new(vec![]);
+        let (_, downloader) = url_pack();
+        let curseforge = FakeCurseForge {
+            failure: Some(ModpackSourceError::Network("timed out".into())),
+            ..FakeCurseForge::default()
+        };
+        let result = install_with(&world, &curseforge, &downloader).await;
+        assert!(
+            matches!(result, Err(InstallPackwizError::Pack(_))),
+            "{result:?}"
+        );
+        assert!(world.instances.list().await.unwrap().is_empty());
     }
 
     #[tokio::test]

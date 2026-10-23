@@ -13,6 +13,7 @@
 #![cfg(feature = "network-tests")]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use launcher_core::infrastructure::curseforge::CurseForgeSource;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -124,6 +125,11 @@ async fn installs_and_launches_a_packwiz_pack_offline() {
     println!("data dir: {}", paths.root().display());
 
     let http = ReqwestHttpClient::new(USER_AGENT).expect("http client");
+    // CurseForge-mode files download on their own with a key, and stay manual without one.
+    let curseforge = CurseForgeSource::new(
+        http.clone(),
+        std::env::var("CURSEFORGE_API_KEY").ok().as_deref(),
+    );
     let downloader = DownloadManager::new(http.inner().clone(), DownloadConfig::default());
     let packwiz = PackwizFiles::new(http.clone());
     let versions = MojangVersionSource::new(http.clone(), paths.clone());
@@ -157,6 +163,7 @@ async fn installs_and_launches_a_packwiz_pack_offline() {
             instances: &instances,
             servers: &NoServerList,
             source: &packwiz,
+            curseforge: &curseforge,
             files: FileSyncDeps {
                 downloader: &downloader,
                 fs: &TokioFileSystem,

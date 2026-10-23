@@ -34,7 +34,7 @@ mod server;
 mod update;
 
 pub use auth::{FakeMicrosoftAuth, FakeSessions, sample_profile, tokens};
-pub use curseforge::{FakeCurseForge, FakeCurseForgeArchive};
+pub use curseforge::{FakeCurseForge, FakeCurseForgeArchive, no_curseforge};
 pub use launch::{
     FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource, InMemoryRunningGames,
     RecordingLogSink, RecordingNativesExtractor, sample_asset_index, sample_version_spec,

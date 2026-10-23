@@ -146,6 +146,7 @@ async fn install_new(
         instances: &state.instances,
         servers: &state.servers,
         source: &state.packwiz,
+        curseforge: &state.curseforge,
         files: state.pack_sync().file_sync(),
     };
     let installed = install_pack(request, &deps, &reporter, token).await?;
@@ -171,6 +172,7 @@ async fn update_held(
     let deps = UpdatePackwizDeps {
         instances: &state.instances,
         source: &state.packwiz,
+        curseforge: &state.curseforge,
         files: state.pack_sync().file_sync(),
     };
     let updated = update(id, &deps, &reporter, token).await?;

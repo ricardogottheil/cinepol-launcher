@@ -6,14 +6,17 @@
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
-use crate::application::install_packwiz::{packwiz_origin, read_packwiz};
+use crate::application::install_packwiz::{
+    download_curseforge_files, packwiz_origin, read_packwiz,
+};
 use crate::application::modpack_files::{FileSyncDeps, PackSyncError, SyncSummary, sync_files};
 use crate::domain::instance::{
     Instance, InstanceId, InstanceOrigin, InstanceRepository, InstanceRepositoryError,
 };
 use crate::domain::modpack::sync::ManualFile;
 use crate::domain::modpack::{
-    ModpackSourceKind, PackFileError, PackFiles, PackLocation, PackManifestStore, PackwizSource,
+    CurseForgeLookup, ModpackSourceKind, PackFileError, PackFiles, PackLocation, PackManifestStore,
+    PackwizSource,
 };
 use crate::domain::ports::{Downloader, FileSystem, ProgressReporter};
 
@@ -45,9 +48,11 @@ impl From<PackFileError> for UpdatePackwizError {
 }
 
 /// Everything the packwiz updater talks to.
-pub struct UpdatePackwizDeps<'a, I, W, D, F, P, M> {
+pub struct UpdatePackwizDeps<'a, I, W, L, D, F, P, M> {
     pub instances: &'a I,
     pub source: &'a W,
+    /// Resolves CurseForge-mode files; without a key they stay manual.
+    pub curseforge: &'a L,
     pub files: FileSyncDeps<'a, D, F, P, M>,
 }
 
@@ -64,15 +69,16 @@ pub struct UpdatedPackwiz {
 /// pack files that are still intact are replaced or removed, preserved files
 /// are never replaced, and the instance's game version, loader and origin
 /// version follow the pack.
-pub async fn update_packwiz<I, W, D, F, P, M, R>(
+pub async fn update_packwiz<I, W, L, D, F, P, M, R>(
     id: &InstanceId,
-    deps: &UpdatePackwizDeps<'_, I, W, D, F, P, M>,
+    deps: &UpdatePackwizDeps<'_, I, W, L, D, F, P, M>,
     reporter: &R,
     cancel: &CancellationToken,
 ) -> Result<UpdatedPackwiz, UpdatePackwizError>
 where
     I: InstanceRepository,
     W: PackwizSource,
+    L: CurseForgeLookup,
     D: Downloader,
     F: FileSystem,
     P: PackFiles,
@@ -86,7 +92,8 @@ where
         }
         _ => return Err(UpdatePackwizError::NotPackwiz(instance.id)),
     };
-    let contents = read_packwiz(deps.source, &location, cancel).await?;
+    let mut contents = read_packwiz(deps.source, &location, cancel).await?;
+    download_curseforge_files(deps.curseforge, &mut contents).await?;
     let previous = deps.files.manifests.load(&instance.id).await?;
     let synced = sync_files(
         &deps.files,
@@ -209,6 +216,7 @@ mod tests {
                 instances: &world.instances,
                 servers: &world.servers,
                 source: &source,
+                curseforge: crate::testing::no_curseforge(),
                 files: file_deps(world, &downloader),
             },
             &RecordingReporter::default(),
@@ -227,6 +235,7 @@ mod tests {
         let deps = UpdatePackwizDeps {
             instances: &world.instances,
             source,
+            curseforge: crate::testing::no_curseforge(),
             files: file_deps(world, downloader),
         };
         update_packwiz(&id(), &deps, &RecordingReporter::default(), cancel).await

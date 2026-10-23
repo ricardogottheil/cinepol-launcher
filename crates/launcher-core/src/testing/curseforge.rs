@@ -105,6 +105,13 @@ impl CurseForgeLookup for FakeCurseForge {
     }
 }
 
+/// A catalog that knows no files: CurseForge-mode files stay manual.
+pub fn no_curseforge() -> &'static FakeCurseForge {
+    static NONE: std::sync::LazyLock<FakeCurseForge> =
+        std::sync::LazyLock::new(FakeCurseForge::default);
+    &NONE
+}
+
 /// Serves a manifest and override files per archive path; records the
 /// overrides folder each extraction asked for.
 #[derive(Debug, Default)]
