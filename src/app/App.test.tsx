@@ -31,7 +31,10 @@ describe("App shell", () => {
     renderAt("/");
     const nav = await screen.findByRole("navigation", { name: esCommon.chrome.mainNavigation });
     const groups: [string, string[]][] = [
-      [esCommon.navGroups.game, [esCommon.nav.home, esCommon.nav.instances, esCommon.nav.modpacks]],
+      [
+        esCommon.navGroups.game,
+        [esCommon.nav.home, esCommon.nav.instances, esCommon.nav.servers, esCommon.nav.modpacks],
+      ],
       [esCommon.navGroups.player, [esCommon.nav.profile]],
       [esCommon.navGroups.launcher, [esCommon.nav.settings]],
     ];

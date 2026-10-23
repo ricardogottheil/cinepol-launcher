@@ -62,8 +62,14 @@ export interface InstanceActivity {
 interface ActivityState {
   byInstance: Record<string, InstanceActivity>;
   install: (instanceId: string) => Promise<InstallSummaryDto | null>;
-  /** `syncPack` updates a packwiz instance first, and plays only if that worked. */
-  play: (instanceId: string, options?: { syncPack?: boolean }) => Promise<LaunchOutcomeDto | null>;
+  /**
+   * `syncPack` updates a packwiz instance first, and plays only if that worked;
+   * `joinServer` (`host[:port]`) connects to that server as the game starts.
+   */
+  play: (
+    instanceId: string,
+    options?: { syncPack?: boolean; joinServer?: string },
+  ) => Promise<LaunchOutcomeDto | null>;
   stop: (instanceId: string) => Promise<void>;
   /** Updates a modpack instance in place, keeping the player's changes. */
   /** Resolves with what the update left to download by hand, or `null` when it failed. */
@@ -182,7 +188,7 @@ export const useActivityStore = create<ActivityState>((set) => {
 
   const play = async (
     instanceId: string,
-    options: { syncPack?: boolean } = {},
+    options: { syncPack?: boolean; joinServer?: string } = {},
   ): Promise<LaunchOutcomeDto | null> => {
     if (options.syncPack) {
       const synced = await updatePack(instanceId, "packwiz");
@@ -203,7 +209,7 @@ export const useActivityStore = create<ActivityState>((set) => {
 
     const launch = async () => {
       update(instanceId, { activity: { kind: "running" }, logs: [], error: null, lastExit: null });
-      return launchInstance(instanceId, appendLine);
+      return launchInstance(instanceId, appendLine, options.joinServer ?? null);
     };
 
     try {

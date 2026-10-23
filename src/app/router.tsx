@@ -12,6 +12,7 @@ import { HomePage } from "../features/home/HomePage";
 import { InstancesPage } from "../features/instances/InstancesPage";
 import { ModpackDetailPage } from "../features/modpacks/ModpackDetailPage";
 import { ModpacksPage } from "../features/modpacks/ModpacksPage";
+import { ServersPage } from "../features/servers/ServersPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { AppShell } from "./shell/AppShell";
 
@@ -32,6 +33,7 @@ const designRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   homeRoute,
   createRoute({ getParentRoute: () => rootRoute, path: "/instances", component: InstancesPage }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/servers", component: ServersPage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/modpacks", component: ModpacksPage }),
   createRoute({
     getParentRoute: () => rootRoute,

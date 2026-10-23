@@ -26,6 +26,8 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 ## Features
 
 - One click to play on CINEPOL, with live server status.
+- Other servers saved next to CINEPOL, each with its live status and the
+  instance it is played with.
 - Microsoft (premium) and offline profiles, switched from the sidebar; premium
   profiles can change their skin and cape from the launcher.
 - Isolated instances with Vanilla, Fabric, Quilt, Forge and NeoForge, each with

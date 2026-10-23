@@ -7,10 +7,11 @@ import { bundledConfigDto, useServerConfig } from "../../features/server/useServ
 import { openExternal } from "../../ipc/client";
 
 type NavItem = {
-  to: "/" | "/instances" | "/modpacks" | "/profile" | "/settings" | "/design";
+  to: "/" | "/instances" | "/servers" | "/modpacks" | "/profile" | "/settings" | "/design";
   key:
     | "nav.home"
     | "nav.instances"
+    | "nav.servers"
     | "nav.modpacks"
     | "nav.profile"
     | "nav.settings"
@@ -25,6 +26,7 @@ const GROUPS: { key: NavGroupKey; items: NavItem[] }[] = [
     items: [
       { to: "/", key: "nav.home" },
       { to: "/instances", key: "nav.instances" },
+      { to: "/servers", key: "nav.servers" },
       { to: "/modpacks", key: "nav.modpacks" },
     ],
   },

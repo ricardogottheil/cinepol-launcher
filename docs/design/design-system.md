@@ -191,7 +191,7 @@ App shell (`src/app/shell/`):
   `src-tauri/tauri.macos.conf.json`) and the wordmark clears them.
 - **Sidebar**: text-only section rail, like the website's section strip (no
   decorative icons, D:239-268), grouped by what the player is doing: Game
-  (Home, Instances, Modpacks), Player (Profile), Launcher (Settings). Group
+  (Home, Instances, Servers, Modpacks), Player (Profile), Launcher (Settings). Group
   names are `plate` in `engrave`; current item: `silk` on `panel`. Community
   links (Twitch, Discord) sit above the profile switcher at the foot.
 - **Profile switcher**: the active profile (head, name, kind plate) at the
@@ -211,6 +211,11 @@ App shell (`src/app/shell/`):
   page (`/modpacks/<catalog>/<project>`) with its versions. Installed reuses
   the instance rows; Import groups the file pickers and packwiz. The tab, the
   catalog and the search survive opening a pack.
+- **Servers**: CINEPOL pinned first on a `panel` plate with its live status
+  and the page's only signal control (Play); then "Your servers" as rows
+  (name, address readout, status lamp, players, version, latency, the
+  instance select, then Play, Edit and Remove as plate buttons); then the add
+  form. Play without an instance focuses the select and says why.
 - **Settings > About**: the version and the legal disclaimer.
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (server, recommended version, active account as a spec
