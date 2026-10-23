@@ -22,7 +22,9 @@ pub struct FakeMicrosoftAuth {
     pub owns_game: Result<bool, AuthError>,
     pub profile: Result<MinecraftProfile, AuthError>,
     pub skin: Result<Vec<u8>, AuthError>,
-    /// The answer of a skin upload and of a cape change.
+    /// The answer of a skin upload.
+    pub uploaded: Result<Option<Skin>, AuthError>,
+    /// The answer of a cape change.
     pub change: Result<MinecraftProfile, AuthError>,
     calls: Mutex<Vec<String>>,
 }
@@ -70,6 +72,7 @@ impl FakeMicrosoftAuth {
             owns_game: Ok(true),
             profile: Ok(sample_profile()),
             skin: Ok(b"\x89PNG".to_vec()),
+            uploaded: Ok(sample_profile().skin),
             change: Ok(sample_profile()),
             calls: Mutex::default(),
         }
@@ -138,13 +141,13 @@ impl MicrosoftAuth for FakeMicrosoftAuth {
         minecraft_token: &Secret,
         skin: &SkinPng,
         variant: SkinVariant,
-    ) -> Result<MinecraftProfile, AuthError> {
+    ) -> Result<Option<Skin>, AuthError> {
         self.record(format!(
             "upload:{}:{variant:?}:{}",
             minecraft_token.expose(),
             skin.as_bytes().len()
         ));
-        self.change.clone()
+        self.uploaded.clone()
     }
 
     async fn set_cape(

@@ -4,8 +4,8 @@ use thiserror::Error;
 
 use super::refresh_session::{PremiumSessions, SessionError};
 use crate::domain::account::{
-    AccountId, AccountKind, AccountRepository, AccountRepositoryError, MicrosoftAuth, SkinPng,
-    SkinPngError, SkinVariant,
+    Account, AccountId, AccountKind, AccountRepository, AccountRepositoryError, MicrosoftAuth,
+    SkinPng, SkinPngError, SkinVariant,
 };
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -25,6 +25,7 @@ pub enum ChangeSkinError {
 /// Checks the image, uploads it once (Mojang may suspend accounts that keep
 /// hitting its rate limit, so nothing here retries) and stores the skin
 /// Mojang now reports, so the preview shows it without signing in again.
+/// Once Mojang applied the upload this succeeds, even when storing fails.
 pub async fn change_skin<A, Q, M>(
     id: AccountId,
     png: Vec<u8>,
@@ -38,32 +39,53 @@ where
     Q: PremiumSessions,
     M: MicrosoftAuth,
 {
-    let mut account = accounts
-        .list()
-        .await?
-        .into_iter()
-        .find(|account| account.id == id)
-        .ok_or(ChangeSkinError::NotFound)?;
+    let account = find(id, accounts).await?;
     if !matches!(account.kind, AccountKind::Microsoft(_)) {
         return Err(ChangeSkinError::NotMicrosoft);
     }
     let skin = SkinPng::parse(png)?;
     let token = sessions.session_token(&account).await?;
-    let profile = auth
+    let reported = auth
         .upload_skin(&token, &skin, variant)
         .await
         .map_err(SessionError::from)?;
-    if let AccountKind::Microsoft(microsoft) = &mut account.kind {
-        microsoft.skin = profile.skin;
+    // The upload is applied from here on, so nothing below reports a failure:
+    // the player would upload again against Mojang's rate limit.
+    let Some(reported) = reported else {
+        return Ok(());
+    };
+    // The account as it is now: the upload took a while, and a sign-in may
+    // have saved it meanwhile. A removed account is left removed.
+    match find(id, accounts).await {
+        Ok(mut latest) => {
+            if let AccountKind::Microsoft(microsoft) = &mut latest.kind {
+                microsoft.skin = Some(reported);
+                if let Err(error) = accounts.save(&latest).await {
+                    tracing::warn!(%error, "the new skin is applied but could not be stored");
+                }
+            }
+        }
+        Err(error) => tracing::warn!(%error, "the account changed while its skin was uploaded"),
     }
-    accounts.save(&account).await?;
     Ok(())
+}
+
+async fn find<A: AccountRepository>(
+    id: AccountId,
+    accounts: &A,
+) -> Result<Account, ChangeSkinError> {
+    accounts
+        .list()
+        .await?
+        .into_iter()
+        .find(|account| account.id == id)
+        .ok_or(ChangeSkinError::NotFound)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::account::{Account, AuthError, Skin, SkinUrl, Username};
+    use crate::domain::account::{AuthError, Skin, SkinUrl, Username};
     use crate::testing::{
         FakeMicrosoftAuth, FakeSessions, InMemoryAccountRepository, sample_profile,
     };
@@ -97,7 +119,7 @@ mod tests {
         let accounts = InMemoryAccountRepository::with(vec![account.clone()]);
         let sessions = FakeSessions::with_token("mc-token");
         let mut auth = FakeMicrosoftAuth::approving();
-        auth.change = Ok(slim_profile());
+        auth.uploaded = Ok(slim_profile().skin);
 
         change_skin(
             account.id,
@@ -181,7 +203,7 @@ mod tests {
         let accounts = InMemoryAccountRepository::with(vec![account.clone()]);
         let sessions = FakeSessions::with_token("mc-token");
         let mut auth = FakeMicrosoftAuth::approving();
-        auth.change = Err(AuthError::SkinRejected);
+        auth.uploaded = Err(AuthError::SkinRejected);
 
         assert_eq!(
             change_skin(
@@ -197,6 +219,27 @@ mod tests {
                 AuthError::SkinRejected
             )))
         );
+        assert_eq!(accounts.list().await.unwrap(), [account]);
+    }
+
+    #[tokio::test]
+    async fn an_upload_that_reports_no_skin_keeps_the_stored_one() {
+        let account = premium();
+        let accounts = InMemoryAccountRepository::with(vec![account.clone()]);
+        let sessions = FakeSessions::with_token("mc-token");
+        let mut auth = FakeMicrosoftAuth::approving();
+        auth.uploaded = Ok(None);
+
+        change_skin(
+            account.id,
+            png(),
+            SkinVariant::Slim,
+            &accounts,
+            &sessions,
+            &auth,
+        )
+        .await
+        .unwrap();
         assert_eq!(accounts.list().await.unwrap(), [account]);
     }
 

@@ -18,14 +18,18 @@ rate-limited skin uploads can lead to an account suspension.
   single-shot `HttpRequester` port (never retried), and the UI mutations do
   not retry either. A refused or rate-limited change is reported
   (`skin_rejected`, `cape_not_owned`, `too_many_changes`); the player decides
-  whether to try again.
+  whether to try again. Once Mojang applied an upload it is reported as done,
+  even when its answer is unreadable or storing the new skin fails, so the
+  player is never led to upload again.
 - **Checked before upload.** `SkinPng` accepts only a PNG whose IHDR header is
   64x64 or 64x32 and at most 256 KiB. The UI runs the same check on the picked
   file, so a wrong file fails at once and never counts against the limit.
 - **Tokens.** Changes use `MicrosoftSessions::session_token`, the same refresh
   path as launching; an expired session asks the player to sign in again.
-- **Storage.** After an upload, the skin Mojang reports replaces the account's
-  stored skin link in `accounts.json` (same format). Capes are never stored:
+- **Storage.** After an upload, the skin Mojang reports replaces the skin link
+  of the account as stored after the upload (re-read, so a concurrent sign-in
+  is not overwritten) in `accounts.json` (same format); an answer without a
+  skin keeps the stored one. Capes are never stored:
   the profile page reads them live from `GET /minecraft/profile`, with their
   textures, and a cape whose texture fails to download is still listed.
 - **Transport.** `HttpRequester` gained `PUT`, `DELETE` and a

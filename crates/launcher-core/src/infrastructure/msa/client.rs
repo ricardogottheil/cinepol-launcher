@@ -531,7 +531,7 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
         minecraft_token: &Secret,
         skin: &SkinPng,
         variant: SkinVariant,
-    ) -> Result<MinecraftProfile, AuthError> {
+    ) -> Result<Option<Skin>, AuthError> {
         let step = Step::SkinUpload;
         let variant = match variant {
             SkinVariant::Classic => "classic",
@@ -546,7 +546,11 @@ impl<H: HttpRequester> MicrosoftAuth for MsaClient<H> {
         if !response.is_success() {
             return Err(change_error(step, response.status, AuthError::SkinRejected));
         }
-        read_profile(step, &response)
+        // Applied either way: an unreadable answer must not read as a failure,
+        // or the player would upload again against Mojang's rate limit.
+        Ok(read_profile(step, &response)
+            .ok()
+            .and_then(|profile| profile.skin))
     }
 
     async fn set_cape(

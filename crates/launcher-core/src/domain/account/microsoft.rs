@@ -194,14 +194,15 @@ pub trait MicrosoftAuth: Send + Sync {
         &self,
         url: &SkinUrl,
     ) -> impl Future<Output = Result<Vec<u8>, AuthError>> + Send;
-    /// Uploads a skin; answers the profile as it is now. Sent once: Mojang
+    /// Uploads a skin; answers the skin Mojang now reports, `None` when its
+    /// answer did not say (the upload was still applied). Sent once: Mojang
     /// may suspend accounts that hit its rate limit while uploading.
     fn upload_skin(
         &self,
         minecraft_token: &Secret,
         skin: &SkinPng,
         variant: SkinVariant,
-    ) -> impl Future<Output = Result<MinecraftProfile, AuthError>> + Send;
+    ) -> impl Future<Output = Result<Option<Skin>, AuthError>> + Send;
     /// Wears an owned cape, or none; answers the profile as it is now.
     fn set_cape(
         &self,

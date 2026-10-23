@@ -779,11 +779,11 @@ async fn uploads_a_skin_as_a_multipart_form() {
     let msa = client(http);
     let token = secret("FAKE-minecraft-access-token");
     let png = skin_png();
-    let profile = msa
+    let skin = msa
         .upload_skin(&token, &png, SkinVariant::Slim)
         .await
         .unwrap();
-    assert_eq!(profile.skin.unwrap().variant, SkinVariant::Slim);
+    assert_eq!(skin.unwrap().variant, SkinVariant::Slim);
     let request = &msa.http().requests()[0];
     assert_eq!(request.method, HttpMethod::Post);
     assert_eq!(request.url, SKINS_URL);
@@ -847,4 +847,17 @@ async fn skin_and_cape_changes_say_why_they_failed() {
             "{status}"
         );
     }
+}
+
+#[tokio::test]
+async fn an_applied_upload_with_an_unreadable_answer_still_succeeds() {
+    let http = FakeHttpRequester::default().reply(SKINS_URL, 200, "{}");
+    let skin = client(http)
+        .upload_skin(
+            &secret("FAKE-minecraft-access-token"),
+            &skin_png(),
+            SkinVariant::Classic,
+        )
+        .await;
+    assert_eq!(skin, Ok(None));
 }
