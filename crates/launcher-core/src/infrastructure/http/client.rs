@@ -33,22 +33,30 @@ const MAX_RETRY_AFTER_SECS: u64 = 60;
 #[derive(Debug, Clone)]
 pub struct ReqwestHttpClient {
     client: reqwest::Client,
+    /// For requests carrying an API key: follows no redirect, so the key
+    /// never reaches another host (reqwest only strips standard auth headers).
+    keyed: reqwest::Client,
     initial_backoff: Duration,
 }
 
 impl ReqwestHttpClient {
     pub fn new(user_agent: impl Into<String>) -> Result<Self, HttpError> {
-        let client = reqwest::Client::builder()
-            .user_agent(user_agent.into())
-            .connect_timeout(CONNECT_TIMEOUT)
-            .read_timeout(READ_TIMEOUT)
-            .build()
-            .map_err(|error| HttpError::Network {
-                url: String::new(),
-                reason: format!("could not build the HTTP client: {error}"),
-            })?;
+        let user_agent = user_agent.into();
+        let build = |redirects: reqwest::redirect::Policy| {
+            reqwest::Client::builder()
+                .user_agent(user_agent.clone())
+                .connect_timeout(CONNECT_TIMEOUT)
+                .read_timeout(READ_TIMEOUT)
+                .redirect(redirects)
+                .build()
+                .map_err(|error| HttpError::Network {
+                    url: String::new(),
+                    reason: format!("could not build the HTTP client: {error}"),
+                })
+        };
         Ok(Self {
-            client,
+            client: build(reqwest::redirect::Policy::default())?,
+            keyed: build(reqwest::redirect::Policy::none())?,
             initial_backoff: DEFAULT_BACKOFF,
         })
     }
@@ -88,10 +96,14 @@ impl ReqwestHttpClient {
             url: url.to_owned(),
             reason: error.without_url().to_string(),
         };
+        let client = if call.key.is_some() {
+            &self.keyed
+        } else {
+            &self.client
+        };
         let mut request = match call.json {
-            None => self.client.get(url),
-            Some(body) => self
-                .client
+            None => client.get(url),
+            Some(body) => client
                 .post(url)
                 .header(CONTENT_TYPE, "application/json")
                 .header(ACCEPT, "application/json")
@@ -621,6 +633,39 @@ mod tests {
             }
         );
         assert!(!format!("{error} {error:?} {key:?}").contains("cf-secret-key"));
+    }
+
+    #[tokio::test]
+    async fn keyed_requests_never_follow_a_redirect_with_the_key() {
+        let elsewhere = TestServer::start(vec![("/stolen", vec![Reply::ok("{}")])]).await;
+        let server = TestServer::start(vec![(
+            "/moved",
+            vec![Reply::status(302).with_header("location", &elsewhere.url("/stolen"))],
+        )])
+        .await;
+        let key = ApiKeyHeader::new("x-api-key", Secret::new("cf-secret-key"));
+        let result = client().get_bytes_keyed(&server.url("/moved"), &key).await;
+        assert_eq!(
+            result,
+            Err(HttpError::Status {
+                url: server.url("/moved"),
+                status: 302
+            })
+        );
+        assert!(
+            elsewhere.requests().is_empty(),
+            "the key reached another host"
+        );
+        // Plain requests still follow redirects.
+        let plain = TestServer::start(vec![(
+            "/moved",
+            vec![Reply::status(302).with_header("location", &elsewhere.url("/stolen"))],
+        )])
+        .await;
+        assert_eq!(
+            client().get_bytes(&plain.url("/moved")).await,
+            Ok(b"{}".to_vec())
+        );
     }
 
     #[tokio::test]

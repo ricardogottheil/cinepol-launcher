@@ -19,6 +19,8 @@ distribution of their files; the API then returns no download URL.
   `get_modpack_catalogs`, and the source answers `NotConfigured` without
   sending a request. The key is sent through a dedicated `HttpClient` call
   (`get_bytes_keyed` / `post_json_keyed`) and never appears in errors or logs.
+  Keyed calls follow no redirect (a redirect is an error), so the key never
+  reaches another host: reqwest only strips standard auth headers.
 - **Catalog:** `CurseForgeSource` implements `ModpackSource` (search sorted by
   popularity, filtered by game version and loader, project and file details)
   and `CurseForgeLookup` (files and projects by id, in batches). Project ids
@@ -38,7 +40,9 @@ distribution of their files; the API then returns no download URL.
   `update_curseforge`, which follows the new file's game version and loader.
 - **packwiz:** with a key, packwiz files in CurseForge mode download on their
   own when CurseForge gives their download URL, verified with the hash the
-  pack declares; the rest stay manual.
+  pack declares; the rest stay manual. When CurseForge cannot be reached or
+  refuses the key, every such file stays manual (with a warning in the log),
+  so an outage never stops a packwiz pack from installing or launching.
 
 ## Consequences
 

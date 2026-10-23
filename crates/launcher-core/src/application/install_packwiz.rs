@@ -168,10 +168,11 @@ pub(crate) async fn download_curseforge_files<L: CurseForgeLookup>(
     let known = match lookup.files(&ids).await {
         Ok(known) => known,
         Err(ModpackSourceError::NotConfigured(_)) => return Ok(()),
+        // An outage or a refused key must not stop the pack: its CurseForge
+        // files wait for the player, as without a key.
         Err(error) => {
-            return Err(PackSyncError::Files(PackFileError::Source(
-                error.to_string(),
-            )));
+            tracing::warn!(%error, "CurseForge lookup failed; its files stay manual downloads");
+            return Ok(());
         }
     };
     let mut manual = Vec::new();
@@ -846,19 +847,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_unreachable_curseforge_fails_the_install() {
+    async fn an_unreachable_curseforge_leaves_its_files_manual() {
+        // An outage or a revoked key must not stop the pack from installing
+        // (and its instance from playing): the files wait for the player.
         let world = World::new(vec![]);
         let (_, downloader) = url_pack();
         let curseforge = FakeCurseForge {
             failure: Some(ModpackSourceError::Network("timed out".into())),
-            ..FakeCurseForge::default()
+            ..jei_on_curseforge(true)
         };
-        let result = install_with(&world, &curseforge, &downloader).await;
-        assert!(
-            matches!(result, Err(InstallPackwizError::Pack(_))),
-            "{result:?}"
-        );
-        assert!(world.instances.list().await.unwrap().is_empty());
+        let installed = install_with(&world, &curseforge, &downloader)
+            .await
+            .unwrap();
+        assert_eq!(installed.pending.len(), 1);
+        assert_eq!(installed.pending[0].path, rel("mods/jei.jar"));
     }
 
     #[tokio::test]
