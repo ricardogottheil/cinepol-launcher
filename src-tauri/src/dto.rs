@@ -908,6 +908,38 @@ impl From<&ServerList> for ServerListDto {
     }
 }
 
+/// A server the player saved in the launcher.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedServerDto {
+    pub id: String,
+    pub name: String,
+    pub address: String,
+    /// The instance Play uses; `null` until the player picks one.
+    pub instance_id: Option<String>,
+}
+
+impl From<&launcher_core::domain::saved_server::SavedServer> for SavedServerDto {
+    fn from(server: &launcher_core::domain::saved_server::SavedServer) -> Self {
+        Self {
+            id: server.id.as_uuid().to_string(),
+            name: server.name.as_str().to_owned(),
+            address: server.address.to_string(),
+            instance_id: server.instance.as_ref().map(|id| id.as_str().to_owned()),
+        }
+    }
+}
+
+/// A saved server as the player typed it; `id` is `null` for a new one.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedServerFormDto {
+    pub id: Option<String>,
+    pub name: String,
+    pub address: String,
+    pub instance_id: Option<String>,
+}
+
 /// What the player typed for a server.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]

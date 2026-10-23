@@ -19,8 +19,8 @@ use launcher_core::infrastructure::archive::{
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
 use launcher_core::infrastructure::curseforge::CurseForgeSource;
 use launcher_core::infrastructure::fs::{
-    JsonAccountRepository, JsonInstanceRepository, JsonPackManifestStore, JsonSettingsRepository,
-    StdPackFiles, TokioFileSystem,
+    JsonAccountRepository, JsonInstanceRepository, JsonPackManifestStore,
+    JsonSavedServerRepository, JsonSettingsRepository, StdPackFiles, TokioFileSystem,
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
@@ -106,6 +106,7 @@ pub struct AppState {
     pub launcher_version: String,
     pub instances: JsonInstanceRepository,
     pub accounts: JsonAccountRepository,
+    pub saved_servers: JsonSavedServerRepository,
     pub versions: MojangVersionSource<ReqwestHttpClient>,
     pub downloader: DownloadManager,
     pub java: AppJavaRuntimes,
@@ -238,6 +239,7 @@ impl AppState {
             launcher_version: launcher_version.to_owned(),
             instances: JsonInstanceRepository::new(paths.clone()),
             accounts: JsonAccountRepository::new(paths.accounts_file()),
+            saved_servers: JsonSavedServerRepository::new(paths.saved_servers_file()),
             versions: MojangVersionSource::new(http.clone(), paths.clone()),
             config_source: HttpServerConfigSource::new(http.clone()),
             modrinth: ModrinthSource::new(http.clone()),

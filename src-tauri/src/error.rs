@@ -294,6 +294,52 @@ impl From<LaunchError> for AppError {
     }
 }
 
+impl From<launcher_core::application::save_server::SaveServerError> for AppError {
+    fn from(error: launcher_core::application::save_server::SaveServerError) -> Self {
+        use launcher_core::application::save_server::SaveServerError;
+        let code = match &error {
+            SaveServerError::InvalidName(_) | SaveServerError::InvalidAddress(_) => {
+                ErrorCode::InvalidInput
+            }
+            SaveServerError::UnknownInstance(_) | SaveServerError::NotFound => ErrorCode::NotFound,
+            SaveServerError::AlreadySaved(_) => ErrorCode::AlreadyExists,
+            SaveServerError::Storage(_) | SaveServerError::Instances(_) => ErrorCode::Internal,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<launcher_core::application::remove_saved_server::RemoveSavedServerError> for AppError {
+    fn from(
+        error: launcher_core::application::remove_saved_server::RemoveSavedServerError,
+    ) -> Self {
+        use launcher_core::application::remove_saved_server::RemoveSavedServerError;
+        let code = match &error {
+            RemoveSavedServerError::NotFound => ErrorCode::NotFound,
+            RemoveSavedServerError::Storage(_) => ErrorCode::Internal,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<launcher_core::domain::saved_server::SavedServerRepositoryError> for AppError {
+    fn from(error: launcher_core::domain::saved_server::SavedServerRepositoryError) -> Self {
+        Self::new(ErrorCode::Internal, error.to_string())
+    }
+}
+
+impl From<launcher_core::application::ping_server::PingServerError> for AppError {
+    fn from(error: launcher_core::application::ping_server::PingServerError) -> Self {
+        use launcher_core::application::ping_server::PingServerError;
+        match error {
+            PingServerError::InvalidAddress(_) => {
+                Self::new(ErrorCode::InvalidInput, error.to_string())
+            }
+            PingServerError::Status(status) => Self::from(status),
+        }
+    }
+}
+
 impl From<launcher_core::domain::server::ServerStatusError> for AppError {
     fn from(error: launcher_core::domain::server::ServerStatusError) -> Self {
         Self::new(ErrorCode::ServerUnreachable, error.to_string())

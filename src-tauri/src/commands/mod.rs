@@ -11,6 +11,7 @@ pub mod instance_management;
 pub mod instances;
 pub mod modpacks;
 pub mod packwiz;
+pub mod saved_servers;
 pub mod server;
 pub mod servers;
 pub mod updates;

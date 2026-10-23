@@ -40,6 +40,8 @@ import type {
   ProgressEvent,
   ProgressStageDto,
   ProgressUnitDto,
+  SavedServerDto,
+  SavedServerFormDto,
   ServerConfigDto,
   ServerDto,
   ServerEditDto,
@@ -90,6 +92,8 @@ export type {
   ProgressEvent,
   ProgressStageDto,
   ProgressUnitDto,
+  SavedServerDto,
+  SavedServerFormDto,
   ServerConfigDto,
   ServerDto,
   ServerEditDto,
@@ -362,12 +366,33 @@ export function installInstance(
 }
 
 /** Starts the game; resolves when it exits. Output arrives through `onLog`. */
+/** Starts the game; with `joinServer` (`host[:port]`) it connects to that server. */
 export function launchInstance(
   instanceId: string,
   onLog: (line: LogLineDto) => void,
+  joinServer: string | null = null,
 ): Promise<LaunchOutcomeDto> {
   if (!isTauri()) return Promise.reject(unavailable("launch_instance"));
-  return call("launch_instance", { instanceId, onLog: channel(onLog) });
+  return call("launch_instance", { instanceId, joinServer, onLog: channel(onLog) });
+}
+
+/** The servers the player saved next to CINEPOL. */
+export function listSavedServers(): Promise<SavedServerDto[]> {
+  return call("list_saved_servers");
+}
+
+/** Adds a server (`id: null`) or changes a saved one. */
+export function saveServer(form: SavedServerFormDto): Promise<SavedServerDto> {
+  return call("save_server", { form });
+}
+
+export function removeSavedServer(serverId: string): Promise<null> {
+  return call("remove_saved_server", { serverId });
+}
+
+/** The live status of any server address. */
+export function pingServer(address: string): Promise<ServerStatusDto> {
+  return call("ping_server", { address });
 }
 
 export function killInstance(instanceId: string): Promise<boolean> {

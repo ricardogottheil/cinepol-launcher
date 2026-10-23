@@ -183,6 +183,14 @@ export type ServerListDto = { servers: Array<ServerDto>, };
 
 export type ServerFormDto = { name: string, address: string, acceptTextures: boolean | null, };
 
+export type SavedServerDto = { id: string, name: string, address: string, 
+/**
+ * The instance Play uses; `null` until the player picks one.
+ */
+instanceId: string | null, };
+
+export type SavedServerFormDto = { id: string | null, name: string, address: string, instanceId: string | null, };
+
 export type ServerEditDto = { "kind": "add", form: ServerFormDto, } | { "kind": "update", index: number, form: ServerFormDto, } | { "kind": "remove", index: number, } | { "kind": "move", from: number, to: number, };
 
 export type JavaKindDto = "managed" | "custom";
@@ -224,7 +232,7 @@ export interface Commands {
   list_loader_versions: { args: { loader: string; gameVersion: string }; result: Array<LoaderReleaseDto> };
   create_instance: { args: { name: string; gameVersion: string; loader: string; loaderVersion: string | null }; result: InstanceDto };
   install_instance: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: InstallSummaryDto };
-  launch_instance: { args: { instanceId: string; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
+  launch_instance: { args: { instanceId: string; joinServer: string | null; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
   kill_instance: { args: { instanceId: string }; result: boolean };
   get_server_config: { args: Record<string, never>; result: ServerConfigDto };
   get_server_status: { args: Record<string, never>; result: ServerStatusDto };
@@ -247,6 +255,10 @@ export interface Commands {
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
   open_crash_report: { args: { instanceId: string; fileName: string }; result: null };
   list_servers: { args: { instanceId: string }; result: ServerListDto };
+  list_saved_servers: { args: Record<string, never>; result: SavedServerDto[] };
+  save_server: { args: { form: SavedServerFormDto }; result: SavedServerDto };
+  remove_saved_server: { args: { serverId: string }; result: null };
+  ping_server: { args: { address: string }; result: ServerStatusDto };
   edit_server_list: { args: { instanceId: string; change: ServerEditDto }; result: ServerListDto };
   export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };
   get_settings: { args: Record<string, never>; result: SettingsDto };

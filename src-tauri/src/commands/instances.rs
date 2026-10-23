@@ -7,6 +7,7 @@ use launcher_core::application::list_instances::list_instances as list;
 use launcher_core::application::prepare_cinepol_instance::cinepol_server_entry;
 use launcher_core::domain::instance::InstanceOrigin;
 use launcher_core::domain::loader::{LoaderKind, LoaderSpec, LoaderVersion};
+use launcher_core::domain::server_list::ServerAddress;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
@@ -82,14 +83,22 @@ pub async fn install_instance(
 }
 
 /// Starts the game and resolves when it exits; output streams through `on_log`.
+/// With `join_server` the game connects to that server as it starts.
 #[tauri::command]
 pub async fn launch_instance(
     app: AppHandle,
     state: State<'_, AppState>,
     instance_id: String,
+    join_server: Option<String>,
     on_log: Channel<LogLineDto>,
 ) -> Result<LaunchOutcomeDto, AppError> {
     let id = parse_instance_id(&instance_id)?;
+    // The address becomes a game argument: only a valid one gets through.
+    let join_server = join_server
+        .map(|raw| ServerAddress::parse(&raw))
+        .transpose()
+        .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))?
+        .map(|address| address.to_string());
     let kill = state.games.start(id.as_str()).map_err(|_| {
         AppError::new(
             ErrorCode::AlreadyRunning,
@@ -114,7 +123,7 @@ pub async fn launch_instance(
     let request = LaunchRequest {
         instance: id.clone(),
         account: None,
-        join_server: None,
+        join_server,
     };
     let result = launch(&request, &deps, ChannelLogSink::new(on_log), kill).await;
     state.games.finish(id.as_str());

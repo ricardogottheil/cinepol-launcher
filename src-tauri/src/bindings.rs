@@ -16,8 +16,9 @@ use crate::dto::{
     ManualDownloadsDto, ManualFileDto, ModpackCatalogsDto, ModpackDetailsDto, ModpackExportDto,
     ModpackInstallDto, ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto,
     PackFilesDto, PackwizInstallDto, PackwizUpdateDto, PremiumNameDto, ProgressEvent,
-    ProgressStageDto, ProgressUnitDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto,
-    ServerListDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
+    ProgressStageDto, ProgressUnitDto, SavedServerDto, SavedServerFormDto, ServerConfigDto,
+    ServerDto, ServerEditDto, ServerFormDto, ServerListDto, ServerStatusDto, SettingsDto, SkinDto,
+    WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -84,6 +85,8 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ServerDto::decl(cfg),
         ServerListDto::decl(cfg),
         ServerFormDto::decl(cfg),
+        SavedServerDto::decl(cfg),
+        SavedServerFormDto::decl(cfg),
         ServerEditDto::decl(cfg),
         JavaKindDto::decl(cfg),
         JavaChoiceDto::decl(cfg),
@@ -229,6 +232,7 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             "launch_instance",
             vec![
                 ("instanceId", string()),
+                ("joinServer", format!("{} | null", string())),
                 ("onLog", format!("Channel<{}>", LogLineDto::name(cfg))),
             ],
             LaunchOutcomeDto::name(cfg),
@@ -400,6 +404,26 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             ServerListDto::name(cfg),
         ),
         command(
+            "list_saved_servers",
+            vec![],
+            format!("{}[]", SavedServerDto::name(cfg)),
+        ),
+        command(
+            "save_server",
+            vec![("form", SavedServerFormDto::name(cfg))],
+            SavedServerDto::name(cfg),
+        ),
+        command(
+            "remove_saved_server",
+            vec![("serverId", string())],
+            "null".to_owned(),
+        ),
+        command(
+            "ping_server",
+            vec![("address", string())],
+            ServerStatusDto::name(cfg),
+        ),
+        command(
             "edit_server_list",
             vec![
                 ("instanceId", string()),
@@ -523,6 +547,10 @@ mod tests {
             "open_crash_report",
             "list_servers",
             "edit_server_list",
+            "list_saved_servers",
+            "save_server",
+            "remove_saved_server",
+            "ping_server",
             "install_packwiz",
             "import_packwiz",
             "update_packwiz",
