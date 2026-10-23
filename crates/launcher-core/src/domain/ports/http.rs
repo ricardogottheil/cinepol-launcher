@@ -117,15 +117,56 @@ impl ApiKeyHeader {
 pub enum HttpMethod {
     Get,
     Post,
+    Put,
+    Delete,
 }
 
-/// A request body. Both kinds carry tokens, so they are kept as secrets.
+/// One field of a `multipart/form-data` body: plain text, or a file with its
+/// name and media type. Names and media types must not hold quotes or line
+/// breaks; the adapter refuses them rather than send a broken form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultipartPart {
+    pub name: String,
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+    pub data: Vec<u8>,
+}
+
+impl MultipartPart {
+    pub fn text(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            filename: None,
+            content_type: None,
+            data: value.into().into_bytes(),
+        }
+    }
+
+    pub fn file(
+        name: impl Into<String>,
+        filename: impl Into<String>,
+        content_type: impl Into<String>,
+        data: Vec<u8>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            filename: Some(filename.into()),
+            content_type: Some(content_type.into()),
+            data,
+        }
+    }
+}
+
+/// A request body. Form and JSON bodies carry tokens, so they are kept as
+/// secrets; multipart bodies carry uploads (a skin), never credentials.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HttpBody {
     /// `application/x-www-form-urlencoded` fields.
     Form(Vec<(String, Secret)>),
     /// An `application/json` document.
     Json(Secret),
+    /// A `multipart/form-data` form.
+    Multipart(Vec<MultipartPart>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,6 +192,21 @@ impl HttpRequest {
         Self {
             method: HttpMethod::Post,
             body: Some(body),
+            ..Self::get(url)
+        }
+    }
+
+    pub fn put(url: impl Into<String>, body: HttpBody) -> Self {
+        Self {
+            method: HttpMethod::Put,
+            body: Some(body),
+            ..Self::get(url)
+        }
+    }
+
+    pub fn delete(url: impl Into<String>) -> Self {
+        Self {
+            method: HttpMethod::Delete,
             ..Self::get(url)
         }
     }

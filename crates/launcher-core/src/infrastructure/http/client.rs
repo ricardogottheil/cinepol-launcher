@@ -8,7 +8,7 @@ use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderValue, RETRY_AF
 
 use crate::domain::ports::{
     ApiKeyHeader, HttpBody, HttpClient, HttpError, HttpMethod, HttpRequest, HttpRequester,
-    HttpResponse, Secret,
+    HttpResponse, MultipartPart, Secret,
 };
 
 /// What one request sends besides its URL.
@@ -265,6 +265,8 @@ impl HttpRequester for ReqwestHttpClient {
         let mut builder = match method {
             HttpMethod::Get => self.client.get(&url),
             HttpMethod::Post => self.client.post(&url),
+            HttpMethod::Put => self.client.put(&url),
+            HttpMethod::Delete => self.client.delete(&url),
         };
         if let Some(token) = bearer {
             let mut value = HeaderValue::from_str(&format!("Bearer {}", token.expose()))
@@ -281,6 +283,16 @@ impl HttpRequester for ReqwestHttpClient {
                 .header(CONTENT_TYPE, "application/json")
                 .header(ACCEPT, "application/json")
                 .body(document.expose().to_owned()),
+            Some(HttpBody::Multipart(parts)) => {
+                let boundary = format!("cinepol-{}", uuid::Uuid::new_v4().simple());
+                let form = encode_multipart(&parts, &boundary).map_err(network)?;
+                builder
+                    .header(
+                        CONTENT_TYPE,
+                        format!("multipart/form-data; boundary={boundary}"),
+                    )
+                    .body(form)
+            }
         };
         let mut response = builder
             .send()
@@ -345,6 +357,39 @@ fn parse_retry_after(value: Option<&str>) -> Option<u64> {
         .parse::<u64>()
         .ok()
         .map(|secs| secs.min(MAX_RETRY_AFTER_SECS))
+}
+
+/// A `multipart/form-data` body (RFC 7578). Names, file names and media types
+/// end up inside quoted headers, so quotes and line breaks are refused.
+fn encode_multipart(parts: &[MultipartPart], boundary: &str) -> Result<Vec<u8>, String> {
+    let header_safe = |value: &str| !value.contains(['"', '\r', '\n']);
+    let mut body = Vec::new();
+    for part in parts {
+        let mut fields = vec![part.name.as_str()];
+        fields.extend(part.filename.as_deref());
+        fields.extend(part.content_type.as_deref());
+        if !fields.iter().all(|field| header_safe(field)) {
+            return Err(format!(
+                "the form field {:?} cannot be sent as multipart",
+                part.name
+            ));
+        }
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        let mut disposition = format!("Content-Disposition: form-data; name=\"{}\"", part.name);
+        if let Some(filename) = &part.filename {
+            disposition.push_str(&format!("; filename=\"{filename}\""));
+        }
+        body.extend_from_slice(disposition.as_bytes());
+        body.extend_from_slice(b"\r\n");
+        if let Some(content_type) = &part.content_type {
+            body.extend_from_slice(format!("Content-Type: {content_type}\r\n").as_bytes());
+        }
+        body.extend_from_slice(b"\r\n");
+        body.extend_from_slice(&part.data);
+        body.extend_from_slice(b"\r\n");
+    }
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+    Ok(body)
 }
 
 #[cfg(test)]
@@ -736,5 +781,92 @@ mod tests {
             None
         );
         assert_eq!(parse_retry_after(None), None);
+    }
+
+    #[tokio::test]
+    async fn puts_json_and_deletes_without_a_body() {
+        let server = TestServer::start(vec![(
+            "/capes/active",
+            vec![Reply::ok("{}"), Reply::ok("{}")],
+        )])
+        .await;
+        let url = server.url("/capes/active");
+        let token = Secret::new("mc-token");
+        client()
+            .send(
+                HttpRequest::put(&url, HttpBody::Json(Secret::new(r#"{"capeId":"c1"}"#)))
+                    .with_bearer(&token),
+            )
+            .await
+            .unwrap();
+        client()
+            .send(HttpRequest::delete(&url).with_bearer(&token))
+            .await
+            .unwrap();
+        let requests = server.requests();
+        assert_eq!(requests[0].method, "PUT");
+        assert_eq!(requests[0].body, br#"{"capeId":"c1"}"#);
+        assert_eq!(
+            requests[0].headers.get("content-type").map(String::as_str),
+            Some("application/json")
+        );
+        assert_eq!(requests[1].method, "DELETE");
+        assert!(requests[1].body.is_empty());
+        assert_eq!(
+            requests[1].headers.get("authorization").map(String::as_str),
+            Some("Bearer mc-token")
+        );
+    }
+
+    #[tokio::test]
+    async fn posts_a_multipart_form_with_a_file() {
+        let server = TestServer::start(vec![("/skins", vec![Reply::ok("{}")])]).await;
+        let png = b"\x89PNG\r\n\x1a\nrest".to_vec();
+        client()
+            .send(HttpRequest::post(
+                server.url("/skins"),
+                HttpBody::Multipart(vec![
+                    MultipartPart::text("variant", "slim"),
+                    MultipartPart::file("file", "skin.png", "image/png", png.clone()),
+                ]),
+            ))
+            .await
+            .unwrap();
+        let request = &server.requests()[0];
+        let content_type = request.headers.get("content-type").unwrap();
+        let boundary = content_type
+            .strip_prefix("multipart/form-data; boundary=")
+            .expect("a multipart content type");
+        let mut expected = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"variant\"\r\n\r\nslim\r\n\
+             --{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"skin.png\"\r\n\
+             Content-Type: image/png\r\n\r\n"
+        )
+        .into_bytes();
+        expected.extend_from_slice(&png);
+        expected.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        assert_eq!(request.body, expected);
+    }
+
+    #[tokio::test]
+    async fn refuses_multipart_names_that_would_break_the_form() {
+        let server = TestServer::start(vec![("/skins", vec![Reply::ok("{}")])]).await;
+        for part in [
+            MultipartPart::text("va\"riant", "slim"),
+            MultipartPart::file("file", "skin\r\n.png", "image/png", vec![1]),
+            MultipartPart::file("file", "skin.png", "image/png\r\nX: y", vec![1]),
+        ] {
+            let result = client()
+                .send(HttpRequest::post(
+                    server.url("/skins"),
+                    HttpBody::Multipart(vec![part]),
+                ))
+                .await;
+            assert!(
+                matches!(result, Err(HttpError::Network { .. })),
+                "{result:?}"
+            );
+        }
+        assert_eq!(server.hits("/skins"), 0);
     }
 }

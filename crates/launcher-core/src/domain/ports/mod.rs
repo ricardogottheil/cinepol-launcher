@@ -16,7 +16,7 @@ pub use download::{DownloadError, DownloadRequest, DownloadSummary, Downloader};
 pub use filesystem::{FileSystem, FileSystemError};
 pub use http::{
     ApiKeyHeader, HttpBody, HttpClient, HttpError, HttpMethod, HttpRequest, HttpRequester,
-    HttpResponse,
+    HttpResponse, MultipartPart,
 };
 pub use progress::{ProgressReporter, ProgressStage, ProgressUnit, ProgressUpdate, StagedReporter};
 pub use secrets::{Secret, SecretKey, SecretStore, SecretStoreError};
