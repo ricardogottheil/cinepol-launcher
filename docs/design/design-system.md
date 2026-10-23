@@ -176,6 +176,7 @@ All live in `src/components/ui/` and are previewed on the dev-only route
 | `EquipmentPlate` | Equipment plate, D:195-201, D:669-680 | The cinema caption: subject + color temperature |
 | `WorldFrame` | Worlds gallery, WorldGallery.astro:46-89 | 16:9 capture with its plate |
 | `SpecSheet` | World readings ("label -> value") | Instance details: version, loader, Java, memory |
+| `PlayerHead` | Launcher only | A profile's face from its skin (face + hat layer, pixelated); initial on a plate without a skin |
 | `Meter` | (launcher only) | Progress as a reading: hairline track, silk fill (never signal), tabular count |
 | `StepList` | How to join, HowToJoin.astro:43-58 | Numbered steps where order matters (Microsoft sign-in) |
 | `BrandGlyph` | src/icons/brandGlyphs.ts | Twitch and Discord only, simple-icons (CC0) |
@@ -188,8 +189,17 @@ App shell (`src/app/shell/`):
   macOS keeps the native traffic lights (overlay title bar,
   `src-tauri/tauri.macos.conf.json`) and the wordmark clears them.
 - **Sidebar**: text-only section rail, like the website's section strip (no
-  decorative icons, D:239-268). Current item: `silk` on `panel`. Community links
-  (Twitch, Discord) and the legal disclaimer sit at the bottom.
+  decorative icons, D:239-268), grouped by what the player is doing: Game
+  (Home, Instances, Modpacks), Player (Profile), Launcher (Settings). Group
+  names are `plate` in `engrave`; current item: `silk` on `panel`. Community
+  links (Twitch, Discord) sit above the profile switcher at the foot.
+- **Profile switcher**: the active profile (head, name, kind plate) at the
+  foot of the sidebar. It opens a menu on `panel` with a `hairline-lit` edge
+  that lists online (Microsoft) and offline profiles in separate groups, plus
+  "View profile" and "Add profile". Heads come from the skin's face and hat
+  layer (`PlayerHead`); profiles without a skin show their initial, never one
+  of the game's default players.
+- **Settings > About**: the version and the legal disclaimer.
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (server, recommended version, active account as a spec
   sheet; the signal control "Play"), the CINEPOL banner with its equipment plate

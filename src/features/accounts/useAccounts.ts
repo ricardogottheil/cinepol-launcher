@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  type AccountDto,
   checkPremiumName,
   createOfflineAccount,
   getAccountPolicy,
@@ -59,13 +60,17 @@ export function useAccountSkin(accountId: string | null) {
   });
 }
 
-/** The running Microsoft sign-in and how to start one. */
-export function useMicrosoftSignIn() {
+/** The running Microsoft sign-in and how to start one; `onAdded` gets the new account. */
+export function useMicrosoftSignIn(onAdded?: (account: AccountDto) => void) {
   const queryClient = useQueryClient();
   const state = useSignInStore((store) => store.signIn);
   const startSignIn = useSignInStore((store) => store.start);
   return {
     state,
-    start: () => startSignIn(() => void queryClient.invalidateQueries({ queryKey: accountsKey })),
+    start: () =>
+      startSignIn((account) => {
+        void queryClient.invalidateQueries({ queryKey: accountsKey });
+        onAdded?.(account);
+      }),
   };
 }

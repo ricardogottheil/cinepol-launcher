@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  type AccountDto,
   type ClientErrorCode,
   type DeviceCodeDto,
   loginMicrosoft,
@@ -13,12 +14,12 @@ export type MicrosoftSignIn =
 
 interface SignInState {
   signIn: MicrosoftSignIn;
-  /** Starts a sign-in unless one is already running; `onSignedIn` runs on success. */
-  start: (onSignedIn: () => void) => void;
+  /** Starts a sign-in unless one is already running; `onSignedIn` gets the new account. */
+  start: (onSignedIn: (account: AccountDto) => void) => void;
 }
 
 /**
- * The Microsoft sign-in lives outside the Accounts page, so leaving the page
+ * The Microsoft sign-in lives outside the add-profile page, so leaving the page
  * keeps the code on screen when coming back and never starts a second sign-in.
  */
 export const useSignInStore = create<SignInState>((set, get) => ({
@@ -33,9 +34,9 @@ export const useSignInStore = create<SignInState>((set, get) => ({
     const operation = loginMicrosoft((code) => set({ signIn: { kind: "waiting", code, cancel } }));
     handle.cancel = operation.cancel;
     operation.done.then(
-      () => {
+      (account) => {
         set({ signIn: { kind: "idle", error: null } });
-        onSignedIn();
+        onSignedIn(account);
       },
       (error: unknown) => {
         const code = toIpcError(error).code;

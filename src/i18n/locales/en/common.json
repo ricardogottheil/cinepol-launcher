@@ -17,9 +17,14 @@
     "home": "Home",
     "instances": "Instances",
     "modpacks": "Modpacks",
-    "accounts": "Accounts",
+    "profile": "Profile",
     "settings": "Settings",
     "designKit": "Design kit"
+  },
+  "navGroups": {
+    "game": "Game",
+    "player": "Player",
+    "launcher": "Launcher"
   },
   "links": {
     "twitch": "polispol1 on Twitch",
@@ -138,17 +143,12 @@
     "modpack": "Installing the modpack files"
   },
   "accounts": {
-    "title": "Accounts",
-    "active": "Active",
-    "makeActive": "Use this account",
     "offline": "Offline",
     "microsoft": "Microsoft",
-    "empty": "No accounts yet.",
     "offlineTitle": "Play without a premium account",
     "offlineHint": "3 to 16 letters, numbers or underscores. The server accepts players without a premium account.",
     "usernameLabel": "Username",
     "create": "Add account",
-    "loading": "Loading accounts",
     "premiumNameWarning": "This name belongs to a premium account; the server will ask you to sign in with Microsoft.",
     "microsoftTitle": "Microsoft account",
     "microsoftHint": "Sign in with the Microsoft account that owns Minecraft: Java Edition.",
@@ -166,7 +166,17 @@
     "offlineRequiresPremium": "Add a Microsoft account first to create profiles without premium.",
     "skinTitle": "Skin",
     "skinLabel": "Skin preview of the active account",
-    "skinOffline": "Accounts without premium use the game's default skin."
+    "skinOffline": "Accounts without premium use the game's default skin.",
+    "switcherLabel": "Switch profile",
+    "onlineGroup": "Online",
+    "offlineGroup": "Offline",
+    "viewProfile": "View profile",
+    "addProfile": "Add profile",
+    "addTitle": "Add a profile",
+    "noProfile": "You have no profile yet.",
+    "added": "{{name}} added.",
+    "useProfile": "Use this profile",
+    "kindLabel": "Type"
   },
   "instances": {
     "title": "Instances",
@@ -299,7 +309,8 @@
       "remote": "In use: the remote configuration",
       "bundled": "In use: the copy bundled with the launcher"
     },
-    "saved": "Saved"
+    "saved": "Saved",
+    "aboutTitle": "About"
   },
   "units": {
     "megabytes": "MB"

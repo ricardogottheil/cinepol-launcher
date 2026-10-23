@@ -3,64 +3,25 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { TextField } from "../../components/ui/TextField";
 import { type AccountDto, openExternal, toIpcError } from "../../ipc/client";
-import { SkinViewer } from "./SkinViewer";
 import {
   useAccountPolicy,
-  useAccountSkin,
   useAccounts,
   useCheckPremiumName,
   useCreateOfflineAccount,
   useMicrosoftSignIn,
-  useRemoveAccount,
   useSetActiveAccount,
 } from "./useAccounts";
 
-function AccountRow({ account, active }: { account: AccountDto; active: boolean }) {
-  const { t } = useTranslation();
-  const select = useSetActiveAccount();
-  const remove = useRemoveAccount();
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-6 border-b border-hairline py-5">
-      <div className="flex flex-col gap-1">
-        <span data-readout className="readout-md text-silk">
-          {account.username}
-        </span>
-        <span className="plate text-engrave">{t(`accounts.${account.kind}`)}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        {active ? (
-          <span className="plate text-silk">{t("accounts.active")}</span>
-        ) : (
-          <Button onClick={() => select.mutate(account.id)} disabled={select.isPending}>
-            {t("accounts.makeActive")}
-          </Button>
-        )}
-        {confirming ? (
-          <>
-            <Button onClick={() => remove.mutate(account.id)} disabled={remove.isPending}>
-              {t("accounts.confirmRemove")}
-            </Button>
-            <Button onClick={() => setConfirming(false)}>{t("accounts.keep")}</Button>
-          </>
-        ) : (
-          <Button onClick={() => setConfirming(true)}>{t("accounts.remove")}</Button>
-        )}
-      </div>
-    </li>
-  );
-}
-
 /** The device-code sign-in: a button, then the code to type and where. */
-function MicrosoftSignInPanel() {
+function MicrosoftSignInPanel({ onAdded }: { onAdded: (account: AccountDto) => void }) {
   const { t } = useTranslation();
   const policy = useAccountPolicy();
-  const { state, start } = useMicrosoftSignIn();
+  const { state, start } = useMicrosoftSignIn(onAdded);
 
   if (!policy.data) return null;
   if (!policy.data.microsoftAvailable) {
     return (
-      <section className="flex flex-col gap-3 border-t border-hairline pt-8">
+      <section className="flex flex-col gap-3 border-t border-hairline pt-6">
         <h2 className="display-md m-0 text-silk">{t("accounts.microsoftTitle")}</h2>
         <p className="m-0 text-silk-dim">{t("accounts.microsoftUnavailable")}</p>
       </section>
@@ -68,7 +29,7 @@ function MicrosoftSignInPanel() {
   }
 
   return (
-    <section className="flex flex-col gap-5 border-t border-hairline pt-8">
+    <section className="flex flex-col gap-5 border-t border-hairline pt-6">
       <h2 className="display-md m-0 text-silk">{t("accounts.microsoftTitle")}</h2>
       {state.kind === "idle" ? (
         <>
@@ -113,7 +74,13 @@ function MicrosoftSignInPanel() {
   );
 }
 
-function OfflineAccountForm({ blocked }: { blocked: boolean }) {
+function OfflineAccountForm({
+  blocked,
+  onAdded,
+}: {
+  blocked: boolean;
+  onAdded: (account: AccountDto) => void;
+}) {
   const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const create = useCreateOfflineAccount();
@@ -125,8 +92,9 @@ function OfflineAccountForm({ blocked }: { blocked: boolean }) {
     const name = username.trim();
     checkName.reset();
     create.mutate(name, {
-      onSuccess: () => {
+      onSuccess: (account) => {
         setUsername("");
+        onAdded(account);
         // Never blocks: the profile exists already; a failed lookup warns nothing.
         checkName.mutate(name);
       },
@@ -134,7 +102,7 @@ function OfflineAccountForm({ blocked }: { blocked: boolean }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5 border-t border-hairline pt-8">
+    <form onSubmit={submit} className="flex flex-col gap-5 border-t border-hairline pt-6">
       <h2 className="display-md m-0 text-silk">{t("accounts.offlineTitle")}</h2>
       {blocked ? (
         <p className="m-0 max-w-[640px] text-silk-dim">{t("accounts.offlineRequiresPremium")}</p>
@@ -167,68 +135,38 @@ function OfflineAccountForm({ blocked }: { blocked: boolean }) {
   );
 }
 
-/** The active account's skin in 3D; offline accounts have none to show. */
-function ActiveSkin({ account }: { account: AccountDto | undefined }) {
-  const { t } = useTranslation();
-  const premiumId = account?.kind === "microsoft" ? account.id : null;
-  const skin = useAccountSkin(premiumId);
-  if (!account) return null;
-  return (
-    <section className="flex flex-col gap-4">
-      <h2 className="plate m-0 text-engrave">{t("accounts.skinTitle")}</h2>
-      {premiumId ? (
-        <SkinViewer
-          texture={skin.data?.dataUrl ?? null}
-          slim={skin.data?.slim ?? false}
-          label={t("accounts.skinLabel")}
-          className="w-full max-w-[280px]"
-        />
-      ) : (
-        <p className="m-0 max-w-[280px] text-[0.875rem] text-silk-dim">
-          {t("accounts.skinOffline")}
-        </p>
-      )}
-    </section>
-  );
-}
-
-export function AccountsPage() {
+/** Adds a profile: a Microsoft account (online) or an offline name. */
+export function AddProfilePage() {
   const { t } = useTranslation();
   const accounts = useAccounts();
   const policy = useAccountPolicy();
+  const select = useSetActiveAccount();
+  const [added, setAdded] = useState<AccountDto | null>(null);
   const list = accounts.data?.accounts ?? [];
-  const active = list.find((account) => account.id === accounts.data?.activeId);
   const offlineBlocked =
     (policy.data?.requirePremiumForOffline ?? false) &&
     !list.some((account) => account.kind === "microsoft");
+  const addedIsActive = added !== null && added.id === accounts.data?.activeId;
 
   return (
     <div className="@container mx-auto flex max-w-[1120px] flex-col gap-10 px-gutter-lg py-10">
-      <h1 className="display-lg m-0 text-silk">{t("accounts.title")}</h1>
-      <div className="grid grid-cols-1 gap-10 @3xl:grid-cols-[1fr_280px]">
-        <section aria-label={t("accounts.title")}>
-          {accounts.isPending ? (
-            <p className="m-0 text-engrave">{t("accounts.loading")}</p>
-          ) : accounts.isError ? (
-            <p className="m-0 text-stale">{t(`errors.${toIpcError(accounts.error).code}`)}</p>
-          ) : list.length === 0 ? (
-            <p className="m-0 border-t border-hairline pt-6 text-silk-dim">{t("accounts.empty")}</p>
-          ) : (
-            <ul className="m-0 list-none border-t border-hairline p-0">
-              {list.map((account) => (
-                <AccountRow
-                  key={account.id}
-                  account={account}
-                  active={account.id === accounts.data?.activeId}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
-        <ActiveSkin account={active} />
+      <h1 className="display-lg m-0 text-silk">{t("accounts.addTitle")}</h1>
+      <div role="status" className="empty:hidden">
+        {added ? (
+          <div className="flex flex-wrap items-center gap-4 rounded-control border border-hairline-lit p-4">
+            <span className="text-silk">{t("accounts.added", { name: added.username })}</span>
+            {addedIsActive ? null : (
+              <Button onClick={() => select.mutate(added.id)} disabled={select.isPending}>
+                {t("accounts.useProfile")}
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
-      <MicrosoftSignInPanel />
-      <OfflineAccountForm blocked={offlineBlocked} />
+      <div className="grid grid-cols-1 gap-10 @3xl:grid-cols-2">
+        <MicrosoftSignInPanel onAdded={setAdded} />
+        <OfflineAccountForm blocked={offlineBlocked} onAdded={setAdded} />
+      </div>
     </div>
   );
 }

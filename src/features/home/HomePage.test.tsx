@@ -84,7 +84,7 @@ describe("HomePage", () => {
     renderHome();
     expect(await screen.findByRole("link", { name: esCommon.home.addAccount })).toHaveAttribute(
       "href",
-      "/accounts",
+      "/profile/new",
     );
   });
 
@@ -225,7 +225,7 @@ describe("HomePage", () => {
     expect(await screen.findByText(esCommon.errors.session_expired)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: esCommon.home.signInAgain })).toHaveAttribute(
       "href",
-      "/accounts",
+      "/profile/new",
     );
   });
 

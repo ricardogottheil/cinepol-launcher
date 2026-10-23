@@ -5,7 +5,8 @@ import {
   createRouter,
   type RouterHistory,
 } from "@tanstack/react-router";
-import { AccountsPage } from "../features/accounts/AccountsPage";
+import { AddProfilePage } from "../features/accounts/AddProfilePage";
+import { ProfilePage } from "../features/accounts/ProfilePage";
 import { DesignKitPage } from "../features/design-kit/DesignKitPage";
 import { HomePage } from "../features/home/HomePage";
 import { InstancesPage } from "../features/instances/InstancesPage";
@@ -31,7 +32,8 @@ const routeTree = rootRoute.addChildren([
   homeRoute,
   createRoute({ getParentRoute: () => rootRoute, path: "/instances", component: InstancesPage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/modpacks", component: ModpacksPage }),
-  createRoute({ getParentRoute: () => rootRoute, path: "/accounts", component: AccountsPage }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/profile", component: ProfilePage }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/profile/new", component: AddProfilePage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage }),
   ...(import.meta.env.DEV ? [designRoute] : []),
 ]);

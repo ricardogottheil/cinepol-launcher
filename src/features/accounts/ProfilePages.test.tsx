@@ -1,9 +1,10 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { App } from "../../app/App";
+import { createAppRouter } from "../../app/router";
 import esCommon from "../../i18n/locales/es/common.json";
 import { type DeviceCodeDto, IpcError } from "../../ipc/client";
-import { renderWithQuery } from "../../test/render";
-import { AccountsPage } from "./AccountsPage";
 import { useSignInStore } from "./signInStore";
 
 const client = vi.hoisted(() => ({
@@ -37,11 +38,12 @@ vi.mock("../../ipc/client", async (importOriginal) => ({
 
 const steve = { id: "1", kind: "offline", username: "Steve", profileUuid: "u1" } as const;
 const alex = { id: "2", kind: "offline", username: "Alex", profileUuid: "u2" } as const;
+const premium = { id: "9", kind: "microsoft", username: "Polispol1", profileUuid: "p" } as const;
 const labels = esCommon.accounts;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  client.listAccounts.mockResolvedValue({ accounts: [steve, alex], activeId: "1" });
+  client.listAccounts.mockResolvedValue({ accounts: [steve, alex, premium], activeId: "1" });
   client.checkPremiumName.mockResolvedValue("free");
   client.getAccountPolicy.mockResolvedValue({
     microsoftAvailable: true,
@@ -49,16 +51,22 @@ beforeEach(() => {
   });
   client.getAccountSkin.mockResolvedValue(null);
   client.removeAccount.mockResolvedValue(null);
+  client.setActiveAccount.mockResolvedValue(null);
   client.openExternal.mockResolvedValue(undefined);
   useSignInStore.setState({ signIn: { kind: "idle", error: null } });
 });
+
+function renderAt(path: string) {
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
+  render(<App router={router} />);
+  return router;
+}
 
 const code: DeviceCodeDto = {
   userCode: "ABCD-EFGH",
   verificationUri: "https://www.microsoft.com/link",
   expiresInSecs: 900,
 };
-const premium = { id: "9", kind: "microsoft", username: "Polispol1", profileUuid: "p" } as const;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -88,43 +96,115 @@ async function createAccount(name: string) {
   fireEvent.click(screen.getByRole("button", { name: labels.create }));
 }
 
-describe("AccountsPage", () => {
-  it("lists accounts and marks the active one", async () => {
-    renderWithQuery(<AccountsPage />);
-    expect(await screen.findByText("Steve")).toBeInTheDocument();
-    expect(screen.getByText(labels.active)).toBeInTheDocument();
-    expect(screen.getAllByText(labels.offline)).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: labels.makeActive }));
+async function openSwitcher() {
+  const button = await screen.findByRole("button", { name: labels.switcherLabel });
+  await waitFor(() => expect(button).toHaveTextContent("Steve"));
+  fireEvent.click(button);
+  return { button, menu: screen.getByRole("menu", { name: labels.switcherLabel }) };
+}
+
+describe("profile switcher", () => {
+  it("shows the active profile and switches between online and offline groups", async () => {
+    renderAt("/profile");
+    const { button, menu } = await openSwitcher();
+    expect(button).toHaveAttribute("aria-expanded", "true");
+
+    const online = within(menu).getByRole("group", { name: labels.onlineGroup });
+    expect(within(online).getByRole("menuitemradio", { name: /Polispol1/ })).toBeInTheDocument();
+    const offline = within(menu).getByRole("group", { name: labels.offlineGroup });
+    expect(within(offline).getByRole("menuitemradio", { name: /Steve/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+
+    fireEvent.click(within(offline).getByRole("menuitemradio", { name: /Alex/ }));
     await waitFor(() => expect(client.setActiveAccount).toHaveBeenCalledWith("2"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("creates an offline account with the trimmed name", async () => {
+  it("closes with Escape and gives the focus back", async () => {
+    renderAt("/profile");
+    const { button, menu } = await openSwitcher();
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
+  it("opens the page to add a profile", async () => {
+    renderAt("/profile");
+    const { menu } = await openSwitcher();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: labels.addProfile }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: labels.addTitle }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers to add a profile when there is none", async () => {
+    client.listAccounts.mockResolvedValue({ accounts: [], activeId: null });
+    renderAt("/profile");
+    expect(await screen.findByText(labels.noProfile)).toBeInTheDocument();
+    const links = screen.getAllByRole("link", { name: labels.addProfile });
+    expect(links.length).toBeGreaterThan(0);
+    fireEvent.click(links[0] as HTMLElement);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: labels.addTitle }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("profile page", () => {
+  it("shows the active Microsoft profile with its skin", async () => {
+    client.listAccounts.mockResolvedValue({ accounts: [premium], activeId: "9" });
+    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,AAA", slim: true });
+    renderAt("/profile");
+    expect(await screen.findByRole("heading", { level: 1, name: "Polispol1" })).toBeInTheDocument();
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,AAA"),
+    );
+    expect(viewer).toHaveAttribute("data-slim", "true");
+    expect(client.getAccountSkin).toHaveBeenCalledWith("9");
+  });
+
+  it("says that offline profiles use the default skin", async () => {
+    renderAt("/profile");
+    expect(await screen.findByRole("heading", { level: 1, name: "Steve" })).toBeInTheDocument();
+    expect(screen.getByText(labels.skinOffline)).toBeInTheDocument();
+  });
+
+  it("removes the active profile after a confirmation", async () => {
+    renderAt("/profile");
+    fireEvent.click(await screen.findByRole("button", { name: labels.remove }));
+    expect(client.removeAccount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: labels.confirmRemove }));
+    await waitFor(() => expect(client.removeAccount).toHaveBeenCalledWith("1"));
+  });
+});
+
+describe("add profile page", () => {
+  it("creates an offline profile with the trimmed name and offers to use it", async () => {
     client.createOfflineAccount.mockResolvedValue({ ...alex, id: "3", username: "Pol" });
-    renderWithQuery(<AccountsPage />);
-    fireEvent.change(await screen.findByLabelText(labels.usernameLabel), {
-      target: { value: " Pol " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: labels.create }));
+    renderAt("/profile/new");
+    await createAccount(" Pol ");
     await waitFor(() => expect(client.createOfflineAccount).toHaveBeenCalledWith("Pol"));
-    await waitFor(() => expect(client.listAccounts).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(labels.added.replace("{{name}}", "Pol"))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: labels.useProfile }));
+    await waitFor(() => expect(client.setActiveAccount).toHaveBeenCalledWith("3"));
   });
 
   it("explains a rejected name by its error code", async () => {
     client.createOfflineAccount.mockRejectedValue(
       new IpcError("already_exists", "an offline profile named Steve already exists"),
     );
-    renderWithQuery(<AccountsPage />);
-    fireEvent.change(await screen.findByLabelText(labels.usernameLabel), {
-      target: { value: "Steve" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: labels.create }));
+    renderAt("/profile/new");
+    await createAccount("Steve");
     expect(await screen.findByText(esCommon.errors.already_exists)).toBeInTheDocument();
   });
 
   it("warns, without blocking, when the new name belongs to a premium account", async () => {
     client.createOfflineAccount.mockResolvedValue({ ...alex, id: "3", username: "polispol1" });
     client.checkPremiumName.mockResolvedValue("premium");
-    renderWithQuery(<AccountsPage />);
+    renderAt("/profile/new");
     await createAccount("polispol1");
     await waitFor(() => expect(client.createOfflineAccount).toHaveBeenCalledWith("polispol1"));
     expect(await screen.findByText(labels.premiumNameWarning)).toBeInTheDocument();
@@ -133,7 +213,7 @@ describe("AccountsPage", () => {
 
   it("shows no warning for a free name or when the lookup is unavailable", async () => {
     client.createOfflineAccount.mockResolvedValue({ ...alex, id: "3", username: "Pol" });
-    renderWithQuery(<AccountsPage />);
+    renderAt("/profile/new");
     await createAccount("Pol");
     await waitFor(() => expect(client.checkPremiumName).toHaveBeenCalledWith("Pol"));
     client.checkPremiumName.mockResolvedValue("unknown");
@@ -142,24 +222,27 @@ describe("AccountsPage", () => {
     expect(screen.queryByText(labels.premiumNameWarning)).not.toBeInTheDocument();
   });
 
-  it("signs in with Microsoft by showing the code and where to type it", async () => {
+  it("signs in with Microsoft by showing the code, then offers the new profile", async () => {
     const { done } = scriptSignIn();
-    renderWithQuery(<AccountsPage />);
+    renderAt("/profile/new");
     fireEvent.click(await screen.findByRole("button", { name: labels.microsoftSignIn }));
 
     expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: labels.openLink }));
     expect(client.openExternal).toHaveBeenCalledWith("https://www.microsoft.com/link");
 
-    client.listAccounts.mockResolvedValue({ accounts: [steve, premium], activeId: "1" });
     await act(async () => done.resolve(premium));
     await waitFor(() => expect(screen.queryByText("ABCD-EFGH")).not.toBeInTheDocument());
-    expect(await screen.findByText("Polispol1")).toBeInTheDocument();
+    expect(
+      await screen.findByText(labels.added.replace("{{name}}", "Polispol1")),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: labels.useProfile }));
+    await waitFor(() => expect(client.setActiveAccount).toHaveBeenCalledWith("9"));
   });
 
   it("cancels a waiting sign-in and explains a refused one", async () => {
     const first = scriptSignIn();
-    renderWithQuery(<AccountsPage />);
+    renderAt("/profile/new");
     fireEvent.click(await screen.findByRole("button", { name: labels.microsoftSignIn }));
     await screen.findByText("ABCD-EFGH");
     fireEvent.click(screen.getByRole("button", { name: labels.cancelSignIn }));
@@ -178,52 +261,31 @@ describe("AccountsPage", () => {
       microsoftAvailable: false,
       requirePremiumForOffline: false,
     });
-    renderWithQuery(<AccountsPage />);
+    renderAt("/profile/new");
     expect(await screen.findByText(labels.microsoftUnavailable)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: labels.microsoftSignIn })).not.toBeInTheDocument();
   });
 
-  it("removes an account after a confirmation", async () => {
-    renderWithQuery(<AccountsPage />);
-    const removeButtons = await screen.findAllByRole("button", { name: labels.remove });
-    const alexRemove = removeButtons[1];
-    if (!alexRemove) throw new Error("no remove button for the second account");
-    fireEvent.click(alexRemove);
-    expect(client.removeAccount).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: labels.confirmRemove }));
-    await waitFor(() => expect(client.removeAccount).toHaveBeenCalledWith("2"));
-  });
-
   it("gates offline profiles behind a premium account when the build asks for it", async () => {
+    client.listAccounts.mockResolvedValue({ accounts: [steve], activeId: "1" });
     client.getAccountPolicy.mockResolvedValue({
       microsoftAvailable: true,
       requirePremiumForOffline: true,
     });
-    renderWithQuery(<AccountsPage />);
+    renderAt("/profile/new");
     expect(await screen.findByText(labels.offlineRequiresPremium)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.create })).toBeDisabled();
   });
 
-  it("previews the active Microsoft account's skin", async () => {
-    client.listAccounts.mockResolvedValue({ accounts: [premium], activeId: "9" });
-    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,AAA", slim: true });
-    renderWithQuery(<AccountsPage />);
-    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
-    await waitFor(() =>
-      expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,AAA"),
-    );
-    expect(viewer).toHaveAttribute("data-slim", "true");
-    expect(client.getAccountSkin).toHaveBeenCalledWith("9");
-  });
-
   it("keeps a waiting sign-in across leaving the page and never starts a second one", async () => {
     scriptSignIn();
-    const first = renderWithQuery(<AccountsPage />);
+    const router = renderAt("/profile/new");
     fireEvent.click(await screen.findByRole("button", { name: labels.microsoftSignIn }));
     expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
-    first.unmount();
 
-    renderWithQuery(<AccountsPage />);
+    await act(() => router.navigate({ to: "/profile" }));
+    await waitFor(() => expect(screen.queryByText("ABCD-EFGH")).not.toBeInTheDocument());
+    await act(() => router.navigate({ to: "/profile/new" }));
     expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: labels.microsoftSignIn })).not.toBeInTheDocument();
     useSignInStore.getState().start(() => {});

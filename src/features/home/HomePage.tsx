@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import serverBanner from "../../assets/worlds/cinepol-recursos.webp";
-import { Button } from "../../components/ui/Button";
+import { Button, plateLinkClass } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
 import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
@@ -19,8 +19,7 @@ import { ProgressMeter } from "../instances/ProgressMeter";
 import { instancesKey, useInstances } from "../instances/useInstances";
 import { bundledConfigDto, useServerConfig, useServerStatus } from "../server/useServer";
 
-const plateLink =
-  "plate-lg inline-flex h-11 items-center rounded-plate border border-hairline-lit px-4 text-silk-dim no-underline transition-colors duration-[160ms] ease-settle hover:border-engrave hover:text-silk";
+const plateLink = plateLinkClass;
 
 /** The player's instances, or an empty state. */
 function HomeInstances() {
@@ -110,7 +109,7 @@ function QuickPlay({ recommended }: { recommended: string }) {
           <>
             <span className="text-stale">{t(`errors.${error}`)}</span>
             {error === "session_expired" ? (
-              <Link to="/accounts" className="ml-3 text-silk underline">
+              <Link to="/profile/new" className="ml-3 text-silk underline">
                 {t("home.signInAgain")}
               </Link>
             ) : null}
@@ -173,7 +172,7 @@ export function HomePage() {
 
           <QuickPlay recommended={config.recommendedVersion} />
           {accountName ? null : (
-            <Link to="/accounts" className={`${plateLink} mt-3 self-start`}>
+            <Link to="/profile/new" className={`${plateLink} mt-3 self-start`}>
               {t("home.addAccount")}
             </Link>
           )}

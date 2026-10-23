@@ -17,9 +17,14 @@
     "home": "Inicio",
     "instances": "Instancias",
     "modpacks": "Modpacks",
-    "accounts": "Cuentas",
+    "profile": "Perfil",
     "settings": "Ajustes",
     "designKit": "Kit de diseño"
+  },
+  "navGroups": {
+    "game": "Juego",
+    "player": "Jugador",
+    "launcher": "Launcher"
   },
   "links": {
     "twitch": "Twitch de polispol1",
@@ -138,17 +143,12 @@
     "modpack": "Instalando los archivos del modpack"
   },
   "accounts": {
-    "title": "Cuentas",
-    "active": "Activa",
-    "makeActive": "Usar esta cuenta",
     "offline": "Sin premium",
     "microsoft": "Microsoft",
-    "empty": "Todavía no hay cuentas.",
     "offlineTitle": "Juega sin cuenta premium",
     "offlineHint": "De 3 a 16 letras, números o guiones bajos. El servidor acepta jugadores sin cuenta premium.",
     "usernameLabel": "Nombre de usuario",
     "create": "Añadir cuenta",
-    "loading": "Cargando cuentas",
     "premiumNameWarning": "Este nombre es de una cuenta premium; el servidor te pedirá iniciar sesión con Microsoft.",
     "microsoftTitle": "Cuenta de Microsoft",
     "microsoftHint": "Inicia sesión con la cuenta de Microsoft que tiene Minecraft: Java Edition.",
@@ -166,7 +166,17 @@
     "offlineRequiresPremium": "Añade primero una cuenta de Microsoft para crear perfiles sin premium.",
     "skinTitle": "Aspecto",
     "skinLabel": "Vista previa del aspecto de la cuenta activa",
-    "skinOffline": "Las cuentas sin premium usan el aspecto por defecto del juego."
+    "skinOffline": "Las cuentas sin premium usan el aspecto por defecto del juego.",
+    "switcherLabel": "Cambiar de perfil",
+    "onlineGroup": "Online",
+    "offlineGroup": "Offline",
+    "viewProfile": "Ver perfil",
+    "addProfile": "Añadir perfil",
+    "addTitle": "Añadir un perfil",
+    "noProfile": "Todavía no tienes un perfil.",
+    "added": "{{name}} añadido.",
+    "useProfile": "Usar este perfil",
+    "kindLabel": "Tipo"
   },
   "instances": {
     "title": "Instancias",
@@ -299,7 +309,8 @@
       "remote": "En uso: la configuración remota",
       "bundled": "En uso: la copia incluida en el launcher"
     },
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "aboutTitle": "Acerca de"
   },
   "units": {
     "megabytes": "MB"
