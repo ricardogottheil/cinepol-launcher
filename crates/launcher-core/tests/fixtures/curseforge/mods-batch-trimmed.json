@@ -1,0 +1,1228 @@
+{
+ "data": [
+  {
+   "id": 306612,
+   "gameId": 432,
+   "name": "Fabric API",
+   "slug": "fabric-api",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/fabric-api",
+    "wikiUrl": "https://fabricmc.net/wiki/",
+    "issuesUrl": "https://github.com/FabricMC/fabric/issues",
+    "sourceUrl": "https://github.com/FabricMC/fabric"
+   },
+   "summary": "Core API library for the Fabric toolchain",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 185822,
+    "modId": 306612,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/185/822/256/256/636829723898798601.png",
+    "url": "https://media.forgecdn.net/avatars/185/822/636829723898798601.png"
+   },
+   "downloadCount": 238964583,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 308702,
+   "gameId": 432,
+   "name": "Mod Menu",
+   "slug": "modmenu",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/modmenu",
+    "wikiUrl": "https://github.com/terraformersmc/modmenu?tab=readme-ov-file#developers",
+    "issuesUrl": "https://github.com/Prospector/ModMenu/issues",
+    "sourceUrl": "https://github.com/Prospector/ModMenu"
+   },
+   "summary": "Adds a mod menu to view the list of mods you have installed.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1577189,
+    "modId": 308702,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1577/189/256/256/639021849968664892.png",
+    "url": "https://media.forgecdn.net/avatars/1577/189/639021849968664892.png"
+   },
+   "downloadCount": 83677648,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 308769,
+   "gameId": 432,
+   "name": "Fabric Language Kotlin",
+   "slug": "fabric-language-kotlin",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/fabric-language-kotlin",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/FabricMC/fabric-language-kotlin/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc",
+    "sourceUrl": "https://github.com/FabricMC/fabric-language-kotlin"
+   },
+   "summary": "Fabric language module for Kotlin",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1111600,
+    "modId": 308769,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1111/600/256/256/638663264350908845.png",
+    "url": "https://media.forgecdn.net/avatars/1111/600/638663264350908845.png"
+   },
+   "downloadCount": 86739733,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 335493,
+   "gameId": 432,
+   "name": "Dynamic FPS",
+   "slug": "dynamic-fps",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/dynamic-fps",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/juliand665/Dynamic-FPS/issues",
+    "sourceUrl": "https://github.com/juliand665/Dynamic-FPS"
+   },
+   "summary": "Improve performance when Minecraft is in the background",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 218967,
+    "modId": 335493,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/218/967/256/256/637013973797981040.png",
+    "url": "https://media.forgecdn.net/avatars/218/967/637013973797981040.png"
+   },
+   "downloadCount": 54293001,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 348521,
+   "gameId": 432,
+   "name": "Cloth Config API (Fabric/Forge/NeoForge)",
+   "slug": "cloth-config",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/cloth-config",
+    "wikiUrl": "https://shedaniel.gitbook.io/cloth-config/",
+    "issuesUrl": "https://github.com/shedaniel/ClothConfig/issues",
+    "sourceUrl": "https://github.com/shedaniel/ClothConfig"
+   },
+   "summary": "Config Screen API for Minecraft",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 282467,
+    "modId": 348521,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/282/467/256/256/637289313020452406.png",
+    "url": "https://media.forgecdn.net/avatars/282/467/637289313020452406.png"
+   },
+   "downloadCount": 384237153,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 360438,
+   "gameId": 432,
+   "name": "Lithium (Fabric/NeoForge)",
+   "slug": "lithium",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/lithium",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/jellysquid3/lithium-fabric/issues",
+    "sourceUrl": "https://github.com/jellysquid3/lithium"
+   },
+   "summary": "An optimization mod for Minecraft which improves server performance significantly.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 246646,
+    "modId": 360438,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/246/646/256/256/637158441743060329.png",
+    "url": "https://media.forgecdn.net/avatars/246/646/637158441743060329.png"
+   },
+   "downloadCount": 100416430,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 393442,
+   "gameId": 432,
+   "name": "LambDynamicLights",
+   "slug": "lambdynamiclights",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/lambdynamiclights",
+    "wikiUrl": "https://lambdaurora.dev/projects/lambdynamiclights/docs/v4/",
+    "issuesUrl": "https://github.com/LambdAurora/LambDynamicLights/issues",
+    "sourceUrl": "https://github.com/LambdAurora/LambDynamicLights"
+   },
+   "summary": "The most feature-complete and optimized dynamic lighting mod.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1129408,
+    "modId": 393442,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1129/408/256/256/638687799770919257.png",
+    "url": "https://media.forgecdn.net/avatars/1129/408/638687799770919257.png"
+   },
+   "downloadCount": 47081296,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 394468,
+   "gameId": 432,
+   "name": "Sodium",
+   "slug": "sodium",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/sodium",
+    "wikiUrl": "https://github.com/CaffeineMC/sodium/wiki",
+    "issuesUrl": "https://github.com/CaffeineMC/sodium-fabric/issues",
+    "sourceUrl": "https://github.com/CaffeineMC/sodium"
+   },
+   "summary": "The fastest and most compatible rendering optimization mod for Minecraft. Now available for both NeoForge and Fabric!",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 284773,
+    "modId": 394468,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/284/773/256/256/637298471098686391.png",
+    "url": "https://media.forgecdn.net/avatars/284/773/637298471098686391.png"
+   },
+   "downloadCount": 159664349,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 447673,
+   "gameId": 432,
+   "name": "Sodium Extra",
+   "slug": "sodium-extra",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/sodium-extra",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/FlashyReese/sodium-extra-fabric/issues",
+    "sourceUrl": "https://github.com/FlashyReese/sodium-extra-fabric"
+   },
+   "summary": "Features that shouldn't be in Sodium",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 344698,
+    "modId": 447673,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/344/698/256/256/637491211740686215.png",
+    "url": "https://media.forgecdn.net/avatars/344/698/637491211740686215.png"
+   },
+   "downloadCount": 75006164,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 448233,
+   "gameId": 432,
+   "name": "Entity Culling Fabric/Forge",
+   "slug": "entityculling",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/entityculling",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/tr7zw/EntityCulling/issues",
+    "sourceUrl": "https://github.com/tr7zw/EntityCulling-Fabric"
+   },
+   "summary": "Using async path-tracing to hide BlockEntities/Entities that are not visible",
+   "classId": 6,
+   "allowModDistribution": false,
+   "logo": {
+    "id": 345318,
+    "modId": 448233,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/345/318/256/256/637492631463701682.png",
+    "url": "https://media.forgecdn.net/avatars/345/318/637492631463701682.png"
+   },
+   "downloadCount": 236416658,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 455508,
+   "gameId": 432,
+   "name": "Iris Shaders",
+   "slug": "irisshaders",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/irisshaders",
+    "wikiUrl": "https://shaders.properties",
+    "issuesUrl": "https://github.com/IrisShaders/Iris/issues",
+    "sourceUrl": "https://github.com/IrisShaders/Iris"
+   },
+   "summary": "A modern shaders mod for Minecraft intended to be compatible with existing Optifine shaders",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1002450,
+    "modId": 455508,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1002/450/256/256/638522657871453967.png",
+    "url": "https://media.forgecdn.net/avatars/1002/450/638522657871453967.png"
+   },
+   "downloadCount": 141952895,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 459857,
+   "gameId": 432,
+   "name": "FerriteCore (Fabric)",
+   "slug": "ferritecore-fabric",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/ferritecore-fabric",
+    "wikiUrl": null,
+    "issuesUrl": "https://github.com/malte0811/FerriteCore/issues",
+    "sourceUrl": "https://github.com/malte0811/FerriteCore"
+   },
+   "summary": "Memory usage optimizations",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 358034,
+    "modId": 459857,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/358/34/256/256/637518275077940306.jpeg",
+    "url": "https://media.forgecdn.net/avatars/358/34/637518275077940306.jpeg"
+   },
+   "downloadCount": 77506388,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 475358,
+   "gameId": 432,
+   "name": "Better Mount HUD",
+   "slug": "better-mount-hud",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/better-mount-hud",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/Lortseam/better-mount-hud/issues",
+    "sourceUrl": "https://github.com/Lortseam/better-mount-hud"
+   },
+   "summary": "Improves the ingame HUD while riding a mount",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 374604,
+    "modId": 475358,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/374/604/256/256/637548658626234882.png",
+    "url": "https://media.forgecdn.net/avatars/374/604/637548658626234882.png"
+   },
+   "downloadCount": 21817668,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 511319,
+   "gameId": 432,
+   "name": "Reese's Sodium Options",
+   "slug": "reeses-sodium-options",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/reeses-sodium-options",
+    "wikiUrl": "",
+    "issuesUrl": null,
+    "sourceUrl": "https://github.com/FlashyReese/reeses-sodium-options"
+   },
+   "summary": "Alternative Options Menu for Sodium",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 414599,
+    "modId": 511319,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/414/599/256/256/637636962431399112.png",
+    "url": "https://media.forgecdn.net/avatars/414/599/637636962431399112.png"
+   },
+   "downloadCount": 78259969,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 518319,
+   "gameId": 432,
+   "name": "More Chat History",
+   "slug": "morechathistory",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/morechathistory",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/JackFred2/MoreChatHistory/issues",
+    "sourceUrl": "https://github.com/JackFredMods/MoreChatHistory"
+   },
+   "summary": "Increases the size of the chat history.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 422324,
+    "modId": 518319,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/422/324/256/256/637651575280125838.png",
+    "url": "https://media.forgecdn.net/avatars/422/324/637651575280125838.png"
+   },
+   "downloadCount": 13864437,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 527334,
+   "gameId": 432,
+   "name": "Language Reload",
+   "slug": "language-reload",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/language-reload",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/Jerozgen/LanguageReload/issues",
+    "sourceUrl": "https://github.com/Jerozgen/LanguageReload"
+   },
+   "summary": "Reduces load times and adds fallbacks for languages",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 433367,
+    "modId": 527334,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/433/367/256/256/637672262111524644.png",
+    "url": "https://media.forgecdn.net/avatars/433/367/637672262111524644.png"
+   },
+   "downloadCount": 31860738,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 531351,
+   "gameId": 432,
+   "name": "Continuity",
+   "slug": "continuity",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/continuity",
+    "wikiUrl": "https://github.com/PepperCode1/Continuity/wiki",
+    "issuesUrl": "https://github.com/PepperCode1/Continuity/issues",
+    "sourceUrl": "https://github.com/PepperCode1/Continuity"
+   },
+   "summary": "A Minecraft mod that allows for efficient connected textures",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 437816,
+    "modId": 531351,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/437/816/256/256/637682110255957193.png",
+    "url": "https://media.forgecdn.net/avatars/437/816/637682110255957193.png"
+   },
+   "downloadCount": 65348769,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 547434,
+   "gameId": 432,
+   "name": "Forge Config API Port",
+   "slug": "forge-config-api-port",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/forge-config-api-port",
+    "wikiUrl": "https://github.com/Fuzss/forgeconfigapiport/wiki",
+    "issuesUrl": "https://github.com/Fuzss/forgeconfigapiport/issues",
+    "sourceUrl": "https://github.com/Fuzss/forgeconfigapiport"
+   },
+   "summary": "NeoForge's & Forge's config systems provided to other modding ecosystems. Designed for a multiloader architecture.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1039223,
+    "modId": 547434,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1039/223/256/256/638564744744297085.png",
+    "url": "https://media.forgecdn.net/avatars/1039/223/638564744744297085.png"
+   },
+   "downloadCount": 83987691,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 556408,
+   "gameId": 432,
+   "name": "Sodium Shadowy Path Blocks (SSPB)",
+   "slug": "sodium-shadowy-path-blocks",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/sodium-shadowy-path-blocks",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/Rynnavinx/sodium-shadowy-path-blocks/issues",
+    "sourceUrl": "https://github.com/Rynnavinx/sodium-shadowy-path-blocks"
+   },
+   "summary": "Reintroduces vanilla-like smooth lighting to non-full blocks (e.g. dirt paths and how they have dark shading when directly next to a full block) when using Sodium. ",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 514342,
+    "modId": 556408,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/514/342/256/256/637834982978560561.png",
+    "url": "https://media.forgecdn.net/avatars/514/342/637834982978560561.png"
+   },
+   "downloadCount": 9540273,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 563977,
+   "gameId": 432,
+   "name": "Puzzle",
+   "slug": "puzzle",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/puzzle",
+    "wikiUrl": "https://www.midnightdust.eu/wiki/puzzle/",
+    "issuesUrl": "https://github.com/PuzzleMC/Puzzle/issues",
+    "sourceUrl": "https://github.com/PuzzleMC/Puzzle"
+   },
+   "summary": "Adds resourcepack features and a GUI to more conveniently configure OptiFine alternatives. ",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 475738,
+    "modId": 563977,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/475/738/256/256/637768134990685183.png",
+    "url": "https://media.forgecdn.net/avatars/475/738/637768134990685183.png"
+   },
+   "downloadCount": 23533869,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 568563,
+   "gameId": 432,
+   "name": "[ETF] Entity Texture Features - [Fabric & Forge]",
+   "slug": "entity-texture-features-fabric",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/entity-texture-features-fabric",
+    "wikiUrl": "https://github.com/Traben-0/Entity_Texture_Features/blob/master/.github/README.md",
+    "issuesUrl": "https://github.com/Traben-0/EmissiveMod/issues",
+    "sourceUrl": "https://github.com/Traben-0/EmissiveMod"
+   },
+   "summary": "Custom, Emissive and Varied mobs like Optifine and so much more.. +Player skin features!)",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 983279,
+    "modId": 568563,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/983/279/256/256/638491557830728907.png",
+    "url": "https://media.forgecdn.net/avatars/983/279/638491557830728907.png"
+   },
+   "downloadCount": 161323479,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 574741,
+   "gameId": 432,
+   "name": "Zoomify",
+   "slug": "zoomify",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/zoomify",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/isXander/Zoomify/issues",
+    "sourceUrl": "https://github.com/isXander/Zoomify"
+   },
+   "summary": "A zoom mod with infinite customizability.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 507501,
+    "modId": 574741,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/507/501/256/256/637827666833902941.png",
+    "url": "https://media.forgecdn.net/avatars/507/501/637827666833902941.png"
+   },
+   "downloadCount": 43702333,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 596224,
+   "gameId": 432,
+   "name": "Debugify",
+   "slug": "debugify",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/debugify",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/W-OVERFLOW/Debugify/issues",
+    "sourceUrl": "https://github.com/W-OVERFLOW/Debugify"
+   },
+   "summary": "Fixes Minecraft bugs found on the bug tracker",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 513642,
+    "modId": 596224,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/513/642/256/256/637833206141911324.png",
+    "url": "https://media.forgecdn.net/avatars/513/642/637833206141911324.png"
+   },
+   "downloadCount": 37624755,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 618770,
+   "gameId": 432,
+   "name": "Paginated Advancements & Custom Frames",
+   "slug": "paginated-advancements",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/paginated-advancements",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/DaFuqs/PaginatedAdvancements/issues",
+    "sourceUrl": "https://github.com/DaFuqs/PaginatedAdvancements"
+   },
+   "summary": "Better advancements screen",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 540994,
+    "modId": 618770,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/540/994/256/256/637867614281576022.png",
+    "url": "https://media.forgecdn.net/avatars/540/994/637867614281576022.png"
+   },
+   "downloadCount": 10870711,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 618812,
+   "gameId": 432,
+   "name": "Main Menu Credits",
+   "slug": "main-menu-credits",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/main-menu-credits",
+    "wikiUrl": "https://github.com/isXander/main-menu-credits/wiki/Usage",
+    "issuesUrl": "https://github.com/isXander/main-menu-credits/issues",
+    "sourceUrl": "https://github.com/isXander/main-menu-credits"
+   },
+   "summary": "Adds a way of adding information to the user's title screen.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 541048,
+    "modId": 618812,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/541/48/256/256/637867730184886013.png",
+    "url": "https://media.forgecdn.net/avatars/541/48/637867730184886013.png"
+   },
+   "downloadCount": 7192323,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 619986,
+   "gameId": 432,
+   "name": "OptiGUI",
+   "slug": "optigui",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/optigui",
+    "wikiUrl": "https://opekope2.dev/OptiGUI/",
+    "issuesUrl": "https://github.com/opekope2/OptiGUI/issues",
+    "sourceUrl": "https://github.com/opekope2/OptiGUI"
+   },
+   "summary": "Blazing fast custom GUI textures on Fabric and Quilt with built-in OptiFine custom GUI resource pack support",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 798272,
+    "modId": 619986,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/798/272/256/256/638159913375685193.png",
+    "url": "https://media.forgecdn.net/avatars/798/272/638159913375685193.png"
+   },
+   "downloadCount": 13538185,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 630104,
+   "gameId": 432,
+   "name": "MoreCulling",
+   "slug": "moreculling",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/moreculling",
+    "wikiUrl": "https://github.com/fxmorin/MoreCulling/wiki",
+    "issuesUrl": "https://github.com/fxmorin/MoreCulling/issues",
+    "sourceUrl": "https://github.com/fxmorin/MoreCulling"
+   },
+   "summary": "A mod that changes how multiple types of culling are handled in order to improve performance",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 555060,
+    "modId": 630104,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/555/60/256/256/637898054310106097.png",
+    "url": "https://media.forgecdn.net/avatars/555/60/637898054310106097.png"
+   },
+   "downloadCount": 28766729,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 634062,
+   "gameId": 432,
+   "name": "No Chat Reports",
+   "slug": "no-chat-reports",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/no-chat-reports",
+    "wikiUrl": "https://github.com/Aizistral-Studios/No-Chat-Reports/wiki",
+    "issuesUrl": "https://github.com/Aizistral-Studios/No-Chat-Reports/issues",
+    "sourceUrl": "https://github.com/Aizistral-Studios/No-Chat-Reports"
+   },
+   "summary": "Makes chat unreportable (where possible)",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 560068,
+    "modId": 634062,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/560/68/256/256/637910636688514454.png",
+    "url": "https://media.forgecdn.net/avatars/560/68/637910636688514454.png"
+   },
+   "downloadCount": 124279848,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 667299,
+   "gameId": 432,
+   "name": "YetAnotherConfigLib",
+   "slug": "yacl",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/yacl",
+    "wikiUrl": "https://docs.isxander.dev/yet-another-config-lib",
+    "issuesUrl": "https://github.com/isXander/YetAnotherConfigLib/issues",
+    "sourceUrl": "https://github.com/isXander/YetAnotherConfigLib"
+   },
+   "summary": "A builder-based configuration library for Minecraft.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 598727,
+    "modId": 667299,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/598/727/256/256/637977258872864320.png",
+    "url": "https://media.forgecdn.net/avatars/598/727/637977258872864320.png"
+   },
+   "downloadCount": 131450039,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 686911,
+   "gameId": 432,
+   "name": "ImmediatelyFast",
+   "slug": "immediatelyfast",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/immediatelyfast",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/RaphiMC/ImmediatelyFast/issues",
+    "sourceUrl": "https://github.com/RaphiMC/ImmediatelyFast"
+   },
+   "summary": "Speed up immediate mode rendering in Minecraft",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 873971,
+    "modId": 686911,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/873/971/256/256/638294478643875692.png",
+    "url": "https://media.forgecdn.net/avatars/873/971/638294478643875692.png"
+   },
+   "downloadCount": 192438324,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 708967,
+   "gameId": 432,
+   "name": "FastQuit",
+   "slug": "fastquit",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/fastquit",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/KingContaria/FastQuit/issues",
+    "sourceUrl": "https://github.com/KingContaria/FastQuit"
+   },
+   "summary": "Lets you return to the Title Screen early while your world is still saving in the background! ",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 645504,
+    "modId": 708967,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/645/504/256/256/638045686820025440.png",
+    "url": "https://media.forgecdn.net/avatars/645/504/638045686820025440.png"
+   },
+   "downloadCount": 11192517,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 833233,
+   "gameId": 432,
+   "name": "Remove Reloading Screen",
+   "slug": "rrls",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/rrls",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/dima-dencep/rrls/issues",
+    "sourceUrl": "https://github.com/dima-dencep/rrls"
+   },
+   "summary": "Makes resource packs load in the background, allowing you to do other things while waiting!",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1179051,
+    "modId": 833233,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1179/51/256/256/638752022519805362.png",
+    "url": "https://media.forgecdn.net/avatars/1179/51/638752022519805362.png"
+   },
+   "downloadCount": 17806913,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 835847,
+   "gameId": 432,
+   "name": "Controlify (Controller support)",
+   "slug": "controlify",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/controlify",
+    "wikiUrl": "https://moddedmc.wiki/projects/controlify",
+    "issuesUrl": "https://github.com/isXander/Controlify/issues",
+    "sourceUrl": "https://github.com/isXander/Controlify"
+   },
+   "summary": "Adds controller support to Minecraft!",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 787500,
+    "modId": 835847,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/787/500/256/256/638139956611512060.png",
+    "url": "https://media.forgecdn.net/avatars/787/500/638139956611512060.png"
+   },
+   "downloadCount": 8370250,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 844662,
+   "gameId": 432,
+   "name": "[EMF] Entity Model Features [Fabric & Forge]",
+   "slug": "entity-model-features",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/entity-model-features",
+    "wikiUrl": "https://github.com/Traben-0/Entity_Model_Features/blob/master/FEATURES.md",
+    "issuesUrl": "https://github.com/Traben-0/Entity_Model_Features/issues",
+    "sourceUrl": "https://github.com/Traben-0/Entity_Model_Features"
+   },
+   "summary": "EMF is an, OptiFine format, Custom Entity Model replacement mod available for Fabric and Forge.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 983284,
+    "modId": 844662,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/983/284/256/256/638491564386011875.png",
+    "url": "https://media.forgecdn.net/avatars/983/284/638491564386011875.png"
+   },
+   "downloadCount": 147548616,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 849519,
+   "gameId": 432,
+   "name": "e4mc",
+   "slug": "e4mc",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/e4mc",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/vgskye/e4mc-minecraft-architectury/issues",
+    "sourceUrl": "https://github.com/vgskye/e4mc-minecraft-architectury"
+   },
+   "summary": "Open a LAN server to anyone, anywhere, anytime.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1861120,
+    "modId": 849519,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1861/120/256/256/639168773968861009.png",
+    "url": "https://media.forgecdn.net/avatars/1861/120/639168773968861009.png"
+   },
+   "downloadCount": 24576144,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 855981,
+   "gameId": 432,
+   "name": "Chat Reporting Helper",
+   "slug": "chat-reporting-helper",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/texture-packs/chat-reporting-helper",
+    "wikiUrl": "https://fabulously-optimized.gitbook.io/modpack/readme/chat-reporting-faq#chat-reporting-and-fabulously-optimized",
+    "issuesUrl": "https://github.com/Fabulously-Optimized/fabulously-optimized/issues",
+    "sourceUrl": "https://github.com/Fabulously-Optimized/fabulously-optimized/tree/main/Resource%20Packs/Chat%20Reporting%20Helper"
+   },
+   "summary": "An educational tool that explains chat reporting in a simple and neutral way.",
+   "classId": 12,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 811154,
+    "modId": 855981,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/811/154/256/256/638183655521642697.png",
+    "url": "https://media.forgecdn.net/avatars/811/154/638183655521642697.png"
+   },
+   "downloadCount": 7122603,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 867964,
+   "gameId": 432,
+   "name": "Translations for Sodium",
+   "slug": "translations-for-sodium",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/texture-packs/translations-for-sodium",
+    "wikiUrl": "https://crowdin.com/project/sodium-fabric",
+    "issuesUrl": "https://crowdin.com/project/sodium-fabric/discussions",
+    "sourceUrl": "https://github.com/Madis0/sodium-fabric-translations"
+   },
+   "summary": "Unofficial translations for the Sodium Minecraft mod",
+   "classId": 12,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 825164,
+    "modId": 867964,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/825/164/256/256/638210697516027864.png",
+    "url": "https://media.forgecdn.net/avatars/825/164/638210697516027864.png"
+   },
+   "downloadCount": 8618026,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 958094,
+   "gameId": 432,
+   "name": "Polytone",
+   "slug": "polytone",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/polytone",
+    "wikiUrl": "https://github.com/MehVahdJukaar/polytone/wiki",
+    "issuesUrl": "https://github.com/MehVahdJukaar/polytone/issues",
+    "sourceUrl": null
+   },
+   "summary": "Custom Block Sounds, Colors, Lightmaps, Colormaps,  Post Shaders, Custom Item Models, Biome Variant Textures, Gui modifiers, Tooltips, Custom Particles, Creative Tabs. Supports Optifine format. For Resource Packs",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 950676,
+    "modId": 958094,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/950/676/256/256/638439526301118778.png",
+    "url": "https://media.forgecdn.net/avatars/950/676/638439526301118778.png"
+   },
+   "downloadCount": 10673597,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 975120,
+   "gameId": 432,
+   "name": "Cubes Without Borders",
+   "slug": "cubes-without-borders",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/cubes-without-borders",
+    "wikiUrl": null,
+    "issuesUrl": "https://github.com/Kira-NT/cubes-without-borders/issues/new/choose",
+    "sourceUrl": "https://github.com/Kira-NT/cubes-without-borders"
+   },
+   "summary": "A mod that allows you to play Minecraft in a borderless fullscreen window.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 948648,
+    "modId": 975120,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/948/648/256/256/638436093486563938.png",
+    "url": "https://media.forgecdn.net/avatars/948/648/638436093486563938.png"
+   },
+   "downloadCount": 15851845,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1026394,
+   "gameId": 432,
+   "name": "BetterGrassify",
+   "slug": "bettergrassify",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/bettergrassify",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/UltimatChamp/BetterGrassify/issues",
+    "sourceUrl": "https://github.com/UltimatChamp/BetterGrassify"
+   },
+   "summary": "Gamers can finally touch grass!? OptiFine's Fancy and Fast better grass implemented on Fabric and NeoForge!",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1003889,
+    "modId": 1026394,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1003/889/256/256/638524731104450693.png",
+    "url": "https://media.forgecdn.net/avatars/1003/889/638524731104450693.png"
+   },
+   "downloadCount": 7723386,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1037459,
+   "gameId": 432,
+   "name": "Text Placeholder API",
+   "slug": "text-placeholder-api",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/text-placeholder-api",
+    "wikiUrl": null,
+    "issuesUrl": null,
+    "sourceUrl": null
+   },
+   "summary": "Placeholder and Text manipulation library for your Minecraft mods.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1015016,
+    "modId": 1037459,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1015/16/256/256/638540602996666426.png",
+    "url": "https://media.forgecdn.net/avatars/1015/16/638540602996666426.png"
+   },
+   "downloadCount": 16419781,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1154099,
+   "gameId": 432,
+   "name": "Crash Assistant",
+   "slug": "crash-assistant",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/crash-assistant",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/KostromDan/Crash-Assistant/issues",
+    "sourceUrl": "https://github.com/KostromDan/Crash-Assistant"
+   },
+   "summary": "Shows a GUI after Minecraft crashes, immediately showing and analyzing all affected logs.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1482227,
+    "modId": 1154099,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1482/227/256/256/638963404721998907.png",
+    "url": "https://media.forgecdn.net/avatars/1482/227/638963404721998907.png"
+   },
+   "downloadCount": 73247677,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1285307,
+   "gameId": 432,
+   "name": "Ixeris",
+   "slug": "ixeris",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/ixeris",
+    "wikiUrl": "",
+    "issuesUrl": "https://github.com/decce6/Ixeris/issues",
+    "sourceUrl": "https://github.com/decce6/Ixeris"
+   },
+   "summary": "Buffered raw input and threaded event polling",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1312213,
+    "modId": 1285307,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1312/213/256/256/638853309190922968.png",
+    "url": "https://media.forgecdn.net/avatars/1312/213/638853309190922968.png"
+   },
+   "downloadCount": 9147336,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1291862,
+   "gameId": 432,
+   "name": "Cape Provider",
+   "slug": "cape-provider",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/cape-provider",
+    "wikiUrl": null,
+    "issuesUrl": "https://github.com/litetex-oss/mcm-cape-provider/issues",
+    "sourceUrl": "https://github.com/litetex-oss/mcm-cape-provider"
+   },
+   "summary": "Provides you with capes! You can choose from various providers or add your own",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1325674,
+    "modId": 1291862,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1325/674/256/256/638861863496728581.png",
+    "url": "https://media.forgecdn.net/avatars/1325/674/638861863496728581.png"
+   },
+   "downloadCount": 931086,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1301799,
+   "gameId": 432,
+   "name": "Skyboxify",
+   "slug": "skyboxify",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/skyboxify",
+    "wikiUrl": "https://legacy-visuals-project.github.io/Skyboxify/",
+    "issuesUrl": "https://github.com/Legacy-Visuals-Project/optiboxes/issues",
+    "sourceUrl": "https://github.com/Legacy-Visuals-Project/Skyboxify"
+   },
+   "summary": "A skybox mod that allows you to use OptiFine skies in Fabric 1.21+",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1563313,
+    "modId": 1301799,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1563/313/256/256/639014185532412047.png",
+    "url": "https://media.forgecdn.net/avatars/1563/313/639014185532412047.png"
+   },
+   "downloadCount": 2812845,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1340480,
+   "gameId": 432,
+   "name": "Config Manager",
+   "slug": "configmanager",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/configmanager",
+    "wikiUrl": "https://github.com/TheBossMagnus/Config-Manager/blob/dev/MODPACK_GUIDE.md",
+    "issuesUrl": "https://github.com/TheBossMagnus/Config-Manager/issues",
+    "sourceUrl": "https://github.com/TheBossMagnus/Config-Manager"
+   },
+   "summary": "A minecraft mod that allows modpack developers to ship configuration file in the most user-friendly way possible",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1428092,
+    "modId": 1340480,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1428/92/256/256/638925158119131894.webp",
+    "url": "https://media.forgecdn.net/avatars/1428/92/638925158119131894.webp"
+   },
+   "downloadCount": 1515408,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1367508,
+   "gameId": 432,
+   "name": "ModernFix-mVUS",
+   "slug": "modernfix-mvus",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/modernfix-mvus",
+    "wikiUrl": null,
+    "issuesUrl": null,
+    "sourceUrl": "https://github.com/coredex-source/ModernFix---mVUS"
+   },
+   "summary": "A fork of ModernFix that adds minor version update support.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1482888,
+    "modId": 1367508,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1482/888/256/256/638963898842663065.png",
+    "url": "https://media.forgecdn.net/avatars/1482/888/638963898842663065.png"
+   },
+   "downloadCount": 1993798,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1434533,
+   "gameId": 432,
+   "name": "Better Block Entities",
+   "slug": "better-block-entities",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/better-block-entities",
+    "wikiUrl": null,
+    "issuesUrl": null,
+    "sourceUrl": "https://github.com/ceeden/betterblockentities"
+   },
+   "summary": "A Minecraft optimization mod for Fabric/Sodium that improves FPS / Block Entity Rendering by implementing a Hybrid Renderer.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1622337,
+    "modId": 1434533,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1622/337/256/256/639042904954218022.png",
+    "url": "https://media.forgecdn.net/avatars/1622/337/639042904954218022.png"
+   },
+   "downloadCount": 1840035,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1512894,
+   "gameId": 432,
+   "name": "Animatica Refabricated",
+   "slug": "animatica-refabricated",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/animatica-refabricated",
+    "wikiUrl": null,
+    "issuesUrl": null,
+    "sourceUrl": "https://github.com/coredex-source/AnimaticaRefabricated"
+   },
+   "summary": "A fork of Animatica implementing the OptiFine/MCPatcher animated texture format.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1754759,
+    "modId": 1512894,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1754/759/256/256/639116763521053195.png",
+    "url": "https://media.forgecdn.net/avatars/1754/759/639116763521053195.png"
+   },
+   "downloadCount": 724773,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1520456,
+   "gameId": 432,
+   "name": "MixinTrace Reborn",
+   "slug": "mixintrace-reborn",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/mixintrace-reborn",
+    "wikiUrl": null,
+    "issuesUrl": "https://github.com/IAFEnvoy/MixinTrace-Reborn/issues",
+    "sourceUrl": "https://github.com/IAFEnvoy/MixinTrace-Reborn"
+   },
+   "summary": "Adds a list of mixins in the stacktrace to crash reports.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1767665,
+    "modId": 1520456,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1767/665/256/256/639123448464920244.webp",
+    "url": "https://media.forgecdn.net/avatars/1767/665/639123448464920244.webp"
+   },
+   "downloadCount": 265265,
+   "isAvailable": true,
+   "status": 4
+  },
+  {
+   "id": 1655703,
+   "gameId": 432,
+   "name": "Renice Shot",
+   "slug": "renice-shot",
+   "links": {
+    "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/renice-shot",
+    "wikiUrl": null,
+    "issuesUrl": null,
+    "sourceUrl": "https://github.com/wechirok/renice-shot"
+   },
+   "summary": "A Fabric client mod for taking high-resolution screenshots.",
+   "classId": 6,
+   "allowModDistribution": true,
+   "logo": {
+    "id": 1988502,
+    "modId": 1655703,
+    "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1988/502/256/256/639225063162283339.png",
+    "url": "https://media.forgecdn.net/avatars/1988/502/639225063162283339.png"
+   },
+   "downloadCount": 179736,
+   "isAvailable": true,
+   "status": 4
+  }
+ ]
+}
