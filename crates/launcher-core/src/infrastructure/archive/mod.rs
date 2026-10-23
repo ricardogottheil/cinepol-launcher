@@ -5,10 +5,12 @@
 //! write target is checked against the canonicalized destination root.
 //! Symbolic and hard links are only created when they resolve inside it.
 
+mod curseforge;
 mod extract;
 mod mrpack;
 mod natives;
 
+pub use curseforge::ZipCurseForgeArchive;
 pub(crate) use extract::create_link_inside;
 pub use extract::{extract_tar_gz, extract_tar_gz_async, extract_zip, extract_zip_async};
 pub use mrpack::ZipMrpackArchive;

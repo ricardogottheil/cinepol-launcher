@@ -74,7 +74,10 @@ impl MrpackArchive for ZipMrpackArchive {
     ) -> Result<Vec<StagedFile>, PackFileError> {
         let (path, staging) = (archive.to_path_buf(), staging.to_path_buf());
         let limits = *self;
-        blocking(archive, move || extract_overrides(&path, &staging, limits)).await
+        blocking(archive, move || {
+            extract_folders(&path, &staging, limits, &[OVERRIDES, CLIENT_OVERRIDES])
+        })
+        .await
     }
 
     async fn write(
@@ -88,7 +91,7 @@ impl MrpackArchive for ZipMrpackArchive {
     }
 }
 
-async fn blocking<T: Send + 'static>(
+pub(super) async fn blocking<T: Send + 'static>(
     archive: &Path,
     work: impl FnOnce() -> Result<T, PackFileError> + Send + 'static,
 ) -> Result<T, PackFileError> {
@@ -104,7 +107,7 @@ fn io_error(path: &Path, reason: impl Display) -> PackFileError {
     }
 }
 
-fn invalid(archive: &Path, reason: impl Display) -> PackFileError {
+pub(super) fn invalid(archive: &Path, reason: impl Display) -> PackFileError {
     PackFileError::InvalidArchive(format!("{}: {reason}", archive.display()))
 }
 
@@ -118,7 +121,7 @@ fn from_extract(staging: &Path, error: ExtractError) -> PackFileError {
     }
 }
 
-fn open(archive: &Path) -> Result<zip::ZipArchive<File>, PackFileError> {
+pub(super) fn open(archive: &Path) -> Result<zip::ZipArchive<File>, PackFileError> {
     let file = File::open(archive).map_err(|error| io_error(archive, error))?;
     zip::ZipArchive::new(file).map_err(|error| invalid(archive, error))
 }
@@ -155,27 +158,29 @@ struct Planned {
     path: RelativePath,
 }
 
-/// Where an entry goes: `None` when it is not an override file (other
-/// folders, `server-overrides/`, directories, links). An entry whose name is
-/// unsafe anywhere in the archive is an error.
-fn classify(name: &str, is_file: bool) -> Result<Option<(u8, RelativePath)>, PackFileError> {
+/// Where an entry goes: `None` when it is not a file under one of `folders`
+/// (other folders such as `server-overrides/`, directories, links). The pass
+/// is the folder's position. An entry whose name is unsafe anywhere in the
+/// archive is an error.
+fn classify(
+    name: &str,
+    is_file: bool,
+    folders: &[&str],
+) -> Result<Option<(usize, RelativePath)>, PackFileError> {
     let unsafe_entry = || PackFileError::UnsafeEntry(name.to_owned());
     let components = entry_components(name).map_err(|_| unsafe_entry())?;
-    let pass = match components.first() {
-        Some(&OVERRIDES) => 0,
-        Some(&CLIENT_OVERRIDES) => 1,
-        _ => return Ok(None),
+    let Some(pass) = components
+        .first()
+        .and_then(|first| folders.iter().position(|folder| folder == first))
+    else {
+        return Ok(None);
     };
     if !is_file || components.len() < 2 {
         return Ok(None);
     }
     // The raw name must be `<prefix>/<safe relative path>`: no backslashes,
     // empty segments or leading separators once the prefix is stripped.
-    let prefix = if pass == 0 {
-        OVERRIDES
-    } else {
-        CLIENT_OVERRIDES
-    };
+    let prefix = folders[pass];
     let rest = name
         .strip_prefix(prefix)
         .and_then(|rest| rest.strip_prefix('/'))
@@ -184,15 +189,18 @@ fn classify(name: &str, is_file: bool) -> Result<Option<(u8, RelativePath)>, Pac
     Ok(Some((pass, path)))
 }
 
-fn extract_overrides(
+/// Extracts every file under `folders` (later folders win on the same path)
+/// into `staging`, size capped, with each file's path inside the folder.
+pub(super) fn extract_folders(
     archive: &Path,
     staging: &Path,
     limits: ZipMrpackArchive,
+    folders: &[&str],
 ) -> Result<Vec<StagedFile>, PackFileError> {
     let mut zip = open(archive)?;
 
     // Check every name before writing anything.
-    let mut planned: Vec<(u8, Planned)> = Vec::new();
+    let mut planned: Vec<(usize, Planned)> = Vec::new();
     for index in 0..zip.len() {
         let entry = zip
             .by_index(index)
@@ -202,11 +210,11 @@ fn extract_overrides(
             .map_err(|error| invalid(archive, error))?
             .into_owned();
         let is_file = !entry.is_dir() && !entry.is_symlink();
-        if let Some((pass, path)) = classify(&name, is_file)? {
+        if let Some((pass, path)) = classify(&name, is_file, folders)? {
             planned.push((pass, Planned { index, name, path }));
         }
     }
-    // `overrides/` first, then `client-overrides/`, each in archive order.
+    // Folder by folder (`overrides/` before `client-overrides/`), each in archive order.
     planned.sort_by_key(|(pass, planned)| (*pass, planned.index));
 
     let root = Root::prepare(staging).map_err(|error| from_extract(staging, error))?;
