@@ -204,6 +204,13 @@ App shell (`src/app/shell/`):
   it before it is applied), the label -> value sheet, then for premium
   profiles "Change skin" (PNG, model, apply once) and the capes as toggle
   buttons (a click wears one; no request while moving through them).
+- **Modpacks**: tabs Explore / Installed / Import (`nav-label`, the current
+  tab underlined in `silk`). Explore puts the filters on top and the packs as
+  cards (icon, title as a stretched link, two-line description, loader
+  plates, downloads readout) in an auto-fill grid; a card opens the pack's own
+  page (`/modpacks/<catalog>/<project>`) with its versions. Installed reuses
+  the instance rows; Import groups the file pickers and packwiz. The tab, the
+  catalog and the search survive opening a pack.
 - **Settings > About**: the version and the legal disclaimer.
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (server, recommended version, active account as a spec

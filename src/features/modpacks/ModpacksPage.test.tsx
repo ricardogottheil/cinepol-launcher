@@ -1,9 +1,11 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { App } from "../../app/App";
+import { createAppRouter } from "../../app/router";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError, type ProgressEvent } from "../../ipc/client";
-import { renderWithQuery } from "../../test/render";
-import { ModpacksPage } from "./ModpacksPage";
+import { initialBrowse, useModpackBrowse } from "./browseStore";
 import { useModpackJobStore } from "./modpackJobStore";
 
 const client = vi.hoisted(() => ({
@@ -15,6 +17,8 @@ const client = vi.hoisted(() => ({
   getModpackCatalogs: vi.fn(),
   installPackwiz: vi.fn(),
   importPackwiz: vi.fn(),
+  listInstances: vi.fn(),
+  listAccounts: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -30,6 +34,7 @@ const summary = {
   description: "Improve your graphics and performance",
   iconUrl: "https://cdn.modrinth.com/data/1KVo5zza/icon.png",
   downloads: 12_345_678,
+  loaders: ["fabric"],
 };
 const version = {
   id: "uQxD0ENB",
@@ -48,6 +53,8 @@ const instance = {
   loader: "fabric",
   loaderVersion: "0.19.5",
   origin: "custom",
+  modpackSource: null,
+  updatePackOnLaunch: false,
   playtimeSecs: 0,
 } as const;
 const installed = {
@@ -67,21 +74,42 @@ function deferred<T>() {
 beforeEach(() => {
   vi.clearAllMocks();
   useModpackJobStore.setState({ job: { kind: "idle" }, error: null, installed: null });
+  useModpackBrowse.setState(initialBrowse);
   client.searchModpacks.mockResolvedValue({ items: [summary], total: 1 });
   client.getModpack.mockResolvedValue({ summary, versions: [version] });
   client.getModpackCatalogs.mockResolvedValue({ curseforge: true });
+  client.listInstances.mockResolvedValue([]);
+  client.listAccounts.mockResolvedValue({ accounts: [], activeId: null });
 });
+
+function renderAt(path: string) {
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
+  render(<App router={router} />);
+  return router;
+}
+
+async function openTab(name: string) {
+  fireEvent.click(await screen.findByRole("tab", { name }));
+  return screen.getByRole("tabpanel", { name });
+}
+
+async function openDetail(title = summary.title) {
+  fireEvent.click(await screen.findByRole("link", { name: title }));
+  return screen.findByRole("heading", { level: 1, name: title });
+}
 
 describe("catalogs", () => {
   it("offers only Modrinth when the build has no CurseForge key", async () => {
     client.getModpackCatalogs.mockResolvedValue({ curseforge: false });
-    renderWithQuery(<ModpacksPage />);
-    await screen.findByRole("heading", { name: summary.title });
+    renderAt("/modpacks");
+    await screen.findByRole("link", { name: summary.title });
     expect(screen.queryByRole("combobox", { name: labels.catalog })).not.toBeInTheDocument();
     expect(client.searchModpacks).toHaveBeenCalledWith(
       expect.objectContaining({ source: "modrinth" }),
     );
-    expect(screen.getByRole("button", { name: labels.import })).toBeInTheDocument();
+    const panel = await openTab(labels.tabs.import);
+    expect(within(panel).getByRole("button", { name: labels.import })).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: labels.importZip })).not.toBeInTheDocument();
   });
 
   it("searches CurseForge, opens its packs there and imports its zips", async () => {
@@ -94,12 +122,13 @@ describe("catalogs", () => {
     client.searchModpacks.mockImplementation(({ source }: { source: string }) =>
       Promise.resolve({ items: [source === "curseforge" ? curseforge : summary], total: 1 }),
     );
+    client.getModpack.mockResolvedValue({ summary: curseforge, versions: [version] });
     client.importCurseForgeZip.mockReturnValue({
       operationId: "op",
       done: Promise.resolve(null),
       cancel: vi.fn(),
     });
-    renderWithQuery(<ModpacksPage />);
+    renderAt("/modpacks");
     const select = await screen.findByRole("combobox", { name: labels.catalog });
     fireEvent.change(select, { target: { value: "curseforge" } });
 
@@ -108,37 +137,35 @@ describe("catalogs", () => {
         expect.objectContaining({ source: "curseforge", page: 0 }),
       ),
     );
-    expect(screen.getByText(labels.sources.curseforge)).toBeInTheDocument();
     expect(
       screen.getByRole("searchbox", {
         name: labels.searchLabel.replace("{{catalog}}", "CurseForge"),
       }),
     ).toBeInTheDocument();
-    const row = (await screen.findByRole("heading", { name: curseforge.title })).closest("li");
-    if (!row) throw new Error("row not found");
-    fireEvent.click(within(row).getByRole("button", { name: labels.showVersions }));
+    await openDetail(curseforge.title);
     await waitFor(() => expect(client.getModpack).toHaveBeenCalledWith("curseforge", "396246"));
+    expect(screen.getByText(labels.sources.curseforge)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: labels.importZip }));
+    fireEvent.click(screen.getByRole("link", { name: labels.back }));
+    const panel = await openTab(labels.tabs.import);
+    fireEvent.click(within(panel).getByRole("button", { name: labels.importZip }));
     expect(client.importCurseForgeZip).toHaveBeenCalled();
     expect(client.importMrpack).not.toHaveBeenCalled();
   });
 });
 
-async function openVersions() {
-  renderWithQuery(<ModpacksPage />);
-  const row = (await screen.findByRole("heading", { name: summary.title })).closest("li");
-  if (!row) throw new Error("row not found");
-  fireEvent.click(within(row).getByRole("button", { name: labels.showVersions }));
-  await within(row).findByText("14.1.1");
-  return row;
-}
-
-describe("ModpacksPage", () => {
-  it("lists Modrinth modpacks and searches as the player types", async () => {
-    renderWithQuery(<ModpacksPage />);
-    expect(await screen.findByRole("heading", { name: summary.title })).toBeInTheDocument();
-    expect(screen.getByText(summary.description)).toBeInTheDocument();
+describe("explore", () => {
+  it("lists modpack cards with their loaders and searches as the player types", async () => {
+    renderAt("/modpacks");
+    const link = await screen.findByRole("link", { name: summary.title });
+    const card = link.closest("article");
+    if (!card) throw new Error("card not found");
+    expect(within(card).getByText(summary.description)).toBeInTheDocument();
+    expect(within(card).getByText(esCommon.instances.loaders.fabric)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: labels.tabs.explore })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(client.searchModpacks).toHaveBeenCalledWith(
       expect.objectContaining({ query: "", page: 0, loader: null }),
     );
@@ -153,8 +180,8 @@ describe("ModpacksPage", () => {
   });
 
   it("filters by loader", async () => {
-    renderWithQuery(<ModpacksPage />);
-    await screen.findByRole("heading", { name: summary.title });
+    renderAt("/modpacks");
+    await screen.findByRole("link", { name: summary.title });
     fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "fabric" } });
     await waitFor(() =>
       expect(client.searchModpacks).toHaveBeenCalledWith(
@@ -163,6 +190,17 @@ describe("ModpacksPage", () => {
     );
   });
 
+  it("shows a rate limit error from the search", { timeout: 10_000 }, async () => {
+    client.searchModpacks.mockRejectedValue(new IpcError("rate_limited", "slow down"));
+    renderAt("/modpacks");
+    // The app's query client retries a rate limit twice before it shows.
+    expect(
+      await screen.findByText(esCommon.errors.rate_limited, {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("modpack detail", () => {
   it("shows a version's spec and installs it with progress", async () => {
     const done = deferred<typeof installed>();
     let report: (event: ProgressEvent) => void = () => {};
@@ -177,9 +215,12 @@ describe("ModpacksPage", () => {
         return { operationId: "op", done: done.promise, cancel: vi.fn() };
       },
     );
-    const row = await openVersions();
-    expect(within(row).getByText("26.2")).toBeInTheDocument();
-    fireEvent.click(within(row).getByRole("button", { name: labels.install }));
+    renderAt("/modpacks");
+    await openDetail();
+    const versions = await screen.findByRole("region", { name: labels.versionsTitle });
+    await within(versions).findByText("14.1.1");
+    expect(within(versions).getByText("26.2")).toBeInTheDocument();
+    fireEvent.click(within(versions).getByRole("button", { name: labels.install }));
     expect(client.installModpack).toHaveBeenCalledWith(
       "modrinth",
       summary.project,
@@ -199,21 +240,12 @@ describe("ModpacksPage", () => {
       summary,
       versions: [{ ...version, installable: false, size: null }],
     });
-    const row = await openVersions();
-    expect(within(row).getByRole("button", { name: labels.install })).toBeDisabled();
-    expect(within(row).getByText("Sin archivo .mrpack")).toBeInTheDocument();
-  });
-
-  it("imports a local .mrpack and ignores a closed picker", async () => {
-    client.importMrpack.mockReturnValue({
-      operationId: "op",
-      done: Promise.resolve(null),
-      cancel: vi.fn(),
-    });
-    renderWithQuery(<ModpacksPage />);
-    fireEvent.click(await screen.findByRole("button", { name: labels.import }));
-    await waitFor(() => expect(client.importMrpack).toHaveBeenCalled());
-    expect(screen.queryByRole("status")?.textContent ?? "").toBe("");
+    renderAt("/modpacks");
+    await openDetail();
+    const versions = await screen.findByRole("region", { name: labels.versionsTitle });
+    await within(versions).findByText("14.1.1");
+    expect(within(versions).getByRole("button", { name: labels.install })).toBeDisabled();
+    expect(within(versions).getByText("Sin archivo .mrpack")).toBeInTheDocument();
   });
 
   it("shows why an install failed", async () => {
@@ -222,19 +254,43 @@ describe("ModpacksPage", () => {
       done: Promise.reject(new IpcError("invalid_modpack", "bad pack")),
       cancel: vi.fn(),
     }));
-    const row = await openVersions();
-    fireEvent.click(within(row).getByRole("button", { name: labels.install }));
+    renderAt("/modpacks");
+    await openDetail();
+    const versions = await screen.findByRole("region", { name: labels.versionsTitle });
+    fireEvent.click(await within(versions).findByRole("button", { name: labels.install }));
     expect(await screen.findByText(esCommon.errors.invalid_modpack)).toBeInTheDocument();
   });
 
-  it("shows a rate limit error from the search", async () => {
-    client.searchModpacks.mockRejectedValue(new IpcError("rate_limited", "slow down"));
-    renderWithQuery(<ModpacksPage />);
-    expect(await screen.findByText(esCommon.errors.rate_limited)).toBeInTheDocument();
+  it("goes back to the catalog", async () => {
+    renderAt("/modpacks/modrinth/1KVo5zza");
+    expect(
+      await screen.findByRole("heading", { level: 1, name: summary.title }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: labels.back }));
+    expect(await screen.findByRole("tab", { name: labels.tabs.explore })).toBeInTheDocument();
   });
 });
 
-describe("ModpacksPage packwiz", () => {
+describe("installed", () => {
+  it("lists only the instances that come from a modpack", async () => {
+    client.listInstances.mockResolvedValue([
+      { ...instance, id: "fo", origin: "modpack", modpackSource: "modrinth" },
+      { ...instance, id: "plain", name: "Plain 26.2", origin: "custom" },
+    ]);
+    renderAt("/modpacks");
+    const panel = await openTab(labels.tabs.installed);
+    expect(await within(panel).findByText(instance.name)).toBeInTheDocument();
+    expect(within(panel).queryByText("Plain 26.2")).not.toBeInTheDocument();
+  });
+
+  it("says when no modpack is installed", async () => {
+    renderAt("/modpacks");
+    const panel = await openTab(labels.tabs.installed);
+    expect(await within(panel).findByText(labels.noInstalled)).toBeInTheDocument();
+  });
+});
+
+describe("import", () => {
   const packwiz = esCommon.modpacks.packwiz;
   const jei = {
     name: "Just Enough Items (JEI)",
@@ -242,18 +298,33 @@ describe("ModpacksPage packwiz", () => {
     pageUrl: "https://www.curseforge.com/projects/238222",
   };
 
+  it("imports a local .mrpack and ignores a closed picker", async () => {
+    client.importMrpack.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve(null),
+      cancel: vi.fn(),
+    });
+    renderAt("/modpacks");
+    await screen.findByRole("link", { name: summary.title });
+    const panel = await openTab(labels.tabs.import);
+    fireEvent.click(within(panel).getByRole("button", { name: labels.import }));
+    await waitFor(() => expect(client.importMrpack).toHaveBeenCalled());
+    expect(screen.queryByText(labels.importing)).not.toBeInTheDocument();
+  });
+
   it("installs a pack from its pack.toml URL and says what is left to download", async () => {
     client.installPackwiz.mockReturnValue({
       operationId: "op",
       done: Promise.resolve({ ...installed, pending: [jei] }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<ModpacksPage />);
+    renderAt("/modpacks");
+    const panel = await openTab(labels.tabs.import);
     const url = "https://example.com/pack/pack.toml";
-    fireEvent.change(await screen.findByLabelText(packwiz.urlLabel), {
+    fireEvent.change(within(panel).getByLabelText(packwiz.urlLabel), {
       target: { value: ` ${url} ` },
     });
-    fireEvent.click(screen.getByRole("button", { name: packwiz.install }));
+    fireEvent.click(within(panel).getByRole("button", { name: packwiz.install }));
     expect(client.installPackwiz).toHaveBeenCalledWith(url, expect.any(Function));
     expect(
       await screen.findByText(
@@ -263,8 +334,9 @@ describe("ModpacksPage packwiz", () => {
   });
 
   it("does not install without a URL", async () => {
-    renderWithQuery(<ModpacksPage />);
-    expect(await screen.findByRole("button", { name: packwiz.install })).toBeDisabled();
+    renderAt("/modpacks");
+    const panel = await openTab(labels.tabs.import);
+    expect(within(panel).getByRole("button", { name: packwiz.install })).toBeDisabled();
   });
 
   it("opens a local pack.toml with the picker", async () => {
@@ -273,8 +345,9 @@ describe("ModpacksPage packwiz", () => {
       done: Promise.resolve({ ...installed, pending: [] }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<ModpacksPage />);
-    fireEvent.click(await screen.findByRole("button", { name: packwiz.import }));
+    renderAt("/modpacks");
+    const panel = await openTab(labels.tabs.import);
+    fireEvent.click(within(panel).getByRole("button", { name: packwiz.import }));
     expect(
       await screen.findByText(labels.installed.replace("{{name}}", instance.name)),
     ).toBeInTheDocument();

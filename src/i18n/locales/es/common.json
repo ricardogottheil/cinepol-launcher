@@ -356,8 +356,6 @@
     "page": "Página {{page}}",
     "pageOf": "Página {{page}} de {{count}}",
     "downloads": "Descargas",
-    "showVersions": "Versiones",
-    "hideVersions": "Ocultar versiones",
     "versionsLoading": "Cargando versiones",
     "noVersions": "Este modpack todavía no tiene versiones.",
     "spec": {
@@ -383,7 +381,18 @@
       "import": "Abrir pack.toml"
     },
     "installedPending_one": "{{name}} necesita {{count}} archivo que descargas a mano. Termínalo en Instancias.",
-    "installedPending_other": "{{name}} necesita {{count}} archivos que descargas a mano. Termínalo en Instancias."
+    "installedPending_other": "{{name}} necesita {{count}} archivos que descargas a mano. Termínalo en Instancias.",
+    "tabs": {
+      "explore": "Explorar",
+      "installed": "Instalados",
+      "import": "Importar"
+    },
+    "tabsLabel": "Secciones de modpacks",
+    "back": "Volver a Modpacks",
+    "versionsTitle": "Versiones",
+    "noInstalled": "Todavía no instalaste modpacks.",
+    "importFiles": "Desde un archivo",
+    "importFilesHint": "Un pack que descargaste: .mrpack de Modrinth o .zip de CurseForge."
   },
   "updates": {
     "title": "Actualización del launcher",

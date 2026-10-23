@@ -356,8 +356,6 @@
     "page": "Page {{page}}",
     "pageOf": "Page {{page}} of {{count}}",
     "downloads": "Downloads",
-    "showVersions": "Versions",
-    "hideVersions": "Hide versions",
     "versionsLoading": "Loading versions",
     "noVersions": "This modpack has no versions yet.",
     "spec": {
@@ -383,7 +381,18 @@
       "import": "Open pack.toml"
     },
     "installedPending_one": "{{name}} needs {{count}} file you download by hand. Finish it in Instances.",
-    "installedPending_other": "{{name}} needs {{count}} files you download by hand. Finish it in Instances."
+    "installedPending_other": "{{name}} needs {{count}} files you download by hand. Finish it in Instances.",
+    "tabs": {
+      "explore": "Explore",
+      "installed": "Installed",
+      "import": "Import"
+    },
+    "tabsLabel": "Modpack sections",
+    "back": "Back to Modpacks",
+    "versionsTitle": "Versions",
+    "noInstalled": "No modpacks installed yet.",
+    "importFiles": "From a file",
+    "importFilesHint": "A pack you downloaded: Modrinth .mrpack or CurseForge .zip."
   },
   "updates": {
     "title": "Launcher update",
