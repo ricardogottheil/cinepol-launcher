@@ -62,6 +62,9 @@ Build-time settings (not secrets):
 2. Create an **annotated** tag whose message is the release notes, and push it:
    `git tag -a v0.2.0 -m "Faster modpack installs"` then `git push origin v0.2.0`.
    The tag must match the version, or the release stops at the preflight.
+   The launcher shows the tag message as is in its update notice, so write the
+   notes in English and Spanish, one block after the other (players see the
+   Spanish UI by default).
 3. The workflow builds the five targets, then the `publish` job writes
    `latest.json`, creates a draft release in the releases repository, uploads
    every file and publishes it. Only then do installed launchers see it.
