@@ -37,7 +37,7 @@ pull request.
 | `CINEPOL_UPDATER_PUBKEY` | variable | Content of the `.pub` file. Compiled into the launcher (`src-tauri/build.rs`, `src-tauri/src/updater.rs`) and written into the release config, so the CLI checks the key pair matches. It is public by design. |
 | `RELEASES_TOKEN` | secret | Fine-grained token with **Contents: read and write** on the releases repository only. |
 | `MSA_CLIENT_ID` | secret | Microsoft login client ID (see the README). |
-| `CURSEFORGE_API_KEY` | secret | CurseForge API key. |
+| `CURSEFORGE_API_KEY` | secret | CurseForge third-party API key, compiled into the launcher (`src-tauri/build.rs`). Builds without it hide CurseForge (ADR 0010). |
 | `APPLE_CERTIFICATE` | secret | Base64 `.p12` Developer ID Application certificate. |
 | `APPLE_CERTIFICATE_PASSWORD` | secret | Password of the `.p12`. |
 | `APPLE_SIGNING_IDENTITY` | secret | e.g. `Developer ID Application: <Name> (<TEAMID>)`. |

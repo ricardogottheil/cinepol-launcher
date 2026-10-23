@@ -43,7 +43,9 @@ current API key cannot use (it reads search results but not files).
   seconds; a file named like the expected one (including browser `(1)`
   suffixes) is installed only when its hash matches, and the original stays
   in Downloads. Play is disabled while files are missing. With a CurseForge
-  key that can read files (M11), these files will download on their own.
+  key (ADR 0010), the files CurseForge gives a download URL for download on
+  their own, verified with the hash the pack declares; only the ones whose
+  authors forbid third-party downloads stay manual.
 - **Locations:** the webview may send only `https` pack URLs. Local packs are
   chosen with the native file picker, so the UI cannot point the launcher at
   arbitrary paths. The location is stored in the instance origin

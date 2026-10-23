@@ -29,9 +29,10 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 - Microsoft (premium) and offline accounts.
 - Isolated instances with Vanilla, Fabric, Quilt, Forge and NeoForge, each with
   its own Java, memory, JVM arguments and window size.
-- Modpacks from Modrinth (`.mrpack`) and packwiz, kept up to date without
-  touching the player's own changes. CurseForge is next, once its API key is
-  approved.
+- Modpacks from Modrinth (`.mrpack`), CurseForge (catalog or `.zip`) and
+  packwiz, kept up to date without touching the player's own changes. Files
+  whose authors forbid third-party downloads are picked up from the
+  Downloads folder.
 - Automatic Java runtime management.
 - A server list editor, a log viewer with level and text filters, and crash
   reports one click away.
