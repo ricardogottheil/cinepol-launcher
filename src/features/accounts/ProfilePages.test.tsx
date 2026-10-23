@@ -181,6 +181,17 @@ describe("profile page", () => {
   });
 });
 
+describe("profile page keep", () => {
+  it("keeps the profile when the removal is not confirmed", async () => {
+    renderAt("/profile");
+    fireEvent.click(await screen.findByRole("button", { name: labels.remove }));
+    fireEvent.click(screen.getByRole("button", { name: labels.keep }));
+    expect(screen.queryByRole("button", { name: labels.confirmRemove })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.remove })).toBeInTheDocument();
+    expect(client.removeAccount).not.toHaveBeenCalled();
+  });
+});
+
 describe("profile page confirmation", () => {
   it("never carries a pending removal over to another profile", async () => {
     renderAt("/profile");
