@@ -28,7 +28,9 @@ struct ServersFile {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ServerRecord {
-    id: Uuid,
+    /// Text, not `Uuid`: one id edited by hand must drop that entry, not
+    /// fail the whole file (which would set every server aside).
+    id: String,
     name: String,
     address: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -38,7 +40,7 @@ struct ServerRecord {
 impl From<&SavedServer> for ServerRecord {
     fn from(server: &SavedServer) -> Self {
         Self {
-            id: server.id.as_uuid(),
+            id: server.id.as_uuid().to_string(),
             name: server.name.as_str().to_owned(),
             address: server.address.to_string(),
             instance: server.instance.as_ref().map(|id| id.as_str().to_owned()),
@@ -50,7 +52,7 @@ impl ServerRecord {
     /// An entry edited into something invalid is dropped, never trusted.
     fn into_server(self) -> Option<SavedServer> {
         Some(SavedServer {
-            id: SavedServerId::parse(&self.id.to_string())?,
+            id: SavedServerId::parse(&self.id)?,
             name: ServerName::parse(&self.name).ok()?,
             address: ServerAddress::parse(&self.address).ok()?,
             instance: self.instance.and_then(|raw| InstanceId::parse(&raw).ok()),
@@ -134,7 +136,7 @@ impl SavedServerRepository for JsonSavedServerRepository {
         match data
             .servers
             .iter_mut()
-            .find(|existing| existing.id == record.id)
+            .find(|existing| SavedServerId::parse(&existing.id) == Some(server.id))
         {
             Some(existing) => *existing = record,
             None => data.servers.push(record),
@@ -146,7 +148,8 @@ impl SavedServerRepository for JsonSavedServerRepository {
         let _guard = self.lock.lock().await;
         let mut data = self.load().await?;
         let before = data.servers.len();
-        data.servers.retain(|record| record.id != id.as_uuid());
+        data.servers
+            .retain(|record| SavedServerId::parse(&record.id) != Some(id));
         let removed = data.servers.len() != before;
         if removed {
             self.store(data).await?;
@@ -195,6 +198,7 @@ mod tests {
         let body = format!(
             r#"{{"schemaVersion":1,"servers":[
                 {{"id":"{good}","name":"Good","address":"play.example.net","instance":"../escape"}},
+                {{"id":"not-a-uuid","name":"Bad id","address":"other.example.net"}},
                 {{"id":"{}","name":"Bad host","address":"bad host!"}},
                 {{"id":"{}","name":"","address":"empty.example.net"}}
             ]}}"#,

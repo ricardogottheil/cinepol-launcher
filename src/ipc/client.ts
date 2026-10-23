@@ -365,8 +365,10 @@ export function installInstance(
   );
 }
 
-/** Starts the game; resolves when it exits. Output arrives through `onLog`. */
-/** Starts the game; with `joinServer` (`host[:port]`) it connects to that server. */
+/**
+ * Starts the game; resolves when it exits. Output arrives through `onLog`.
+ * With `joinServer` (`host[:port]`) it connects to that server.
+ */
 export function launchInstance(
   instanceId: string,
   onLog: (line: LogLineDto) => void,
