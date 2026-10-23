@@ -26,7 +26,8 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 ## Features
 
 - One click to play on CINEPOL, with live server status.
-- Microsoft (premium) and offline accounts.
+- Microsoft (premium) and offline profiles, switched from the sidebar; premium
+  profiles can change their skin and cape from the launcher.
 - Isolated instances with Vanilla, Fabric, Quilt, Forge and NeoForge, each with
   its own Java, memory, JVM arguments and window size.
 - Modpacks from Modrinth (`.mrpack`), CurseForge (catalog or `.zip`) and

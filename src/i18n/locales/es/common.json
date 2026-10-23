@@ -130,7 +130,11 @@
     "updates_not_configured": "Esta versión no puede actualizarse sola",
     "update_changed": "La actualización cambió; vuelve a buscar",
     "update_failed": "No se pudo instalar la actualización",
-    "catalog_not_configured": "Esta versión no puede usar ese catálogo de modpacks"
+    "catalog_not_configured": "Esta versión no puede usar ese catálogo de modpacks",
+    "invalid_skin": "La imagen tiene que ser un PNG de 64×64 o 64×32",
+    "skin_rejected": "Minecraft rechazó esta skin",
+    "cape_not_owned": "Esta cuenta no tiene esa capa",
+    "too_many_changes": "Minecraft limita los cambios seguidos. Espera unos minutos"
   },
   "stages": {
     "metadata": "Leyendo la versión",
@@ -176,7 +180,22 @@
     "noProfile": "Todavía no tienes un perfil.",
     "added": "{{name}} añadido.",
     "useProfile": "Usar este perfil",
-    "kindLabel": "Tipo"
+    "kindLabel": "Tipo",
+    "changeSkinTitle": "Cambiar skin",
+    "pickSkin": "Elegir PNG",
+    "skinHint": "Un PNG de 64×64 o 64×32. Mojang limita los cambios seguidos.",
+    "modelLabel": "Modelo",
+    "classic": "Clásica",
+    "slim": "Slim",
+    "applySkin": "Aplicar skin",
+    "applyingSkin": "Aplicando",
+    "discardSkin": "Descartar",
+    "skinApplied": "Skin actualizada.",
+    "previewNote": "Vista previa: todavía no se aplicó.",
+    "capesTitle": "Capa",
+    "noCape": "Sin capa",
+    "noCapes": "Esta cuenta no tiene capas.",
+    "loadingCapes": "Cargando capas"
   },
   "instances": {
     "title": "Instancias",

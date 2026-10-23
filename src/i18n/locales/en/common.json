@@ -130,7 +130,11 @@
     "updates_not_configured": "This build cannot update itself",
     "update_changed": "The update changed; check again",
     "update_failed": "The update could not be installed",
-    "catalog_not_configured": "This build cannot use that modpack catalog"
+    "catalog_not_configured": "This build cannot use that modpack catalog",
+    "invalid_skin": "The image must be a 64×64 or 64×32 PNG",
+    "skin_rejected": "Minecraft refused this skin",
+    "cape_not_owned": "This account does not own that cape",
+    "too_many_changes": "Minecraft limits changes in a row. Wait a few minutes"
   },
   "stages": {
     "metadata": "Reading the version",
@@ -176,7 +180,22 @@
     "noProfile": "You have no profile yet.",
     "added": "{{name}} added.",
     "useProfile": "Use this profile",
-    "kindLabel": "Type"
+    "kindLabel": "Type",
+    "changeSkinTitle": "Change skin",
+    "pickSkin": "Choose PNG",
+    "skinHint": "A 64×64 or 64×32 PNG. Mojang limits changes in a row.",
+    "modelLabel": "Model",
+    "classic": "Classic",
+    "slim": "Slim",
+    "applySkin": "Apply skin",
+    "applyingSkin": "Applying",
+    "discardSkin": "Discard",
+    "skinApplied": "Skin updated.",
+    "previewNote": "Preview: not applied yet.",
+    "capesTitle": "Cape",
+    "noCape": "No cape",
+    "noCapes": "This account has no capes.",
+    "loadingCapes": "Loading capes"
   },
   "instances": {
     "title": "Instances",

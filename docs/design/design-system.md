@@ -177,6 +177,7 @@ All live in `src/components/ui/` and are previewed on the dev-only route
 | `WorldFrame` | Worlds gallery, WorldGallery.astro:46-89 | 16:9 capture with its plate |
 | `SpecSheet` | World readings ("label -> value") | Instance details: version, loader, Java, memory |
 | `PlayerHead` | Launcher only | A profile's face from its skin (face + hat layer, pixelated); initial on a plate without a skin |
+| `CapeSwatch` | Launcher only | A cape's front (10x16 at 1,1 of its texture, pixelated); an empty plate without a texture |
 | `Meter` | (launcher only) | Progress as a reading: hairline track, silk fill (never signal), tabular count |
 | `StepList` | How to join, HowToJoin.astro:43-58 | Numbered steps where order matters (Microsoft sign-in) |
 | `BrandGlyph` | src/icons/brandGlyphs.ts | Twitch and Discord only, simple-icons (CC0) |
@@ -199,6 +200,10 @@ App shell (`src/app/shell/`):
   "View profile" and "Add profile". Heads come from the skin's face and hat
   layer (`PlayerHead`); profiles without a skin show their initial, never one
   of the game's default players.
+- **Profile page**: the head and name, the 3D skin (a picked PNG previews on
+  it before it is applied), the label -> value sheet, then for premium
+  profiles "Change skin" (PNG, model, apply once) and the capes as toggle
+  buttons (a click wears one; no request while moving through them).
 - **Settings > About**: the version and the legal disclaimer.
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (server, recommended version, active account as a spec

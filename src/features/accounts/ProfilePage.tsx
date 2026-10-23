@@ -6,6 +6,7 @@ import { PlayerHead } from "../../components/ui/PlayerHead";
 import { SpecSheet } from "../../components/ui/SpecSheet";
 import { type AccountDto, toIpcError } from "../../ipc/client";
 import { SkinViewer } from "./SkinViewer";
+import { CapePicker, SkinChanger, type SkinDraft } from "./SkinWardrobe";
 import { useAccountSkin, useAccounts, useRemoveAccount } from "./useAccounts";
 
 function RemoveProfile({ account }: { account: AccountDto }) {
@@ -35,13 +36,15 @@ function Profile({ account }: { account: AccountDto }) {
   const { t } = useTranslation();
   const premium = account.kind === "microsoft";
   const skin = useAccountSkin(premium ? account.id : null);
+  // A picked skin shows on the figure before it is applied.
+  const [draft, setDraft] = useState<SkinDraft | null>(null);
   return (
     <div className="grid grid-cols-1 gap-10 @3xl:grid-cols-[320px_1fr]">
       <section aria-label={t("accounts.skinTitle")} className="flex flex-col gap-4">
         {premium ? (
           <SkinViewer
-            texture={skin.data?.dataUrl ?? null}
-            slim={skin.data?.slim ?? false}
+            texture={draft?.file.dataUrl ?? skin.data?.dataUrl ?? null}
+            slim={draft ? draft.slim : (skin.data?.slim ?? false)}
             label={t("accounts.skinLabel")}
             className="w-full"
           />
@@ -58,6 +61,17 @@ function Profile({ account }: { account: AccountDto }) {
             { label: t("accounts.kindLabel"), value: t(`accounts.${account.kind}`) },
           ]}
         />
+        {premium ? (
+          <>
+            <SkinChanger
+              accountId={account.id}
+              currentSlim={skin.data?.slim ?? false}
+              draft={draft}
+              onDraft={setDraft}
+            />
+            <CapePicker accountId={account.id} />
+          </>
+        ) : null}
         <RemoveProfile account={account} />
       </div>
     </div>

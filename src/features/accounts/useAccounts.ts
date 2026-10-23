@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type AccountDto,
+  changeAccountSkin,
   checkPremiumName,
   createOfflineAccount,
   getAccountPolicy,
   getAccountSkin,
+  listAccountCapes,
   listAccounts,
   removeAccount,
+  setAccountCape,
   setActiveAccount,
 } from "../../ipc/client";
 import { useSignInStore } from "./signInStore";
@@ -57,6 +60,36 @@ export function useAccountSkin(accountId: string | null) {
     queryFn: () => (accountId ? getAccountSkin(accountId) : Promise.resolve(null)),
     enabled: accountId !== null,
     staleTime: 5 * 60_000,
+  });
+}
+
+/** The capes a Microsoft account owns; nothing to fetch for `null`. */
+export function useAccountCapes(accountId: string | null) {
+  return useQuery({
+    queryKey: ["account-capes", accountId],
+    queryFn: () => (accountId ? listAccountCapes(accountId) : Promise.resolve([])),
+    enabled: accountId !== null,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Uploads a skin. Mutations never retry: Mojang may suspend accounts that keep hitting its limit. */
+export function useChangeSkin(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pngBase64, slim }: { pngBase64: string; slim: boolean }) =>
+      changeAccountSkin(accountId, pngBase64, slim ? "slim" : "classic"),
+    retry: false,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["account-skin", accountId] }),
+  });
+}
+
+export function useSetCape(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (capeId: string | null) => setAccountCape(accountId, capeId),
+    retry: false,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["account-capes", accountId] }),
   });
 }
 

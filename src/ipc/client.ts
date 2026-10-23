@@ -8,6 +8,7 @@ import type {
   AppError,
   AppInfo,
   AppUpdateStatusDto,
+  CapeDto,
   Commands,
   DeviceCodeDto,
   ErrorCode,
@@ -59,6 +60,7 @@ export type {
   AccountsDto,
   AppInfo,
   AppUpdateStatusDto,
+  CapeDto,
   DeviceCodeDto,
   ErrorCode,
   GameVersionsDto,
@@ -116,6 +118,10 @@ const BACKEND_CODES = {
   sign_in_refused: true,
   not_entitled: true,
   app_not_approved: true,
+  invalid_skin: true,
+  skin_rejected: true,
+  cape_not_owned: true,
+  too_many_changes: true,
   keychain_unavailable: true,
   microsoft_not_configured: true,
   loader_unavailable: true,
@@ -285,6 +291,25 @@ export function removeAccount(accountId: string): Promise<null> {
 /** The account's skin as a data URL, or `null` when it has none. */
 export function getAccountSkin(accountId: string): Promise<SkinDto | null> {
   return call("get_account_skin", { accountId });
+}
+
+/** Uploads a skin (base64 PNG) to a Microsoft account. Sent once, never retried. */
+export function changeAccountSkin(
+  accountId: string,
+  pngBase64: string,
+  variant: "classic" | "slim",
+): Promise<null> {
+  return call("change_account_skin", { accountId, pngBase64, variant });
+}
+
+/** The capes a Microsoft account owns, read live from Mojang. */
+export function listAccountCapes(accountId: string): Promise<CapeDto[]> {
+  return call("list_account_capes", { accountId });
+}
+
+/** Wears an owned cape, or none for `null`. */
+export function setAccountCape(accountId: string, capeId: string | null): Promise<null> {
+  return call("set_account_cape", { accountId, capeId });
 }
 
 /** Whether a premium account owns the name (`unknown` when the lookup failed). */

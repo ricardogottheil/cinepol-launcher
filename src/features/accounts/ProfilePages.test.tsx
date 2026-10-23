@@ -17,6 +17,9 @@ const client = vi.hoisted(() => ({
   removeAccount: vi.fn(),
   getAccountSkin: vi.fn(),
   openExternal: vi.fn(),
+  changeAccountSkin: vi.fn(),
+  listAccountCapes: vi.fn(),
+  setAccountCape: vi.fn(),
 }));
 
 vi.mock("./SkinViewer", () => ({
@@ -53,6 +56,9 @@ beforeEach(() => {
   client.removeAccount.mockResolvedValue(null);
   client.setActiveAccount.mockResolvedValue(null);
   client.openExternal.mockResolvedValue(undefined);
+  client.changeAccountSkin.mockResolvedValue(null);
+  client.listAccountCapes.mockResolvedValue([]);
+  client.setAccountCape.mockResolvedValue(null);
   useSignInStore.setState({ signIn: { kind: "idle", error: null } });
 });
 
@@ -317,5 +323,123 @@ describe("add profile page", () => {
     expect(screen.queryByRole("button", { name: labels.microsoftSignIn })).not.toBeInTheDocument();
     useSignInStore.getState().start(() => {});
     expect(client.loginMicrosoft).toHaveBeenCalledOnce();
+  });
+});
+
+/** A file whose bytes are a PNG signature and an IHDR header of that size. */
+function pngFile(width: number, height: number) {
+  const bytes = new Uint8Array(33);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(8, 13);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return { file: new File([bytes], "skin.png", { type: "image/png" }), bytes };
+}
+
+function base64Of(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+async function choosePng(width: number, height: number) {
+  const png = pngFile(width, height);
+  fireEvent.change(await screen.findByLabelText(labels.pickSkin), {
+    target: { files: [png.file] },
+  });
+  return png;
+}
+
+describe("skin and capes", () => {
+  beforeEach(() => {
+    client.listAccounts.mockResolvedValue({ accounts: [premium, steve], activeId: "9" });
+    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,OLD", slim: false });
+  });
+
+  it("previews a chosen PNG, then applies it as a slim skin once", async () => {
+    renderAt("/profile");
+    const png = await choosePng(64, 64);
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute(
+        "data-texture",
+        `data:image/png;base64,${base64Of(png.bytes)}`,
+      ),
+    );
+    expect(screen.getByText(labels.previewNote)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: labels.slim }));
+    await waitFor(() => expect(viewer).toHaveAttribute("data-slim", "true"));
+    fireEvent.click(screen.getByRole("button", { name: labels.applySkin }));
+
+    await waitFor(() =>
+      expect(client.changeAccountSkin).toHaveBeenCalledWith("9", base64Of(png.bytes), "slim"),
+    );
+    expect(await screen.findByText(labels.skinApplied)).toBeInTheDocument();
+    expect(client.changeAccountSkin).toHaveBeenCalledOnce();
+    await waitFor(() => expect(client.getAccountSkin).toHaveBeenCalledTimes(2));
+  });
+
+  it("refuses an image that is not a skin without uploading it", async () => {
+    renderAt("/profile");
+    await choosePng(128, 128);
+    expect(await screen.findByText(esCommon.errors.invalid_skin)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.applySkin })).not.toBeInTheDocument();
+    expect(client.changeAccountSkin).not.toHaveBeenCalled();
+  });
+
+  it("discards a preview", async () => {
+    renderAt("/profile");
+    await choosePng(64, 32);
+    fireEvent.click(await screen.findByRole("button", { name: labels.discardSkin }));
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,OLD"),
+    );
+    expect(client.changeAccountSkin).not.toHaveBeenCalled();
+  });
+
+  it("explains a refused upload and never sends it again by itself", async () => {
+    client.changeAccountSkin.mockRejectedValue(new IpcError("too_many_changes", "429"));
+    renderAt("/profile");
+    await choosePng(64, 64);
+    fireEvent.click(await screen.findByRole("button", { name: labels.applySkin }));
+    expect(await screen.findByText(esCommon.errors.too_many_changes)).toBeInTheDocument();
+    expect(client.changeAccountSkin).toHaveBeenCalledOnce();
+  });
+
+  it("lists the owned capes and wears one or none", async () => {
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: null },
+      { id: "c2", alias: "Pan", active: false, dataUrl: null },
+    ]);
+    renderAt("/profile");
+    const capes = await screen.findByRole("group", { name: labels.capesTitle });
+    expect(within(capes).getByRole("button", { name: "Migrator" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(within(capes).getByRole("button", { name: "Pan" }));
+    await waitFor(() => expect(client.setAccountCape).toHaveBeenCalledWith("9", "c2"));
+    await waitFor(() =>
+      expect(within(capes).getByRole("button", { name: labels.noCape })).toBeEnabled(),
+    );
+    fireEvent.click(within(capes).getByRole("button", { name: labels.noCape }));
+    await waitFor(() => expect(client.setAccountCape).toHaveBeenCalledWith("9", null));
+    expect(client.listAccountCapes).toHaveBeenCalledWith("9");
+  });
+
+  it("says when the account has no capes", async () => {
+    renderAt("/profile");
+    expect(await screen.findByText(labels.noCapes)).toBeInTheDocument();
+  });
+
+  it("offers no skin or cape changes to offline profiles", async () => {
+    client.listAccounts.mockResolvedValue({ accounts: [premium, steve], activeId: "1" });
+    renderAt("/profile");
+    expect(await screen.findByRole("heading", { level: 1, name: "Steve" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(labels.pickSkin)).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: labels.capesTitle })).not.toBeInTheDocument();
+    expect(client.listAccountCapes).not.toHaveBeenCalled();
   });
 });
