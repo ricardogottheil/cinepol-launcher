@@ -36,6 +36,7 @@ pub mod resolve_manual_downloads;
 pub mod run_progress_demo;
 pub mod search_modpacks;
 pub mod select_account;
+pub mod update_curseforge;
 pub mod update_instance_settings;
 pub mod update_modpack;
 pub mod update_packwiz;

@@ -134,7 +134,11 @@ mod tests {
             .iter()
             .find(|file| file.path.as_str() == "config/fabric_loader_dependencies.json")
             .unwrap();
-        assert!(loader.staged.starts_with(staging.path().canonicalize().unwrap()));
+        assert!(
+            loader
+                .staged
+                .starts_with(staging.path().canonicalize().unwrap())
+        );
         assert_eq!(loader.sha1.len(), 40);
         assert!(loader.staged.is_file());
     }
