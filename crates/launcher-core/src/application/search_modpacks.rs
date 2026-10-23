@@ -25,6 +25,7 @@ pub(crate) mod fixtures {
             description: format!("{title} description"),
             icon_url: None,
             downloads: Some(10),
+            loaders: Vec::new(),
         }
     }
 

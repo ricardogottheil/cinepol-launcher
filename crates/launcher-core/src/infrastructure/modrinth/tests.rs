@@ -106,6 +106,7 @@ async fn search_maps_the_hits_of_the_fixture() {
     let first = &page.items[0];
     assert_eq!(first.source, ModpackSourceKind::Modrinth);
     assert_eq!(first.title, "Fabulously Optimized");
+    assert_eq!(first.loaders, [LoaderKind::Fabric]);
     assert!(first.description.starts_with("Beautiful graphics"));
     assert_eq!(
         first.icon_url.as_deref(),
@@ -122,6 +123,7 @@ async fn project_maps_the_fixture() {
     let project = modrinth.project("1KVo5zza").await.unwrap();
     assert_eq!(project.project, "1KVo5zza");
     assert_eq!(project.title, "Fabulously Optimized");
+    assert_eq!(project.loaders, [LoaderKind::Fabric]);
     assert_eq!(project.source, ModpackSourceKind::Modrinth);
     assert_eq!(project.downloads, Some(18_933_003));
     assert!(project.icon_url.is_some());

@@ -843,6 +843,7 @@ mod tests {
             description: String::new(),
             icon_url: None,
             downloads: Some(1),
+            loaders: Vec::new(),
         };
         let source = FakeModpackSource {
             kind: ModpackSourceKind::Modrinth,

@@ -23,6 +23,9 @@ pub(super) struct SearchHit {
     pub icon_url: Option<String>,
     #[serde(default)]
     pub downloads: Option<u64>,
+    /// Tags, loaders among them ("fabric", "optimization"...).
+    #[serde(default)]
+    pub categories: Vec<String>,
 }
 
 /// `GET /project/{id}`.
@@ -37,6 +40,8 @@ pub(super) struct Project {
     pub icon_url: Option<String>,
     #[serde(default)]
     pub downloads: Option<u64>,
+    #[serde(default)]
+    pub loaders: Vec<String>,
 }
 
 /// One entry of `GET /project/{id}/version`, and the values of `POST /version_files`.

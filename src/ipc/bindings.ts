@@ -107,7 +107,11 @@ export type ModpackSummaryDto = {
 /**
  * `modrinth` or `curseforge`.
  */
-source: string, project: string, title: string, description: string, iconUrl: string | null, downloads: number | null, };
+source: string, project: string, title: string, description: string, iconUrl: string | null, downloads: number | null, 
+/**
+ * Loader ids (`fabric`, `quilt`, `forge`, `neoforge`).
+ */
+loaders: Array<string>, };
 
 export type ModpackPageDto = { items: Array<ModpackSummaryDto>, total: number | null, };
 

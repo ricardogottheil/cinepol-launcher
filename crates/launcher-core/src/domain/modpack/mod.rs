@@ -62,6 +62,23 @@ pub struct ModpackSummary {
     pub description: String,
     pub icon_url: Option<String>,
     pub downloads: Option<u64>,
+    /// The mod loaders the pack runs on, in `pack_loaders` order.
+    pub loaders: Vec<LoaderKind>,
+}
+
+/// The modded loaders a catalog lists for a pack, once each, in a fixed order
+/// (Vanilla is never listed: every pack needs a loader).
+pub fn pack_loaders(listed: impl IntoIterator<Item = LoaderKind>) -> Vec<LoaderKind> {
+    let listed: Vec<LoaderKind> = listed.into_iter().collect();
+    [
+        LoaderKind::Fabric,
+        LoaderKind::Quilt,
+        LoaderKind::Forge,
+        LoaderKind::NeoForge,
+    ]
+    .into_iter()
+    .filter(|loader| listed.contains(loader))
+    .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -34,6 +34,16 @@ pub struct Mod {
     pub download_count: Option<f64>,
     #[serde(default)]
     pub logo: Option<Logo>,
+    /// The newest file per game version and loader.
+    #[serde(default)]
+    pub latest_files_indexes: Vec<FileIndex>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileIndex {
+    #[serde(default)]
+    pub mod_loader: Option<u8>,
 }
 
 #[derive(Debug, Deserialize)]

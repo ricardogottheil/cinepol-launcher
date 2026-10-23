@@ -49,6 +49,7 @@ async fn searches_modpacks_with_filters_and_the_api_key() {
     let fo = page.items.iter().find(|item| item.project == FO).unwrap();
     assert_eq!(fo.source, ModpackSourceKind::CurseForge);
     assert_eq!(fo.title, "Fabulously Optimized");
+    assert_eq!(fo.loaders, [LoaderKind::Fabric]);
     assert!(!fo.description.is_empty());
     assert!(fo.icon_url.as_deref().unwrap().starts_with("https://"));
     assert!(fo.downloads.unwrap() > 1_000_000);
@@ -82,6 +83,7 @@ async fn reads_a_modpack_and_its_installable_versions_newest_first() {
     ]);
     let project = cf.project(FO).await.unwrap();
     assert_eq!(project.title, "Fabulously Optimized");
+    assert_eq!(project.loaders, [LoaderKind::Fabric]);
 
     let versions = cf.versions(FO).await.unwrap();
     let ids: Vec<&str> = versions.iter().map(|v| v.id.as_str()).collect();

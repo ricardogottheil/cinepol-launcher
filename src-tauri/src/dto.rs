@@ -329,6 +329,8 @@ pub struct ModpackSummaryDto {
     pub icon_url: Option<String>,
     #[ts(type = "number | null")]
     pub downloads: Option<u64>,
+    /// Loader ids (`fabric`, `quilt`, `forge`, `neoforge`).
+    pub loaders: Vec<String>,
 }
 
 impl From<&ModpackSummary> for ModpackSummaryDto {
@@ -340,6 +342,11 @@ impl From<&ModpackSummary> for ModpackSummaryDto {
             description: summary.description.clone(),
             icon_url: summary.icon_url.clone(),
             downloads: summary.downloads,
+            loaders: summary
+                .loaders
+                .iter()
+                .map(|loader| loader.id().to_owned())
+                .collect(),
         }
     }
 }

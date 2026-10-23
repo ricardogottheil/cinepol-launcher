@@ -17,7 +17,7 @@ use crate::domain::loader::LoaderKind;
 use crate::domain::modpack::mrpack::is_allowed_download;
 use crate::domain::modpack::{
     ModpackFile, ModpackPage, ModpackQuery, ModpackSource, ModpackSourceError, ModpackSourceKind,
-    ModpackSummary, ModpackVersion,
+    ModpackSummary, ModpackVersion, pack_loaders,
 };
 use crate::domain::ports::{HttpClient, HttpError};
 
@@ -103,6 +103,7 @@ impl<H: HttpClient> ModpackSource for ModrinthSource<H> {
                     description: hit.description.unwrap_or_default(),
                     icon_url: hit.icon_url,
                     downloads: hit.downloads,
+                    loaders: listed_loaders(&hit.categories),
                 })
                 .collect(),
             total: answer.total_hits,
@@ -122,6 +123,7 @@ impl<H: HttpClient> ModpackSource for ModrinthSource<H> {
             description: answer.description.unwrap_or_default(),
             icon_url: answer.icon_url,
             downloads: answer.downloads,
+            loaders: listed_loaders(&answer.loaders),
         })
     }
 
@@ -295,6 +297,11 @@ pub(crate) fn encode(raw: &str) -> String {
         }
     }
     encoded
+}
+
+/// Modrinth tags hold the loaders by id among other tags.
+fn listed_loaders(tags: &[String]) -> Vec<LoaderKind> {
+    pack_loaders(tags.iter().filter_map(|tag| LoaderKind::from_id(tag)))
 }
 
 #[cfg(test)]

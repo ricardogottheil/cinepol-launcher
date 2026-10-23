@@ -20,7 +20,7 @@ use crate::domain::modpack::curseforge::{
 };
 use crate::domain::modpack::{
     CurseForgeLookup, ModpackFile, ModpackPage, ModpackQuery, ModpackSource, ModpackSourceError,
-    ModpackSourceKind, ModpackSummary, ModpackVersion, PackFileError,
+    ModpackSourceKind, ModpackSummary, ModpackVersion, PackFileError, pack_loaders,
 };
 use crate::domain::ports::{ApiKeyHeader, HttpClient, HttpError, Secret};
 use crate::infrastructure::modrinth::encode;
@@ -235,7 +235,15 @@ pub fn parse_manifest(bytes: &[u8]) -> Result<RawManifest, PackFileError> {
 }
 
 fn summary(project: wire::Mod) -> ModpackSummary {
+    let loaders = pack_loaders(
+        project
+            .latest_files_indexes
+            .iter()
+            .filter_map(|index| index.mod_loader)
+            .filter_map(loader_kind),
+    );
     ModpackSummary {
+        loaders,
         source: ModpackSourceKind::CurseForge,
         project: project.id.to_string(),
         title: project.name,
@@ -309,6 +317,18 @@ fn version(file: wire::File) -> ModpackVersion {
         published: file.file_date,
         pack_file,
     }
+}
+
+/// The loader behind a CurseForge `modLoaderType` value.
+fn loader_kind(code: u8) -> Option<LoaderKind> {
+    [
+        LoaderKind::Forge,
+        LoaderKind::Fabric,
+        LoaderKind::Quilt,
+        LoaderKind::NeoForge,
+    ]
+    .into_iter()
+    .find(|kind| loader_type(*kind) == Some(code))
 }
 
 /// CurseForge `modLoaderType` values.
