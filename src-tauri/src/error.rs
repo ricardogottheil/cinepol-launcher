@@ -27,6 +27,7 @@ use launcher_core::domain::instance::InstanceRepositoryError;
 use launcher_core::domain::java::JavaRuntimeError;
 use launcher_core::domain::launch::VersionSourceError;
 use launcher_core::domain::loader::{LoaderInstallError, LoaderMetadataError};
+use launcher_core::domain::modpack::curseforge::CurseForgeError;
 use launcher_core::domain::modpack::mrpack::MrpackError;
 use launcher_core::domain::modpack::{ModpackSourceError, PackFileError};
 use launcher_core::domain::ports::DownloadError;
@@ -365,11 +366,15 @@ fn source_code(error: &ModpackSourceError) -> ErrorCode {
 fn pack_file_code(error: &PackFileError) -> ErrorCode {
     match error {
         PackFileError::Io { .. } => ErrorCode::Internal,
-        PackFileError::Index(MrpackError::UnverifiedFile(_)) => ErrorCode::UnverifiedFile,
+        PackFileError::Index(MrpackError::UnverifiedFile(_))
+        | PackFileError::CurseForge(CurseForgeError::UnverifiedFile(_)) => {
+            ErrorCode::UnverifiedFile
+        }
         PackFileError::InvalidArchive(_)
         | PackFileError::UnsafeEntry(_)
         | PackFileError::Index(_)
         | PackFileError::Packwiz(_)
+        | PackFileError::CurseForge(_)
         | PackFileError::TooLarge(_) => ErrorCode::InvalidModpack,
         PackFileError::Source(_) => ErrorCode::Network,
         PackFileError::HashMismatch(_) => ErrorCode::UnverifiedFile,

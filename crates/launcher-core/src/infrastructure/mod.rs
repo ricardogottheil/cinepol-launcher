@@ -3,6 +3,7 @@
 
 pub mod archive;
 pub mod cinepol;
+pub mod curseforge;
 pub mod fs;
 pub mod http;
 pub mod java;

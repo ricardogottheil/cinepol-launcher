@@ -285,7 +285,7 @@ fn source_error(error: HttpError, subject: &str) -> ModpackSourceError {
 
 /// Percent-encodes a query value: RFC 3986 unreserved bytes stay, everything
 /// else (spaces included) becomes `%XX`.
-fn encode(raw: &str) -> String {
+pub(crate) fn encode(raw: &str) -> String {
     let mut encoded = String::with_capacity(raw.len());
     for byte in raw.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {

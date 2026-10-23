@@ -7,8 +7,9 @@ mod ports;
 pub mod sync;
 
 pub use ports::{
-    ModpackSource, ModpackSourceError, MrpackArchive, PackFileError, PackFileLocation, PackFiles,
-    PackLocation, PackManifestStore, PackwizSource, StagedFile,
+    CurseForgeArchive, CurseForgeLookup, ModpackSource, ModpackSourceError, MrpackArchive,
+    PackFileError, PackFileLocation, PackFiles, PackLocation, PackManifestStore, PackwizSource,
+    StagedFile,
 };
 
 use crate::domain::instance::GameVersion;

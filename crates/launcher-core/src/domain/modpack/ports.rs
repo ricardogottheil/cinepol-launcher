@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+use super::curseforge::{CurseForgeError, CurseForgeFile, CurseForgeProject, RawManifest};
 use super::mrpack::{MrpackError, MrpackIndex};
 use super::packwiz::{PackwizError, RawMetafile, RawPackIndex, RawPackToml};
 use super::sync::{LocalFile, PackManifest};
@@ -52,6 +53,38 @@ pub trait ModpackSource: Send + Sync {
     ) -> impl Future<Output = Result<HashMap<String, Vec<String>>, ModpackSourceError>> + Send;
 }
 
+/// The CurseForge lookups a pack install needs beyond [`ModpackSource`]:
+/// the files and projects its manifest lists, by id.
+pub trait CurseForgeLookup: Send + Sync {
+    /// The files with these ids (CurseForge leaves out unknown ones).
+    fn files(
+        &self,
+        ids: &[u64],
+    ) -> impl Future<Output = Result<Vec<CurseForgeFile>, ModpackSourceError>> + Send;
+    /// The projects with these ids (CurseForge leaves out unknown ones).
+    fn projects(
+        &self,
+        ids: &[u64],
+    ) -> impl Future<Output = Result<Vec<CurseForgeProject>, ModpackSourceError>> + Send;
+}
+
+/// Reads a CurseForge pack zip. Archive paths are local files.
+pub trait CurseForgeArchive: Send + Sync {
+    /// Reads the size-capped `manifest.json`.
+    fn read_manifest(
+        &self,
+        archive: &Path,
+    ) -> impl Future<Output = Result<RawManifest, PackFileError>> + Send;
+    /// Extracts the `folder/` subtree into `staging` (zip-slip safe, size
+    /// capped) and returns each file with its path inside the game folder.
+    fn extract_overrides(
+        &self,
+        archive: &Path,
+        folder: &str,
+        staging: &Path,
+    ) -> impl Future<Output = Result<Vec<StagedFile>, PackFileError>> + Send;
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PackFileError {
     #[error("{path}: {reason}")]
@@ -64,6 +97,8 @@ pub enum PackFileError {
     Index(#[from] MrpackError),
     #[error(transparent)]
     Packwiz(#[from] PackwizError),
+    #[error(transparent)]
+    CurseForge(#[from] CurseForgeError),
     #[error("could not read the pack: {0}")]
     Source(String),
     #[error("{0}")]
