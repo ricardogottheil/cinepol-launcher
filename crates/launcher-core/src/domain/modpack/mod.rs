@@ -113,6 +113,17 @@ pub struct ModpackFile {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn pack_loaders_lists_each_modded_loader_once_in_a_fixed_order() {
+        use crate::domain::loader::LoaderKind::{Fabric, Forge, NeoForge, Quilt, Vanilla};
+        assert_eq!(
+            super::pack_loaders([NeoForge, Vanilla, Fabric, NeoForge, Forge, Quilt, Fabric]),
+            [Fabric, Quilt, Forge, NeoForge]
+        );
+        assert!(super::pack_loaders([Vanilla]).is_empty());
+    }
+
     use super::*;
 
     #[test]

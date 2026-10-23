@@ -15,7 +15,7 @@ import {
 const LOADERS: ModdedLoader[] = ["fabric", "quilt", "forge", "neoforge"];
 
 /** Catalog names are brands, never translated. */
-export const CATALOG_NAMES: Record<ModpackCatalog, string> = {
+const CATALOG_NAMES: Record<ModpackCatalog, string> = {
   modrinth: "Modrinth",
   curseforge: "CurseForge",
 };

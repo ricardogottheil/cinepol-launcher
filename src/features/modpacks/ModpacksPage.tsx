@@ -50,7 +50,8 @@ export function ModpacksPage() {
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-controls={`${ids}-${value}-panel`}
+              // Only the selected tab's panel is rendered.
+              aria-controls={selected ? `${ids}-${value}-panel` : undefined}
               tabIndex={selected ? 0 : -1}
               onClick={() => set({ tab: value })}
               className={cx(

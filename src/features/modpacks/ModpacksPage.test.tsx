@@ -190,13 +190,17 @@ describe("explore", () => {
     );
   });
 
-  it("shows a rate limit error from the search", { timeout: 10_000 }, async () => {
-    client.searchModpacks.mockRejectedValue(new IpcError("rate_limited", "slow down"));
-    renderAt("/modpacks");
-    // The app's query client retries a rate limit twice before it shows.
-    expect(
-      await screen.findByText(esCommon.errors.rate_limited, {}, { timeout: 8000 }),
-    ).toBeInTheDocument();
+  it("shows a rate limit error from the search", async () => {
+    // The app's query client retries a rate limit twice, waiting in between.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      client.searchModpacks.mockRejectedValue(new IpcError("rate_limited", "slow down"));
+      renderAt("/modpacks");
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await screen.findByText(esCommon.errors.rate_limited)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -309,6 +313,10 @@ describe("import", () => {
     const panel = await openTab(labels.tabs.import);
     fireEvent.click(within(panel).getByRole("button", { name: labels.import }));
     await waitFor(() => expect(client.importMrpack).toHaveBeenCalled());
+    await waitFor(() => expect(useModpackJobStore.getState().job.kind).toBe("idle"));
+    const { error, installed: done } = useModpackJobStore.getState();
+    expect(error).toBeNull();
+    expect(done).toBeNull();
     expect(screen.queryByText(labels.importing)).not.toBeInTheDocument();
   });
 
