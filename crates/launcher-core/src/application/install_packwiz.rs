@@ -864,6 +864,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_update_during_a_curseforge_outage_keeps_the_downloaded_file() {
+        use crate::application::update_packwiz::{UpdatePackwizDeps, update_packwiz};
+        let world = World::new(vec![]);
+        let downloader = FakeDownloader::with(downloader_bodies().into_iter().chain([(
+            "https://edge.forgecdn.net/files/5101/366/jei.jar".to_owned(),
+            b"jei".to_vec(),
+        )]));
+        let installed = install_with(&world, &jei_on_curseforge(true), &downloader)
+            .await
+            .unwrap();
+        assert!(installed.pending.is_empty());
+
+        let (source, _) = url_pack();
+        let down = FakeCurseForge {
+            failure: Some(ModpackSourceError::Network("timed out".into())),
+            ..FakeCurseForge::default()
+        };
+        let updated = update_packwiz(
+            &installed.instance.id,
+            &UpdatePackwizDeps {
+                instances: &world.instances,
+                source: &source,
+                curseforge: &down,
+                files: file_deps(&world, &downloader),
+            },
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        // The file it downloaded earlier matches the pack's hash, so it stays.
+        assert_eq!(world.read_game_file(ID, "mods/jei.jar").unwrap(), b"jei");
+        assert!(updated.pending.is_empty(), "{:?}", updated.pending);
+        assert_eq!(updated.files.removed, 0);
+    }
+
+    #[tokio::test]
     async fn a_pack_without_a_version_is_recorded_as_unversioned() {
         let world = World::new(vec![]);
         let source = source(pack_toml(None, "1.21.1"), vec![], vec![]);
