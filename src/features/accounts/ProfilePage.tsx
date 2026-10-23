@@ -88,7 +88,8 @@ export function ProfilePage() {
             <PlayerHead skin={skin.data?.dataUrl ?? null} name={active.username} size="lg" />
             <h1 className="display-lg m-0 min-w-0 break-words text-silk">{active.username}</h1>
           </header>
-          <Profile account={active} />
+          {/* Keyed so a pending removal never carries over to another profile. */}
+          <Profile key={active.id} account={active} />
         </>
       ) : (
         <div className="flex flex-col items-start gap-5">

@@ -181,6 +181,22 @@ describe("profile page", () => {
   });
 });
 
+describe("profile page confirmation", () => {
+  it("never carries a pending removal over to another profile", async () => {
+    renderAt("/profile");
+    fireEvent.click(await screen.findByRole("button", { name: labels.remove }));
+    expect(screen.getByRole("button", { name: labels.confirmRemove })).toBeInTheDocument();
+
+    client.listAccounts.mockResolvedValue({ accounts: [steve, alex, premium], activeId: "2" });
+    const { menu } = await openSwitcher();
+    fireEvent.click(within(menu).getByRole("menuitemradio", { name: /Alex/ }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Alex" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.confirmRemove })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.remove })).toBeInTheDocument();
+    expect(client.removeAccount).not.toHaveBeenCalled();
+  });
+});
+
 describe("add profile page", () => {
   it("creates an offline profile with the trimmed name and offers to use it", async () => {
     client.createOfflineAccount.mockResolvedValue({ ...alex, id: "3", username: "Pol" });
