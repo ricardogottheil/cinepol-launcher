@@ -201,7 +201,7 @@ describe("ModpacksPage", () => {
     });
     const row = await openVersions();
     expect(within(row).getByRole("button", { name: labels.install })).toBeDisabled();
-    expect(within(row).getByText(labels.notInstallable)).toBeInTheDocument();
+    expect(within(row).getByText("Sin archivo .mrpack")).toBeInTheDocument();
   });
 
   it("imports a local .mrpack and ignores a closed picker", async () => {

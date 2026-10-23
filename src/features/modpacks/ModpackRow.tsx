@@ -96,7 +96,12 @@ export function ModpackRow({ modpack }: { modpack: ModpackSummaryDto }) {
                 </div>
                 <div className="flex items-center gap-4">
                   {version.installable ? null : (
-                    <span className="plate text-engrave">{t("modpacks.notInstallable")}</span>
+                    <span className="plate text-engrave">
+                      {/* Modrinth versions lack a .mrpack; CurseForge files may forbid downloads. */}
+                      {source === "curseforge"
+                        ? t("modpacks.notDownloadable")
+                        : t("modpacks.notInstallable")}
+                    </span>
                   )}
                   <Button
                     disabled={busy || !version.installable}

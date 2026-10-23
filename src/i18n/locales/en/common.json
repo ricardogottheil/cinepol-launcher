@@ -337,7 +337,8 @@
       "size": "Size"
     },
     "install": "Install",
-    "notInstallable": "Not downloadable by the launcher",
+    "notInstallable": "No .mrpack file",
+    "notDownloadable": "Not downloadable by the launcher",
     "progress": "Modpack install",
     "installing": "Installing {{name}}",
     "importing": "Importing the modpack",
