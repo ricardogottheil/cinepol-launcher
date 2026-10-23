@@ -19,8 +19,9 @@ use crate::domain::modpack::{
     ModpackSummary, ModpackVersion,
 };
 use crate::domain::ports::{
-    Clock, Delay, DownloadError, DownloadRequest, DownloadSummary, Downloader, HttpClient,
-    HttpError, ProgressReporter, ProgressUpdate, Secret, SecretKey, SecretStore, SecretStoreError,
+    ApiKeyHeader, Clock, Delay, DownloadError, DownloadRequest, DownloadSummary, Downloader,
+    HttpClient, HttpError, ProgressReporter, ProgressUpdate, Secret, SecretKey, SecretStore,
+    SecretStoreError,
 };
 use crate::domain::server_list::{ServerList, ServerListStore, ServerListStoreError};
 use tokio_util::sync::CancellationToken;
@@ -516,6 +517,8 @@ pub struct FakeHttpClient {
     bodies: HashMap<String, Vec<u8>>,
     requests: Mutex<Vec<String>>,
     posts: Mutex<Vec<(String, Vec<u8>)>>,
+    /// (URL, header name, key) of every keyed request.
+    keys: Mutex<Vec<(String, String, String)>>,
 }
 
 impl FakeHttpClient {
@@ -536,6 +539,19 @@ impl FakeHttpClient {
         self.posts.lock().unwrap().clone()
     }
 
+    /// Every keyed request as (URL, header name, key), in order.
+    pub fn keys(&self) -> Vec<(String, String, String)> {
+        self.keys.lock().unwrap().clone()
+    }
+
+    fn record_key(&self, url: &str, key: &ApiKeyHeader) {
+        self.keys.lock().unwrap().push((
+            url.to_owned(),
+            key.name.to_owned(),
+            key.value.expose().to_owned(),
+        ));
+    }
+
     fn serve(&self, url: &str) -> Result<Vec<u8>, HttpError> {
         self.requests.lock().unwrap().push(url.to_owned());
         self.bodies
@@ -551,6 +567,22 @@ impl HttpClient for FakeHttpClient {
     }
 
     async fn post_json(&self, url: &str, body: Vec<u8>) -> Result<Vec<u8>, HttpError> {
+        self.posts.lock().unwrap().push((url.to_owned(), body));
+        self.serve(url)
+    }
+
+    async fn get_bytes_keyed(&self, url: &str, key: &ApiKeyHeader) -> Result<Vec<u8>, HttpError> {
+        self.record_key(url, key);
+        self.serve(url)
+    }
+
+    async fn post_json_keyed(
+        &self,
+        url: &str,
+        body: Vec<u8>,
+        key: &ApiKeyHeader,
+    ) -> Result<Vec<u8>, HttpError> {
+        self.record_key(url, key);
         self.posts.lock().unwrap().push((url.to_owned(), body));
         self.serve(url)
     }

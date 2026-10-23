@@ -7,8 +7,19 @@ use reqwest::StatusCode;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderValue, RETRY_AFTER};
 
 use crate::domain::ports::{
-    HttpBody, HttpClient, HttpError, HttpMethod, HttpRequest, HttpRequester, HttpResponse, Secret,
+    ApiKeyHeader, HttpBody, HttpClient, HttpError, HttpMethod, HttpRequest, HttpRequester,
+    HttpResponse, Secret,
 };
+
+/// What one request sends besides its URL.
+#[derive(Clone, Copy, Default)]
+struct Call<'a> {
+    /// A JSON POST body; `None` sends a GET.
+    json: Option<&'a [u8]>,
+    /// Refuse a body larger than this.
+    limit: Option<usize>,
+    key: Option<&'a ApiKeyHeader>,
+}
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
@@ -53,18 +64,13 @@ impl ReqwestHttpClient {
         &self.client
     }
 
-    /// Sends a GET, or a JSON POST when `json` is set, with retries; a body
-    /// over `limit` is refused as soon as it is known to be too large.
-    async fn send_with_retries(
-        &self,
-        url: &str,
-        json: Option<&[u8]>,
-        limit: Option<usize>,
-    ) -> Result<Vec<u8>, HttpError> {
+    /// Sends `call` with retries; a body over its limit is refused as soon
+    /// as it is known to be too large.
+    async fn send_with_retries(&self, url: &str, call: Call<'_>) -> Result<Vec<u8>, HttpError> {
         let mut backoff = self.initial_backoff;
         let mut attempt = 1;
         loop {
-            match self.attempt(url, json, limit).await {
+            match self.attempt(url, call).await {
                 Attempt::Done(result) => return result,
                 Attempt::Retry(error, _) if attempt >= MAX_ATTEMPTS => return Err(error),
                 Attempt::Retry(error, retry_after) => {
@@ -77,12 +83,12 @@ impl ReqwestHttpClient {
         }
     }
 
-    async fn attempt(&self, url: &str, json: Option<&[u8]>, limit: Option<usize>) -> Attempt {
+    async fn attempt(&self, url: &str, call: Call<'_>) -> Attempt {
         let network = |error: reqwest::Error| HttpError::Network {
             url: url.to_owned(),
             reason: error.without_url().to_string(),
         };
-        let request = match json {
+        let mut request = match call.json {
             None => self.client.get(url),
             Some(body) => self
                 .client
@@ -91,13 +97,24 @@ impl ReqwestHttpClient {
                 .header(ACCEPT, "application/json")
                 .body(body.to_vec()),
         };
+        if let Some(key) = call.key {
+            let Ok(mut value) = HeaderValue::from_str(key.value.expose()) else {
+                return Attempt::Done(Err(HttpError::Network {
+                    url: url.to_owned(),
+                    reason: format!("the {} value is not a valid header", key.name),
+                }));
+            };
+            // Kept out of reqwest's debug output.
+            value.set_sensitive(true);
+            request = request.header(key.name, value);
+        }
         let response = match request.send().await {
             Ok(response) => response,
             Err(error) => return Attempt::Retry(network(error), None),
         };
         let status = response.status();
         if status.is_success() {
-            return read_body(response, url, limit).await;
+            return read_body(response, url, call.limit).await;
         }
         if status == StatusCode::NOT_FOUND {
             return Attempt::Done(Err(HttpError::NotFound(url.to_owned())));
@@ -173,15 +190,45 @@ enum Attempt {
 
 impl HttpClient for ReqwestHttpClient {
     async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, HttpError> {
-        self.send_with_retries(url, None, None).await
+        self.send_with_retries(url, Call::default()).await
     }
 
     async fn get_bytes_limited(&self, url: &str, limit: usize) -> Result<Vec<u8>, HttpError> {
-        self.send_with_retries(url, None, Some(limit)).await
+        let call = Call {
+            limit: Some(limit),
+            ..Call::default()
+        };
+        self.send_with_retries(url, call).await
     }
 
     async fn post_json(&self, url: &str, body: Vec<u8>) -> Result<Vec<u8>, HttpError> {
-        self.send_with_retries(url, Some(&body), None).await
+        let call = Call {
+            json: Some(&body),
+            ..Call::default()
+        };
+        self.send_with_retries(url, call).await
+    }
+
+    async fn get_bytes_keyed(&self, url: &str, key: &ApiKeyHeader) -> Result<Vec<u8>, HttpError> {
+        let call = Call {
+            key: Some(key),
+            ..Call::default()
+        };
+        self.send_with_retries(url, call).await
+    }
+
+    async fn post_json_keyed(
+        &self,
+        url: &str,
+        body: Vec<u8>,
+        key: &ApiKeyHeader,
+    ) -> Result<Vec<u8>, HttpError> {
+        let call = Call {
+            json: Some(&body),
+            limit: None,
+            key: Some(key),
+        };
+        self.send_with_retries(url, call).await
     }
 }
 
@@ -534,6 +581,46 @@ mod tests {
             matches!(result, Err(HttpError::Network { .. })),
             "{result:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn keyed_requests_send_the_api_key_and_plain_ones_do_not() {
+        let server = TestServer::start(vec![
+            ("/k", vec![Reply::ok("{}")]),
+            ("/denied", vec![Reply::status(403)]),
+        ])
+        .await;
+        let key = ApiKeyHeader::new("x-api-key", Secret::new("cf-secret-key"));
+        client()
+            .get_bytes_keyed(&server.url("/k"), &key)
+            .await
+            .unwrap();
+        client()
+            .post_json_keyed(&server.url("/k"), b"{\"a\":1}".to_vec(), &key)
+            .await
+            .unwrap();
+        client().get_bytes(&server.url("/k")).await.unwrap();
+
+        let requests = server.requests();
+        let header = |i: usize| requests[i].headers.get("x-api-key").cloned();
+        assert_eq!(header(0).as_deref(), Some("cf-secret-key"));
+        assert_eq!(requests[1].method, "POST");
+        assert_eq!(header(1).as_deref(), Some("cf-secret-key"));
+        assert_eq!(requests[1].body, b"{\"a\":1}");
+        assert_eq!(header(2), None, "plain requests carry no key");
+
+        let error = client()
+            .get_bytes_keyed(&server.url("/denied"), &key)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error,
+            HttpError::Status {
+                url: server.url("/denied"),
+                status: 403
+            }
+        );
+        assert!(!format!("{error} {error:?} {key:?}").contains("cf-secret-key"));
     }
 
     #[tokio::test]

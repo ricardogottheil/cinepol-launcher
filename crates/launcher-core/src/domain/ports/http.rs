@@ -65,6 +65,52 @@ pub trait HttpClient: Send + Sync {
             })
         }
     }
+
+    /// [`HttpClient::get_bytes`] with an API key header, for catalogs that
+    /// need one (CurseForge `x-api-key`). The key never appears in errors.
+    ///
+    /// The default refuses the request, so no client sends a key by accident.
+    fn get_bytes_keyed(
+        &self,
+        url: &str,
+        key: &ApiKeyHeader,
+    ) -> impl Future<Output = Result<Vec<u8>, HttpError>> + Send {
+        let _ = key;
+        let url = url.to_owned();
+        async move { Err(no_keyed_requests(url)) }
+    }
+
+    /// [`HttpClient::post_json`] with an API key header.
+    fn post_json_keyed(
+        &self,
+        url: &str,
+        body: Vec<u8>,
+        key: &ApiKeyHeader,
+    ) -> impl Future<Output = Result<Vec<u8>, HttpError>> + Send {
+        let _ = (body, key);
+        let url = url.to_owned();
+        async move { Err(no_keyed_requests(url)) }
+    }
+}
+
+fn no_keyed_requests(url: String) -> HttpError {
+    HttpError::Network {
+        url,
+        reason: "this HTTP client does not send API keys".into(),
+    }
+}
+
+/// One header carrying an API key (`name: value`). The value is a secret.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiKeyHeader {
+    pub name: &'static str,
+    pub value: Secret,
+}
+
+impl ApiKeyHeader {
+    pub fn new(name: &'static str, value: Secret) -> Self {
+        Self { name, value }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
