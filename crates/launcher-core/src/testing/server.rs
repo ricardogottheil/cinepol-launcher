@@ -75,3 +75,50 @@ impl SettingsRepository for InMemorySettingsRepository {
         Ok(())
     }
 }
+
+/// Saved servers in memory, in the order they were added.
+#[derive(Debug, Default)]
+pub struct InMemorySavedServerRepository {
+    servers: Mutex<Vec<crate::domain::saved_server::SavedServer>>,
+}
+
+impl InMemorySavedServerRepository {
+    pub fn with(servers: Vec<crate::domain::saved_server::SavedServer>) -> Self {
+        Self {
+            servers: Mutex::new(servers),
+        }
+    }
+}
+
+impl crate::domain::saved_server::SavedServerRepository for InMemorySavedServerRepository {
+    async fn list(
+        &self,
+    ) -> Result<
+        Vec<crate::domain::saved_server::SavedServer>,
+        crate::domain::saved_server::SavedServerRepositoryError,
+    > {
+        Ok(self.servers.lock().unwrap().clone())
+    }
+
+    async fn save(
+        &self,
+        server: &crate::domain::saved_server::SavedServer,
+    ) -> Result<(), crate::domain::saved_server::SavedServerRepositoryError> {
+        let mut servers = self.servers.lock().unwrap();
+        match servers.iter_mut().find(|existing| existing.id == server.id) {
+            Some(existing) => *existing = server.clone(),
+            None => servers.push(server.clone()),
+        }
+        Ok(())
+    }
+
+    async fn remove(
+        &self,
+        id: crate::domain::saved_server::SavedServerId,
+    ) -> Result<bool, crate::domain::saved_server::SavedServerRepositoryError> {
+        let mut servers = self.servers.lock().unwrap();
+        let before = servers.len();
+        servers.retain(|server| server.id != id);
+        Ok(servers.len() != before)
+    }
+}

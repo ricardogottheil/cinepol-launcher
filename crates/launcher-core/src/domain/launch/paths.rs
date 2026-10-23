@@ -92,6 +92,11 @@ impl LauncherPaths {
         self.root.join("accounts.json")
     }
 
+    /// Servers the player added next to CINEPOL.
+    pub fn saved_servers_file(&self) -> PathBuf {
+        self.root.join("servers.json")
+    }
+
     /// Scratch space on the same volume as the data, so renames are atomic.
     pub fn temp_dir(&self) -> PathBuf {
         self.root.join("tmp")

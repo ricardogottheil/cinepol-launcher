@@ -43,7 +43,10 @@ pub use modpack::{
     FakeMrpackArchive, FakePackFiles, FakePackwizSource, InMemoryPackManifestStore, WrittenPack,
     sha1_hex, sha512_hex,
 };
-pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySettingsRepository};
+pub use server::{
+    FakeServerConfigSource, FakeServerStatusProbe, InMemorySavedServerRepository,
+    InMemorySettingsRepository,
+};
 pub use update::{FakeAppUpdater, update};
 
 /// Records every progress update.

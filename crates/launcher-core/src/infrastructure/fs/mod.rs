@@ -7,6 +7,7 @@ mod filesystem;
 mod instances;
 mod pack_files;
 mod pack_manifest;
+mod saved_servers;
 mod settings;
 
 pub use accounts::JsonAccountRepository;
@@ -15,4 +16,5 @@ pub use filesystem::TokioFileSystem;
 pub use instances::JsonInstanceRepository;
 pub use pack_files::StdPackFiles;
 pub use pack_manifest::JsonPackManifestStore;
+pub use saved_servers::JsonSavedServerRepository;
 pub use settings::JsonSettingsRepository;
