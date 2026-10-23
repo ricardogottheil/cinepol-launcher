@@ -134,9 +134,20 @@ where
                 UpdateCurseForgeError::NoInstallableVersion(installed.project.clone())
             })?,
     };
-    if target.id == installed.version {
+    // Never an implicit downgrade: when the installed file is newer than the
+    // newest downloadable one (its file stopped being downloadable), stay.
+    let installed_date = versions
+        .iter()
+        .find(|candidate| candidate.id == installed.version)
+        .and_then(|candidate| candidate.published.as_deref());
+    let older = file.is_none()
+        && matches!(
+            (target.published.as_deref(), installed_date),
+            (Some(target), Some(installed)) if target < installed
+        );
+    if target.id == installed.version || older {
         return Ok(UpdateCurseForgeOutcome::UpToDate {
-            version: target.id.clone(),
+            version: installed.version.clone(),
         });
     }
     let pack_file = target
@@ -426,6 +437,31 @@ mod tests {
             update(&s, None).await,
             Err(UpdateCurseForgeError::NoInstallableVersion(PROJECT.into()))
         );
+    }
+
+    #[tokio::test]
+    async fn never_downgrades_when_the_newest_file_cannot_be_downloaded() {
+        let mut s = setup();
+        install_v1(&s).await;
+        update(&s, Some("200")).await.unwrap();
+        // v2 is installed; later its file stops being downloadable.
+        let mut blocked = pack_version("200", "fo-v2.zip");
+        blocked.pack_file = None;
+        s.source.versions.insert(
+            PROJECT.into(),
+            vec![blocked, pack_version("100", "fo-v1.zip")],
+        );
+        assert_eq!(
+            update(&s, None).await,
+            Ok(UpdateCurseForgeOutcome::UpToDate {
+                version: "200".into()
+            })
+        );
+        // Asking for the older file by id still works.
+        assert!(matches!(
+            update(&s, Some("100")).await,
+            Ok(UpdateCurseForgeOutcome::Updated { .. })
+        ));
     }
 
     #[tokio::test]
