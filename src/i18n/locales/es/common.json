@@ -170,7 +170,7 @@
     "offlineRequiresPremium": "Añade primero una cuenta de Microsoft para crear perfiles sin premium.",
     "skinTitle": "Aspecto",
     "skinLabel": "Vista previa del aspecto de la cuenta activa",
-    "skinOffline": "Las cuentas sin premium usan el aspecto por defecto del juego.",
+    "skinOffline": "Los perfiles sin premium usan el aspecto por defecto del juego y no pueden cambiarlo.",
     "switcherLabel": "Cambiar de perfil",
     "onlineGroup": "Online",
     "offlineGroup": "Offline",

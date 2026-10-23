@@ -170,7 +170,7 @@
     "offlineRequiresPremium": "Add a Microsoft account first to create profiles without premium.",
     "skinTitle": "Skin",
     "skinLabel": "Skin preview of the active account",
-    "skinOffline": "Accounts without premium use the game's default skin.",
+    "skinOffline": "Offline profiles use the game's default skin and cannot change it.",
     "switcherLabel": "Switch profile",
     "onlineGroup": "Online",
     "offlineGroup": "Offline",
