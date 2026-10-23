@@ -11,6 +11,8 @@ const client = vi.hoisted(() => ({
   getModpack: vi.fn(),
   installModpack: vi.fn(),
   importMrpack: vi.fn(),
+  importCurseForgeZip: vi.fn(),
+  getModpackCatalogs: vi.fn(),
   installPackwiz: vi.fn(),
   importPackwiz: vi.fn(),
 }));
@@ -67,6 +69,60 @@ beforeEach(() => {
   useModpackJobStore.setState({ job: { kind: "idle" }, error: null, installed: null });
   client.searchModpacks.mockResolvedValue({ items: [summary], total: 1 });
   client.getModpack.mockResolvedValue({ summary, versions: [version] });
+  client.getModpackCatalogs.mockResolvedValue({ curseforge: true });
+});
+
+describe("catalogs", () => {
+  it("offers only Modrinth when the build has no CurseForge key", async () => {
+    client.getModpackCatalogs.mockResolvedValue({ curseforge: false });
+    renderWithQuery(<ModpacksPage />);
+    await screen.findByRole("heading", { name: summary.title });
+    expect(screen.queryByRole("combobox", { name: labels.catalog })).not.toBeInTheDocument();
+    expect(client.searchModpacks).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "modrinth" }),
+    );
+    expect(screen.getByRole("button", { name: labels.import })).toBeInTheDocument();
+  });
+
+  it("searches CurseForge, opens its packs there and imports its zips", async () => {
+    const curseforge = {
+      ...summary,
+      source: "curseforge",
+      project: "396246",
+      title: "Fabulously Optimized (CurseForge)",
+    };
+    client.searchModpacks.mockImplementation(({ source }: { source: string }) =>
+      Promise.resolve({ items: [source === "curseforge" ? curseforge : summary], total: 1 }),
+    );
+    client.importCurseForgeZip.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve(null),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<ModpacksPage />);
+    const select = await screen.findByRole("combobox", { name: labels.catalog });
+    fireEvent.change(select, { target: { value: "curseforge" } });
+
+    await waitFor(() =>
+      expect(client.searchModpacks).toHaveBeenLastCalledWith(
+        expect.objectContaining({ source: "curseforge", page: 0 }),
+      ),
+    );
+    expect(screen.getByText(labels.sources.curseforge)).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", {
+        name: labels.searchLabel.replace("{{catalog}}", "CurseForge"),
+      }),
+    ).toBeInTheDocument();
+    const row = (await screen.findByRole("heading", { name: curseforge.title })).closest("li");
+    if (!row) throw new Error("row not found");
+    fireEvent.click(within(row).getByRole("button", { name: labels.showVersions }));
+    await waitFor(() => expect(client.getModpack).toHaveBeenCalledWith("curseforge", "396246"));
+
+    fireEvent.click(screen.getByRole("button", { name: labels.importZip }));
+    expect(client.importCurseForgeZip).toHaveBeenCalled();
+    expect(client.importMrpack).not.toHaveBeenCalled();
+  });
 });
 
 async function openVersions() {
@@ -86,7 +142,7 @@ describe("ModpacksPage", () => {
     expect(client.searchModpacks).toHaveBeenCalledWith(
       expect.objectContaining({ query: "", page: 0, loader: null }),
     );
-    fireEvent.change(screen.getByLabelText(labels.searchLabel), {
+    fireEvent.change(screen.getByLabelText(labels.searchLabel.replace("{{catalog}}", "Modrinth")), {
       target: { value: "fabulously" },
     });
     await waitFor(() =>

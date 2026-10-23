@@ -306,14 +306,19 @@
   },
   "modpacks": {
     "title": "Modpacks",
-    "source": "From Modrinth",
+    "sources": {
+      "modrinth": "From Modrinth",
+      "curseforge": "From CurseForge"
+    },
+    "catalog": "Catalog",
     "import": "Import .mrpack",
-    "searchLabel": "Search Modrinth",
+    "importZip": "Import CurseForge .zip",
+    "searchLabel": "Search {{catalog}}",
     "searchPlaceholder": "Name or keyword",
     "loaderLabel": "Loader",
     "anyLoader": "Any loader",
     "results": "Modpacks",
-    "loading": "Searching Modrinth",
+    "loading": "Searching {{catalog}}",
     "empty": "No modpack matches this search.",
     "pages": "Result pages",
     "previous": "Previous",
@@ -332,7 +337,7 @@
       "size": "Size"
     },
     "install": "Install",
-    "notInstallable": "No .mrpack file",
+    "notInstallable": "Not downloadable by the launcher",
     "progress": "Modpack install",
     "installing": "Installing {{name}}",
     "importing": "Importing the modpack",

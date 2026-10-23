@@ -25,11 +25,15 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
       : own;
   const { install, play, stop, updatePack, exportPack } = useActivityStore();
   const packSource =
-    instance.modpackSource === "modrinth" || instance.modpackSource === "packwiz"
+    instance.modpackSource === "modrinth" ||
+    instance.modpackSource === "curseforge" ||
+    instance.modpackSource === "packwiz"
       ? instance.modpackSource
       : null;
   const isPackwiz = packSource === "packwiz";
-  const manual = useManualDownloads(instance.id, isPackwiz);
+  // packwiz and CurseForge packs may hold files the player downloads by hand.
+  const hasManualFiles = isPackwiz || packSource === "curseforge";
+  const manual = useManualDownloads(instance.id, hasManualFiles);
   const waitingForFiles = (manual.data?.remaining.length ?? 0) > 0;
   const busy = activity.kind !== "idle";
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -144,7 +148,7 @@ export function InstanceRow({ instance }: { instance: InstanceDto }) {
         ) : null}
       </p>
 
-      {isPackwiz && manual.data && (waitingForFiles || manual.data.resolved.length > 0) ? (
+      {hasManualFiles && manual.data && (waitingForFiles || manual.data.resolved.length > 0) ? (
         <ManualDownloadsPanel
           downloads={manual.data}
           error={manual.error}

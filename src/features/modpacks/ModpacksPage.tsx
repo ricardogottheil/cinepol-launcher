@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { SelectField } from "../../components/ui/SelectField";
 import { TextField } from "../../components/ui/TextField";
-import { type InstanceLoader, toIpcError } from "../../ipc/client";
+import { type InstanceLoader, type ModpackCatalog, toIpcError } from "../../ipc/client";
 import { ProgressMeter } from "../instances/ProgressMeter";
 import { instancesKey } from "../instances/useInstances";
 import { ModpackRow } from "./ModpackRow";
@@ -13,12 +13,19 @@ import {
   MODPACK_PAGE_SIZE,
   SEARCH_DEBOUNCE_MS,
   useDebouncedValue,
+  useModpackCatalogs,
   useModpackSearch,
 } from "./useModpacks";
 
 type ModdedLoader = Exclude<InstanceLoader, "vanilla">;
 
 const LOADERS: ModdedLoader[] = ["fabric", "quilt", "forge", "neoforge"];
+
+/** Catalog names are brands, never translated. */
+const CATALOG_NAMES: Record<ModpackCatalog, string> = {
+  modrinth: "Modrinth",
+  curseforge: "CurseForge",
+};
 
 function isModdedLoader(value: string): value is ModdedLoader {
   return (LOADERS as string[]).includes(value);
@@ -29,17 +36,30 @@ export function ModpacksPage() {
   const [text, setText] = useState("");
   const [loader, setLoader] = useState<ModdedLoader | null>(null);
   const [page, setPage] = useState(0);
+  const [picked, setPicked] = useState<ModpackCatalog>("modrinth");
+  const catalogs = useModpackCatalogs();
+  const hasCurseForge = catalogs.data?.curseforge === true;
+  // Without a key CurseForge is not offered at all.
+  const source: ModpackCatalog = hasCurseForge ? picked : "modrinth";
+  const catalogName = CATALOG_NAMES[source];
   const query = useDebouncedValue(text.trim(), SEARCH_DEBOUNCE_MS);
   const search = useModpackSearch({
-    source: "modrinth",
+    source,
     query,
     gameVersion: null,
     loader,
     page,
     pageSize: MODPACK_PAGE_SIZE,
   });
-  const { job, error, installed, importFile, installPackwizUrl, importPackwizFile } =
-    useModpackJobStore();
+  const {
+    job,
+    error,
+    installed,
+    importFile,
+    importCurseForgeFile,
+    installPackwizUrl,
+    importPackwizFile,
+  } = useModpackJobStore();
   const [packUrl, setPackUrl] = useState("");
   const busy = job.kind !== "idle";
   const queryClient = useQueryClient();
@@ -61,11 +81,33 @@ export function ModpacksPage() {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex flex-col gap-2">
           <h1 className="display-lg m-0 text-silk">{t("modpacks.title")}</h1>
-          <span className="plate text-engrave">{t("modpacks.source")}</span>
+          <span className="plate text-engrave">{t(`modpacks.sources.${source}`)}</span>
         </div>
-        <Button onClick={() => void importFile()} disabled={busy}>
-          {t("modpacks.import")}
-        </Button>
+        <div className="flex flex-wrap items-end gap-4">
+          {hasCurseForge ? (
+            <SelectField
+              label={t("modpacks.catalog")}
+              options={(Object.keys(CATALOG_NAMES) as ModpackCatalog[]).map((value) => ({
+                value,
+                label: CATALOG_NAMES[value],
+              }))}
+              value={source}
+              onChange={(event) => {
+                setPicked(event.target.value === "curseforge" ? "curseforge" : "modrinth");
+                setPage(0);
+              }}
+            />
+          ) : null}
+          {source === "curseforge" ? (
+            <Button onClick={() => void importCurseForgeFile()} disabled={busy}>
+              {t("modpacks.importZip")}
+            </Button>
+          ) : (
+            <Button onClick={() => void importFile()} disabled={busy}>
+              {t("modpacks.import")}
+            </Button>
+          )}
+        </div>
       </div>
 
       {job.kind === "installing" ? (
@@ -139,7 +181,7 @@ export function ModpacksPage() {
 
       <div className="flex flex-wrap items-start gap-4 border-t border-hairline pt-6">
         <TextField
-          label={t("modpacks.searchLabel")}
+          label={t("modpacks.searchLabel", { catalog: catalogName })}
           placeholder={t("modpacks.searchPlaceholder")}
           type="search"
           value={text}
@@ -161,7 +203,7 @@ export function ModpacksPage() {
 
       <section aria-label={t("modpacks.results")} aria-busy={search.isFetching}>
         {search.isPending ? (
-          <p className="m-0 text-engrave">{t("modpacks.loading")}</p>
+          <p className="m-0 text-engrave">{t("modpacks.loading", { catalog: catalogName })}</p>
         ) : search.isError ? (
           <p className="m-0 text-stale">{t(`errors.${toIpcError(search.error).code}`)}</p>
         ) : items.length === 0 ? (
@@ -170,7 +212,7 @@ export function ModpacksPage() {
           <>
             <ul className="m-0 list-none border-t border-hairline p-0">
               {items.map((modpack) => (
-                <ModpackRow key={modpack.project} modpack={modpack} />
+                <ModpackRow key={`${modpack.source}:${modpack.project}`} modpack={modpack} />
               ))}
             </ul>
             {page > 0 || hasNext ? (

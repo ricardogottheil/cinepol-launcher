@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   getModpack,
+  getModpackCatalogs,
   type ModpackCatalog,
   type ModpackSearch,
   searchModpacks,
@@ -19,6 +20,15 @@ export function useModpackSearch(search: ModpackSearch) {
     queryFn: () => searchModpacks(search),
     placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** The catalogs this build can use; static for the whole session. */
+export function useModpackCatalogs() {
+  return useQuery({
+    queryKey: ["modpack-catalogs"],
+    queryFn: getModpackCatalogs,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 

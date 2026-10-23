@@ -587,6 +587,28 @@ describe("InstancesPage", () => {
     expect(await screen.findByText(labels.updated)).toBeInTheDocument();
   });
 
+  it("updates CurseForge instances and lists their manual downloads", async () => {
+    const curseforgeInstance = {
+      ...packwizInstance,
+      id: "fo",
+      modpackSource: "curseforge",
+    } as const;
+    client.listInstances.mockResolvedValue([curseforgeInstance]);
+    client.checkManualDownloads.mockResolvedValue({ resolved: [], remaining: [jei] });
+    client.updateModpack.mockReturnValue({
+      operationId: "op",
+      done: Promise.resolve({ upToDate: true, instance: null, files: null, pending: [] }),
+      cancel: vi.fn(),
+    });
+    renderWithQuery(<InstancesPage />);
+    const panel = await screen.findByRole("region", { name: manual.title });
+    expect(within(panel).getByText(jei.name)).toBeInTheDocument();
+    expect(client.checkManualDownloads).toHaveBeenCalledWith("fo");
+    fireEvent.click(screen.getByRole("button", { name: labels.update }));
+    expect(client.updateModpack).toHaveBeenCalledWith("fo", expect.any(Function));
+    expect(client.updatePackwiz).not.toHaveBeenCalled();
+  });
+
   it("lists manual downloads, links their pages and finishes when they arrive", async () => {
     client.listInstances.mockResolvedValue([packwizInstance]);
     client.checkManualDownloads

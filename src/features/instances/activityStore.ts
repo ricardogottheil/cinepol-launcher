@@ -42,7 +42,8 @@ export type Activity =
     };
 
 /** The catalogs an instance can be updated from. */
-export type PackSource = "modrinth" | "packwiz";
+/** Packwiz syncs with its pack; Modrinth and CurseForge update to their newest version. */
+export type PackSource = "modrinth" | "curseforge" | "packwiz";
 
 /** The outcome of the last modpack update or export, shown under the row. */
 export type ActivityNotice =

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   type ClientErrorCode,
   type InstanceDto,
+  importCurseForgeZip,
   importMrpack,
   importPackwiz,
   installModpack,
@@ -46,6 +47,8 @@ interface ModpackJobState {
     title: string,
   ) => Promise<void>;
   importFile: () => Promise<void>;
+  /** Asks for a CurseForge pack zip and installs it. */
+  importCurseForgeFile: () => Promise<void>;
   /** Installs the packwiz pack at an https `pack.toml` URL. */
   installPackwizUrl: (url: string) => Promise<void>;
   /** Asks for a local `pack.toml` and installs it. */
@@ -110,6 +113,7 @@ export const useModpackJobStore = create<ModpackJobState>((set) => {
     installVersion: (source, project, version, title) =>
       run(title, (onProgress) => installModpack(source, project, version, onProgress)),
     importFile: () => run(null, (onProgress) => importMrpack(onProgress)),
+    importCurseForgeFile: () => run(null, (onProgress) => importCurseForgeZip(onProgress)),
     installPackwizUrl: (url) => run(url, (onProgress) => installPackwiz(url, onProgress)),
     importPackwizFile: () => run(null, (onProgress) => importPackwiz(onProgress)),
   };
