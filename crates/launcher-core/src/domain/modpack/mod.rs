@@ -1,5 +1,6 @@
 //! Modpack sources (Modrinth, CurseForge, packwiz) and what they return.
 
+pub mod curseforge;
 pub mod mrpack;
 pub mod packwiz;
 mod ports;
