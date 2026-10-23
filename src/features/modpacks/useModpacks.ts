@@ -1,6 +1,11 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { getModpack, type ModpackSearch, searchModpacks } from "../../ipc/client";
+import {
+  getModpack,
+  type ModpackCatalog,
+  type ModpackSearch,
+  searchModpacks,
+} from "../../ipc/client";
 
 /** Results per page; Modrinth allows up to 100, the launcher asks for fewer. */
 export const MODPACK_PAGE_SIZE = 20;
@@ -17,10 +22,10 @@ export function useModpackSearch(search: ModpackSearch) {
   });
 }
 
-export function useModpack(project: string, enabled: boolean) {
+export function useModpack(source: ModpackCatalog, project: string, enabled: boolean) {
   return useQuery({
-    queryKey: ["modpack", project],
-    queryFn: () => getModpack(project),
+    queryKey: ["modpack", source, project],
+    queryFn: () => getModpack(source, project),
     enabled,
     staleTime: 5 * 60 * 1000,
   });

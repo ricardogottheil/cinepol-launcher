@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
-import { type ModpackSummaryDto, toIpcError } from "../../ipc/client";
+import { asCatalog, type ModpackSummaryDto, toIpcError } from "../../ipc/client";
 import { formatBytes } from "../instances/formatBytes";
 import { useModpackJobStore } from "./modpackJobStore";
 import { useModpack } from "./useModpacks";
@@ -13,7 +13,8 @@ const SHOWN_VERSIONS = 8;
 export function ModpackRow({ modpack }: { modpack: ModpackSummaryDto }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
-  const details = useModpack(modpack.project, open);
+  const source = asCatalog(modpack.source);
+  const details = useModpack(source, modpack.project, open);
   const busy = useModpackJobStore((state) => state.job.kind !== "idle");
   const installVersion = useModpackJobStore((state) => state.installVersion);
   const numbers = new Intl.NumberFormat(i18n.language);
@@ -99,7 +100,9 @@ export function ModpackRow({ modpack }: { modpack: ModpackSummaryDto }) {
                   )}
                   <Button
                     disabled={busy || !version.installable}
-                    onClick={() => void installVersion(modpack.project, version.id, modpack.title)}
+                    onClick={() =>
+                      void installVersion(source, modpack.project, version.id, modpack.title)
+                    }
                   >
                     {t("modpacks.install")}
                   </Button>

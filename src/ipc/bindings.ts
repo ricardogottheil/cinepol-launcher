@@ -17,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "updates_not_configured" | "update_changed" | "update_failed" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -101,7 +101,11 @@ export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versi
 
 export type SettingsDto = { serverConfigUrl: string, defaultServerConfigUrl: string, };
 
-export type ModpackSummaryDto = { project: string, title: string, description: string, iconUrl: string | null, downloads: number | null, };
+export type ModpackSummaryDto = { 
+/**
+ * `modrinth` or `curseforge`.
+ */
+source: string, project: string, title: string, description: string, iconUrl: string | null, downloads: number | null, };
 
 export type ModpackPageDto = { items: Array<ModpackSummaryDto>, total: number | null, };
 
@@ -111,13 +115,27 @@ export type ModpackVersionDto = { id: string, name: string, versionNumber: strin
  */
 loaders: Array<string>, published: string | null, installable: boolean, size: number | null, };
 
+export type ModpackCatalogsDto = { 
+/**
+ * `false` in builds without a CurseForge API key.
+ */
+curseforge: boolean, };
+
 export type ModpackDetailsDto = { summary: ModpackSummaryDto, versions: Array<ModpackVersionDto>, };
 
 export type PackFilesDto = { written: number, unchanged: number, kept: number, removed: number, };
 
-export type ModpackInstallDto = { instance: InstanceDto, files: PackFilesDto, install: InstallSummaryDto, };
+export type ModpackInstallDto = { instance: InstanceDto, files: PackFilesDto, install: InstallSummaryDto, 
+/**
+ * CurseForge files the player has to download by hand.
+ */
+pending: Array<ManualFileDto>, };
 
-export type ModpackUpdateDto = { upToDate: boolean, instance: InstanceDto | null, files: PackFilesDto | null, };
+export type ModpackUpdateDto = { upToDate: boolean, instance: InstanceDto | null, files: PackFilesDto | null, 
+/**
+ * CurseForge files the player has to download by hand.
+ */
+pending: Array<ManualFileDto>, };
 
 export type ModpackExportDto = { 
 /**
@@ -207,10 +225,12 @@ export interface Commands {
   get_instance_settings: { args: { instanceId: string }; result: InstanceSettingsDto };
   update_instance_settings: { args: { instanceId: string; settings: InstanceSettingsDto }; result: InstanceSettingsDto };
   pick_java_executable: { args: Record<string, never>; result: string | null };
-  search_modpacks: { args: { query: string; gameVersion: string | null; loader: string | null; page: number; pageSize: number }; result: ModpackPageDto };
-  get_modpack: { args: { project: string }; result: ModpackDetailsDto };
-  install_modpack: { args: { operationId: string; project: string; version: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto };
+  search_modpacks: { args: { source: string | null; query: string; gameVersion: string | null; loader: string | null; page: number; pageSize: number }; result: ModpackPageDto };
+  get_modpack: { args: { source: string | null; project: string }; result: ModpackDetailsDto };
+  install_modpack: { args: { operationId: string; source: string | null; project: string; version: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto };
   import_mrpack: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto | null };
+  import_curseforge_zip: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto | null };
+  get_modpack_catalogs: { args: Record<string, never>; result: ModpackCatalogsDto };
   update_modpack: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: ModpackUpdateDto };
   install_packwiz: { args: { operationId: string; url: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto };
   import_packwiz: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto | null };

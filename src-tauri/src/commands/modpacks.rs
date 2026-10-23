@@ -1,4 +1,5 @@
-//! Modrinth modpacks: search, details, install, import, update and export.
+//! Modrinth and CurseForge modpacks: search, details, install, import,
+//! update and (Modrinth) export.
 //!
 //! Installing and updating run the pack sync and then the regular instance
 //! install (game, loader, Java) as one cancellable operation with one progress
@@ -12,18 +13,26 @@ use launcher_core::application::export_mrpack::{
     ExportMrpackDeps, ExportMrpackRequest, export_mrpack as export,
 };
 use launcher_core::application::get_modpack_details::get_modpack_details as details;
+use launcher_core::application::install_curseforge::{
+    CurseForgeDeps, CurseForgeInput, InstallCurseForgeRequest, install_curseforge,
+};
 use launcher_core::application::install_instance::install_instance as install;
 use launcher_core::application::install_modpack::{
     InstallModpackDeps, InstallModpackRequest, PackInput, install_modpack as install_pack,
 };
 use launcher_core::application::prepare_cinepol_instance::cinepol_server_entry;
 use launcher_core::application::search_modpacks::search_modpacks as search;
+use launcher_core::application::update_curseforge::{
+    UpdateCurseForgeDeps, UpdateCurseForgeOutcome, update_curseforge,
+};
 use launcher_core::application::update_modpack::{
     UpdateInput, UpdateModpackDeps, UpdateOutcome, update_modpack as update,
 };
-use launcher_core::domain::instance::{GameVersion, InstanceId, InstanceRepository};
+use launcher_core::domain::instance::{
+    GameVersion, InstanceId, InstanceOrigin, InstanceRepository,
+};
 use launcher_core::domain::loader::LoaderKind;
-use launcher_core::domain::modpack::ModpackQuery;
+use launcher_core::domain::modpack::{ModpackQuery, ModpackSourceKind};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
@@ -31,9 +40,9 @@ use tokio_util::sync::CancellationToken;
 
 use super::parse_instance_id;
 use crate::dto::{
-    InstallSummaryDto, InstanceDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto,
-    ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto,
-    ProgressEvent,
+    InstallSummaryDto, InstanceDto, ManualFileDto, ModpackCatalogsDto, ModpackDetailsDto,
+    ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto,
+    ModpackVersionDto, PackFilesDto, ProgressEvent,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::operations::Hold;
@@ -43,12 +52,35 @@ use crate::state::AppState;
 const MRPACK_EXTENSION: &str = "mrpack";
 /// Label of the file type filter in the native pickers.
 const MRPACK_FILTER: &str = "Modrinth modpack";
+const CURSEFORGE_EXTENSION: &str = "zip";
+const CURSEFORGE_FILTER: &str = "CurseForge modpack";
 
-/// One page of Modrinth modpacks; `page` is zero-based. `game_version` and
-/// `loader` narrow the results when given.
+/// The catalog a command talks to: Modrinth unless the UI asks otherwise.
+fn catalog(source: Option<&str>) -> Result<ModpackSourceKind, AppError> {
+    match source.map(str::trim) {
+        None | Some("") | Some("modrinth") => Ok(ModpackSourceKind::Modrinth),
+        Some("curseforge") => Ok(ModpackSourceKind::CurseForge),
+        Some(other) => Err(AppError::invalid_input(format!(
+            "unknown modpack catalog {other:?}"
+        ))),
+    }
+}
+
+/// Which catalogs this build can use (CurseForge needs a build-time key).
 #[tauri::command]
+pub fn get_modpack_catalogs(state: State<'_, AppState>) -> ModpackCatalogsDto {
+    ModpackCatalogsDto {
+        curseforge: state.curseforge.is_configured(),
+    }
+}
+
+/// One page of modpacks from `source` (Modrinth by default); `page` is
+/// zero-based. `game_version` and `loader` narrow the results when given.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn search_modpacks(
     state: State<'_, AppState>,
+    source: Option<String>,
     query: String,
     game_version: Option<String>,
     loader: Option<String>,
@@ -73,38 +105,57 @@ pub async fn search_modpacks(
         page,
         page_size,
     };
-    Ok(ModpackPageDto::from(&search(&state.modrinth, query).await?))
+    let page = match catalog(source.as_deref())? {
+        ModpackSourceKind::CurseForge => search(&state.curseforge, query).await?,
+        _ => search(&state.modrinth, query).await?,
+    };
+    Ok(ModpackPageDto::from(&page))
 }
 
 /// A modpack's details and its versions, newest first.
 #[tauri::command]
 pub async fn get_modpack(
     state: State<'_, AppState>,
+    source: Option<String>,
     project: String,
 ) -> Result<ModpackDetailsDto, AppError> {
-    let found = details(&state.modrinth, project.trim()).await?;
+    let found = match catalog(source.as_deref())? {
+        ModpackSourceKind::CurseForge => details(&state.curseforge, project.trim()).await?,
+        _ => details(&state.modrinth, project.trim()).await?,
+    };
     Ok(ModpackDetailsDto {
         summary: ModpackSummaryDto::from(&found.project),
         versions: found.versions.iter().map(ModpackVersionDto::from).collect(),
     })
 }
 
-/// Installs a Modrinth modpack version into a new instance, then the game and
-/// its loader. Cancellable with `cancel_operation`.
+/// Installs a modpack version from `source` (Modrinth by default) into a new
+/// instance, then the game and its loader. Cancellable with `cancel_operation`.
 #[tauri::command]
 pub async fn install_modpack(
     state: State<'_, AppState>,
     operation_id: String,
+    source: Option<String>,
     project: String,
     version: String,
     on_progress: Channel<ProgressEvent>,
 ) -> Result<ModpackInstallDto, AppError> {
+    let catalog = catalog(source.as_deref())?;
     let token = state.operations.start(&operation_id)?;
-    let pack = PackInput::Catalog {
-        project: project.trim(),
-        version: version.trim(),
+    let (project, version) = (project.trim(), version.trim());
+    let result = match catalog {
+        ModpackSourceKind::CurseForge => {
+            let pack = CurseForgeInput::Catalog {
+                project,
+                file: version,
+            };
+            install_new_curseforge(&state, pack, &token, on_progress).await
+        }
+        _ => {
+            let pack = PackInput::Catalog { project, version };
+            install_new(&state, pack, &token, on_progress).await
+        }
     };
-    let result = install_new(&state, pack, &token, on_progress).await;
     state.operations.finish(&operation_id);
     result
 }
@@ -120,7 +171,7 @@ pub async fn import_mrpack(
 ) -> Result<Option<ModpackInstallDto>, AppError> {
     // Registered before the picker opens, so the UI's Cancel works from the start.
     let token = state.operations.start(&operation_id)?;
-    let result = match pick_mrpack(&app).await {
+    let result = match pick_file(&app, MRPACK_FILTER, MRPACK_EXTENSION).await {
         Ok(Some(path)) if !token.is_cancelled() => {
             install_new(&state, PackInput::File(&path), &token, on_progress)
                 .await
@@ -133,8 +184,31 @@ pub async fn import_mrpack(
     result
 }
 
-/// Updates a Modrinth modpack instance to its newest version, keeping the
-/// player's changes, then installs the game and loader it needs.
+/// Asks for a CurseForge pack zip and installs it into a new instance, then
+/// the game and its loader. Resolves `null` when the player closes the picker.
+#[tauri::command]
+pub async fn import_curseforge_zip(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    operation_id: String,
+    on_progress: Channel<ProgressEvent>,
+) -> Result<Option<ModpackInstallDto>, AppError> {
+    let token = state.operations.start(&operation_id)?;
+    let result = match pick_file(&app, CURSEFORGE_FILTER, CURSEFORGE_EXTENSION).await {
+        Ok(Some(path)) if !token.is_cancelled() => {
+            install_new_curseforge(&state, CurseForgeInput::File(&path), &token, on_progress)
+                .await
+                .map(Some)
+        }
+        Ok(_) => Ok(None),
+        Err(error) => Err(error),
+    };
+    state.operations.finish(&operation_id);
+    result
+}
+
+/// Updates a Modrinth or CurseForge modpack instance to its newest version,
+/// keeping the player's changes, then installs the game and loader it needs.
 #[tauri::command]
 pub async fn update_modpack(
     state: State<'_, AppState>,
@@ -216,6 +290,47 @@ async fn install_new(
         instance: InstanceDto::from(&installed.instance),
         files: PackFilesDto::from(&installed.files),
         install: InstallSummaryDto::from(&summary),
+        pending: vec![],
+    })
+}
+
+async fn install_new_curseforge(
+    state: &AppState,
+    pack: CurseForgeInput<'_>,
+    token: &CancellationToken,
+    on_progress: Channel<ProgressEvent>,
+) -> Result<ModpackInstallDto, AppError> {
+    let reporter = ChannelReporter::new(on_progress);
+    // The new instance is held from the moment it exists until the game is installed.
+    let held: Mutex<Option<Hold<'_>>> = Mutex::new(None);
+    let claim = |id: &InstanceId| match hold(state, id, token) {
+        Ok(guard) => {
+            *held.lock().unwrap_or_else(PoisonError::into_inner) = Some(guard);
+            true
+        }
+        Err(_) => false,
+    };
+    let request = InstallCurseForgeRequest {
+        pack,
+        name: None,
+        seed_server: Some(cinepol_server_entry(&state.current_config())),
+        claim: Some(&claim),
+    };
+    let deps = CurseForgeDeps {
+        instances: &state.instances,
+        servers: &state.servers,
+        source: &state.curseforge,
+        archive: &state.curseforge_archive,
+        files: state.pack_sync().file_sync(),
+    };
+    let installed = install_curseforge(request, &deps, &reporter, token).await?;
+    let id = &installed.instance.id;
+    let summary = install(id, &state.install_deps(), &reporter, token).await?;
+    Ok(ModpackInstallDto {
+        instance: InstanceDto::from(&installed.instance),
+        files: PackFilesDto::from(&installed.files),
+        install: InstallSummaryDto::from(&summary),
+        pending: installed.pending.iter().map(ManualFileDto::from).collect(),
     })
 }
 
@@ -228,6 +343,11 @@ async fn update_held(
     // No update while the game runs, and kill_instance stops the update.
     let _claim = hold(state, id, token)?;
     let reporter = ChannelReporter::new(on_progress);
+    let instance = state.instances.get(id).await?;
+    if matches!(&instance.origin, InstanceOrigin::Modpack(pack) if pack.source == ModpackSourceKind::CurseForge)
+    {
+        return update_curseforge_held(state, id, token, &reporter).await;
+    }
     let deps = UpdateModpackDeps {
         instances: &state.instances,
         source: &state.modrinth,
@@ -246,6 +366,7 @@ async fn update_held(
             up_to_date: true,
             instance: None,
             files: None,
+            pending: vec![],
         }),
         UpdateOutcome::Updated { instance, files } => {
             install(id, &state.install_deps(), &reporter, token).await?;
@@ -253,6 +374,43 @@ async fn update_held(
                 up_to_date: false,
                 instance: Some(InstanceDto::from(instance.as_ref())),
                 files: Some(PackFilesDto::from(&files)),
+                pending: vec![],
+            })
+        }
+    }
+}
+
+/// [`update_held`] for a CurseForge instance; the caller holds it.
+async fn update_curseforge_held(
+    state: &AppState,
+    id: &InstanceId,
+    token: &CancellationToken,
+    reporter: &ChannelReporter,
+) -> Result<ModpackUpdateDto, AppError> {
+    let deps = UpdateCurseForgeDeps {
+        instances: &state.instances,
+        source: &state.curseforge,
+        archive: &state.curseforge_archive,
+        files: state.pack_sync().file_sync(),
+    };
+    match update_curseforge(id, None, &deps, reporter, token).await? {
+        UpdateCurseForgeOutcome::UpToDate { .. } => Ok(ModpackUpdateDto {
+            up_to_date: true,
+            instance: None,
+            files: None,
+            pending: vec![],
+        }),
+        UpdateCurseForgeOutcome::Updated {
+            instance,
+            files,
+            pending,
+        } => {
+            install(id, &state.install_deps(), reporter, token).await?;
+            Ok(ModpackUpdateDto {
+                up_to_date: false,
+                instance: Some(InstanceDto::from(instance.as_ref())),
+                files: Some(PackFilesDto::from(&files)),
+                pending: pending.iter().map(ManualFileDto::from).collect(),
             })
         }
     }
@@ -272,11 +430,12 @@ pub(crate) fn hold<'a>(
     })
 }
 
-async fn pick_mrpack(app: &AppHandle) -> Result<Option<PathBuf>, AppError> {
-    let dialog = app
-        .dialog()
-        .file()
-        .add_filter(MRPACK_FILTER, &[MRPACK_EXTENSION]);
+async fn pick_file(
+    app: &AppHandle,
+    filter: &str,
+    extension: &str,
+) -> Result<Option<PathBuf>, AppError> {
+    let dialog = app.dialog().file().add_filter(filter, &[extension]);
     let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file())
         .await
         .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))?;
@@ -339,5 +498,28 @@ mod tests {
         assert_eq!(file_stem("Fabulously Optimized"), "Fabulously Optimized");
         assert_eq!(file_stem("a/b\\c:d*?"), "a_b_c_d__");
         assert_eq!(file_stem(" .. "), "modpack");
+    }
+
+    #[test]
+    fn commands_default_to_modrinth_and_refuse_unknown_catalogs() {
+        // Calls made before CurseForge existed send no source.
+        for modrinth in [None, Some(""), Some(" "), Some("modrinth")] {
+            assert_eq!(
+                catalog(modrinth).unwrap(),
+                ModpackSourceKind::Modrinth,
+                "{modrinth:?}"
+            );
+        }
+        assert_eq!(
+            catalog(Some("curseforge")).unwrap(),
+            ModpackSourceKind::CurseForge
+        );
+        for bad in ["packwiz", "CurseForge", "ftb"] {
+            assert_eq!(
+                catalog(Some(bad)).unwrap_err().code,
+                ErrorCode::InvalidInput,
+                "{bad}"
+            );
+        }
     }
 }

@@ -7,6 +7,7 @@ use launcher_core::application::create_offline_profile::CreateOfflineProfileErro
 use launcher_core::application::duplicate_instance::DuplicateInstanceError;
 use launcher_core::application::edit_server_list::EditServerListError;
 use launcher_core::application::export_mrpack::ExportMrpackError;
+use launcher_core::application::install_curseforge::InstallCurseForgeError;
 use launcher_core::application::install_instance::InstallError;
 use launcher_core::application::install_modpack::InstallModpackError;
 use launcher_core::application::install_packwiz::InstallPackwizError;
@@ -18,6 +19,7 @@ use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
 use launcher_core::application::resolve_manual_downloads::ResolveManualDownloadsError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
+use launcher_core::application::update_curseforge::UpdateCurseForgeError;
 use launcher_core::application::update_instance_settings::UpdateInstanceSettingsError;
 use launcher_core::application::update_modpack::UpdateModpackError;
 use launcher_core::application::update_packwiz::UpdatePackwizError;
@@ -69,6 +71,8 @@ pub enum ErrorCode {
     RateLimited,
     /// A modpack archive or index is broken, unsafe or unsupported.
     InvalidModpack,
+    /// This build cannot use that modpack catalog (no CurseForge API key).
+    CatalogNotConfigured,
     /// This build cannot update itself (no signing key).
     UpdatesNotConfigured,
     /// The update shown is no longer the one available; check again.
@@ -356,9 +360,8 @@ fn source_code(error: &ModpackSourceError) -> ErrorCode {
         ModpackSourceError::NotFound(_) => ErrorCode::NotFound,
         ModpackSourceError::RateLimited { .. } => ErrorCode::RateLimited,
         ModpackSourceError::Network(_) => ErrorCode::Network,
-        ModpackSourceError::NotConfigured(_) | ModpackSourceError::InvalidResponse(_) => {
-            ErrorCode::Internal
-        }
+        ModpackSourceError::NotConfigured(_) => ErrorCode::CatalogNotConfigured,
+        ModpackSourceError::InvalidResponse(_) => ErrorCode::Internal,
     }
 }
 
@@ -432,6 +435,41 @@ impl From<UpdateModpackError> for AppError {
             UpdateModpackError::NoPackFile(_) => ErrorCode::InvalidModpack,
             UpdateModpackError::Pack(pack) => pack_sync_code(pack),
             UpdateModpackError::Cancelled => ErrorCode::Cancelled,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<InstallCurseForgeError> for AppError {
+    fn from(error: InstallCurseForgeError) -> Self {
+        let code = match &error {
+            InstallCurseForgeError::Source(source) => source_code(source),
+            InstallCurseForgeError::VersionNotFound(_) => ErrorCode::NotFound,
+            InstallCurseForgeError::NotInstallable(_) => ErrorCode::InvalidModpack,
+            InstallCurseForgeError::Create(CreateInstanceError::Storage(_)) => ErrorCode::Internal,
+            InstallCurseForgeError::Create(_) => ErrorCode::InvalidModpack,
+            InstallCurseForgeError::Pack(pack) => pack_sync_code(pack),
+            InstallCurseForgeError::Cancelled => ErrorCode::Cancelled,
+            InstallCurseForgeError::Busy(_) => ErrorCode::AlreadyRunning,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<UpdateCurseForgeError> for AppError {
+    fn from(error: UpdateCurseForgeError) -> Self {
+        let code = match &error {
+            UpdateCurseForgeError::Instance(InstanceRepositoryError::NotFound(_)) => {
+                ErrorCode::NotFound
+            }
+            UpdateCurseForgeError::Instance(_) => ErrorCode::Internal,
+            UpdateCurseForgeError::NotFromCatalog(_) => ErrorCode::InvalidInput,
+            UpdateCurseForgeError::Source(source) => source_code(source),
+            UpdateCurseForgeError::VersionNotFound(_)
+            | UpdateCurseForgeError::NoInstallableVersion(_) => ErrorCode::NotFound,
+            UpdateCurseForgeError::NotInstallable(_) => ErrorCode::InvalidModpack,
+            UpdateCurseForgeError::Pack(pack) => pack_sync_code(pack),
+            UpdateCurseForgeError::Cancelled => ErrorCode::Cancelled,
         };
         Self::new(code, error.to_string())
     }

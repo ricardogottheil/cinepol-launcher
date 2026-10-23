@@ -24,6 +24,7 @@ import type {
   LogLineDto,
   ManualDownloadsDto,
   ManualFileDto,
+  ModpackCatalogsDto,
   ModpackDetailsDto,
   ModpackExportDto,
   ModpackInstallDto,
@@ -72,6 +73,7 @@ export type {
   LogLineDto,
   ManualDownloadsDto,
   ManualFileDto,
+  ModpackCatalogsDto,
   ModpackDetailsDto,
   ModpackExportDto,
   ModpackInstallDto,
@@ -120,6 +122,7 @@ const BACKEND_CODES = {
   unverified_file: true,
   rate_limited: true,
   invalid_modpack: true,
+  catalog_not_configured: true,
   updates_not_configured: true,
   update_changed: true,
   update_failed: true,
@@ -378,7 +381,16 @@ export function pickJavaExecutable(): Promise<string | null> {
   return call("pick_java_executable");
 }
 
+/** The modpack catalogs the launcher can search. */
+export type ModpackCatalog = "modrinth" | "curseforge";
+
+/** The catalog a summary came from (`ModpackSummaryDto.source`). */
+export function asCatalog(source: string): ModpackCatalog {
+  return source === "curseforge" ? "curseforge" : "modrinth";
+}
+
 export interface ModpackSearch {
+  source: ModpackCatalog;
   query: string;
   gameVersion: string | null;
   loader: Exclude<InstanceLoader, "vanilla"> | null;
@@ -387,24 +399,45 @@ export interface ModpackSearch {
   pageSize: number;
 }
 
-/** One page of Modrinth modpacks. */
+/** One page of modpacks from `search.source`. */
 export function searchModpacks(search: ModpackSearch): Promise<ModpackPageDto> {
   return call("search_modpacks", { ...search });
 }
 
-/** A modpack and its versions, newest first. */
-export function getModpack(project: string): Promise<ModpackDetailsDto> {
-  return call("get_modpack", { project });
+/** Which catalogs this build can use (CurseForge needs a build-time key). */
+export function getModpackCatalogs(): Promise<ModpackCatalogsDto> {
+  return call("get_modpack_catalogs");
 }
 
-/** Installs a Modrinth modpack version into a new instance, game and loader included. */
+/** A modpack and its versions, newest first. */
+export function getModpack(source: ModpackCatalog, project: string): Promise<ModpackDetailsDto> {
+  return call("get_modpack", { source, project });
+}
+
+/** Installs a modpack version into a new instance, game and loader included. */
 export function installModpack(
+  source: ModpackCatalog,
   project: string,
   version: string,
   onProgress: (event: ProgressEvent) => void,
 ): RunningOperation<ModpackInstallDto> {
   return startOperation("install_modpack", (operationId) =>
-    call("install_modpack", { operationId, project, version, onProgress: channel(onProgress) }),
+    call("install_modpack", {
+      operationId,
+      source,
+      project,
+      version,
+      onProgress: channel(onProgress),
+    }),
+  );
+}
+
+/** Asks for a CurseForge pack zip and installs it; resolves `null` when the picker is closed. */
+export function importCurseForgeZip(
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<ModpackInstallDto | null> {
+  return startOperation("import_curseforge_zip", (operationId) =>
+    call("import_curseforge_zip", { operationId, onProgress: channel(onProgress) }),
   );
 }
 

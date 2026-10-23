@@ -75,6 +75,8 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::modpacks::get_modpack,
             commands::modpacks::install_modpack,
             commands::modpacks::import_mrpack,
+            commands::modpacks::import_curseforge_zip,
+            commands::modpacks::get_modpack_catalogs,
             commands::modpacks::update_modpack,
             commands::modpacks::export_mrpack,
             commands::packwiz::install_packwiz,

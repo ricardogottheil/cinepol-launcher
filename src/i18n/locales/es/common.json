@@ -124,7 +124,8 @@
     "invalid_modpack": "Este modpack está dañado, no es seguro o no es compatible",
     "updates_not_configured": "Esta versión no puede actualizarse sola",
     "update_changed": "La actualización cambió; vuelve a buscar",
-    "update_failed": "No se pudo instalar la actualización"
+    "update_failed": "No se pudo instalar la actualización",
+    "catalog_not_configured": "Esta versión no puede usar ese catálogo de modpacks"
   },
   "stages": {
     "metadata": "Leyendo la versión",

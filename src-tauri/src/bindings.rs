@@ -13,11 +13,11 @@ use crate::dto::{
     CommunityLinksDto, ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto,
     InstallSummaryDto, InstanceDto, InstanceOriginDto, InstanceSettingsDto, JavaChoiceDto,
     JavaKindDto, LaunchOutcomeDto, LoaderReleaseDto, LogLevelDto, LogLineDto, LogStreamDto,
-    ManualDownloadsDto, ManualFileDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto,
-    ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto,
-    PackwizInstallDto, PackwizUpdateDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
-    ProgressUnitDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto, ServerListDto,
-    ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
+    ManualDownloadsDto, ManualFileDto, ModpackCatalogsDto, ModpackDetailsDto, ModpackExportDto,
+    ModpackInstallDto, ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto,
+    PackFilesDto, PackwizInstallDto, PackwizUpdateDto, PremiumNameDto, ProgressEvent,
+    ProgressStageDto, ProgressUnitDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto,
+    ServerListDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -70,6 +70,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ModpackSummaryDto::decl(cfg),
         ModpackPageDto::decl(cfg),
         ModpackVersionDto::decl(cfg),
+        ModpackCatalogsDto::decl(cfg),
         ModpackDetailsDto::decl(cfg),
         PackFilesDto::decl(cfg),
         ModpackInstallDto::decl(cfg),
@@ -255,6 +256,7 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
         command(
             "search_modpacks",
             vec![
+                ("source", "string | null".to_owned()),
                 ("query", string()),
                 ("gameVersion", "string | null".to_owned()),
                 ("loader", "string | null".to_owned()),
@@ -265,13 +267,17 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
         ),
         command(
             "get_modpack",
-            vec![("project", string())],
+            vec![
+                ("source", "string | null".to_owned()),
+                ("project", string()),
+            ],
             ModpackDetailsDto::name(cfg),
         ),
         command(
             "install_modpack",
             vec![
                 ("operationId", string()),
+                ("source", "string | null".to_owned()),
                 ("project", string()),
                 ("version", string()),
                 (
@@ -291,6 +297,22 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
                 ),
             ],
             format!("{} | null", ModpackInstallDto::name(cfg)),
+        ),
+        command(
+            "import_curseforge_zip",
+            vec![
+                ("operationId", string()),
+                (
+                    "onProgress",
+                    format!("Channel<{}>", ProgressEvent::name(cfg)),
+                ),
+            ],
+            format!("{} | null", ModpackInstallDto::name(cfg)),
+        ),
+        command(
+            "get_modpack_catalogs",
+            vec![],
+            ModpackCatalogsDto::name(cfg),
         ),
         command(
             "update_modpack",
@@ -468,6 +490,8 @@ mod tests {
             "get_modpack",
             "install_modpack",
             "import_mrpack",
+            "import_curseforge_zip",
+            "get_modpack_catalogs",
             "update_modpack",
             "export_mrpack",
             "open_crash_report",

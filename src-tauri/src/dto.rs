@@ -282,10 +282,21 @@ impl From<&LoaderRelease> for LoaderReleaseDto {
     }
 }
 
+/// The id the UI knows a modpack source by.
+pub fn source_id(kind: ModpackSourceKind) -> &'static str {
+    match kind {
+        ModpackSourceKind::Modrinth => "modrinth",
+        ModpackSourceKind::CurseForge => "curseforge",
+        ModpackSourceKind::Packwiz => "packwiz",
+    }
+}
+
 /// A modpack in a catalog listing or details view.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ModpackSummaryDto {
+    /// `modrinth` or `curseforge`.
+    pub source: String,
     pub project: String,
     pub title: String,
     pub description: String,
@@ -297,6 +308,7 @@ pub struct ModpackSummaryDto {
 impl From<&ModpackSummary> for ModpackSummaryDto {
     fn from(summary: &ModpackSummary) -> Self {
         Self {
+            source: source_id(summary.source).to_owned(),
             project: summary.project.clone(),
             title: summary.title.clone(),
             description: summary.description.clone(),
@@ -405,14 +417,7 @@ impl From<&Instance> for InstanceDto {
                 InstanceOrigin::Modpack(_) => InstanceOriginDto::Modpack,
             },
             modpack_source: match &instance.origin {
-                InstanceOrigin::Modpack(pack) => Some(
-                    match pack.source {
-                        ModpackSourceKind::Modrinth => "modrinth",
-                        ModpackSourceKind::CurseForge => "curseforge",
-                        ModpackSourceKind::Packwiz => "packwiz",
-                    }
-                    .to_owned(),
-                ),
+                InstanceOrigin::Modpack(pack) => Some(source_id(pack.source).to_owned()),
                 _ => None,
             },
             update_pack_on_launch: instance.settings.update_pack_on_launch,
@@ -663,6 +668,16 @@ pub struct ModpackInstallDto {
     pub instance: InstanceDto,
     pub files: PackFilesDto,
     pub install: InstallSummaryDto,
+    /// CurseForge files the player has to download by hand.
+    pub pending: Vec<ManualFileDto>,
+}
+
+/// The modpack catalogs this build can talk to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackCatalogsDto {
+    /// `false` in builds without a CurseForge API key.
+    pub curseforge: bool,
 }
 
 /// `instance` and `files` are absent when the instance was already up to date.
@@ -672,6 +687,8 @@ pub struct ModpackUpdateDto {
     pub up_to_date: bool,
     pub instance: Option<InstanceDto>,
     pub files: Option<PackFilesDto>,
+    /// CurseForge files the player has to download by hand.
+    pub pending: Vec<ManualFileDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

@@ -31,6 +31,7 @@ export function ModpacksPage() {
   const [page, setPage] = useState(0);
   const query = useDebouncedValue(text.trim(), SEARCH_DEBOUNCE_MS);
   const search = useModpackSearch({
+    source: "modrinth",
     query,
     gameVersion: null,
     loader,

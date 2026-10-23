@@ -7,6 +7,7 @@ import {
   installModpack,
   installPackwiz,
   type ManualFileDto,
+  type ModpackCatalog,
   type ProgressEvent,
   type ProgressStageDto,
   type ProgressUnitDto,
@@ -38,7 +39,12 @@ interface ModpackJobState {
   job: ModpackJob;
   error: ClientErrorCode | null;
   installed: InstalledPack | null;
-  installVersion: (project: string, version: string, title: string) => Promise<void>;
+  installVersion: (
+    source: ModpackCatalog,
+    project: string,
+    version: string,
+    title: string,
+  ) => Promise<void>;
   importFile: () => Promise<void>;
   /** Installs the packwiz pack at an https `pack.toml` URL. */
   installPackwizUrl: (url: string) => Promise<void>;
@@ -101,8 +107,8 @@ export const useModpackJobStore = create<ModpackJobState>((set) => {
     job: { kind: "idle" },
     error: null,
     installed: null,
-    installVersion: (project, version, title) =>
-      run(title, (onProgress) => installModpack(project, version, onProgress)),
+    installVersion: (source, project, version, title) =>
+      run(title, (onProgress) => installModpack(source, project, version, onProgress)),
     importFile: () => run(null, (onProgress) => importMrpack(onProgress)),
     installPackwizUrl: (url) => run(url, (onProgress) => installPackwiz(url, onProgress)),
     importPackwizFile: () => run(null, (onProgress) => importPackwiz(onProgress)),

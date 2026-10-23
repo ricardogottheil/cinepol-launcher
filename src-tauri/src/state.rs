@@ -13,7 +13,9 @@ use launcher_core::domain::account::{Account, OfflinePolicy};
 use launcher_core::domain::launch::{LauncherPaths, Platform};
 use launcher_core::domain::ports::Secret;
 use launcher_core::domain::server::ServerConfig;
-use launcher_core::infrastructure::archive::{ZipMrpackArchive, ZipNativesExtractor};
+use launcher_core::infrastructure::archive::{
+    ZipCurseForgeArchive, ZipMrpackArchive, ZipNativesExtractor,
+};
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
 use launcher_core::infrastructure::curseforge::CurseForgeSource;
 use launcher_core::infrastructure::fs::{
@@ -128,6 +130,7 @@ pub struct AppState {
     /// The Modrinth catalog (modpack search, versions, file lookups).
     pub modrinth: ModrinthSource<ReqwestHttpClient>,
     pub curseforge: CurseForgeSource<ReqwestHttpClient>,
+    pub curseforge_archive: ZipCurseForgeArchive,
     pub mrpack: ZipMrpackArchive,
     /// packwiz packs over HTTP or from a local folder.
     pub packwiz: PackwizFiles<ReqwestHttpClient>,
@@ -239,6 +242,7 @@ impl AppState {
             config_source: HttpServerConfigSource::new(http.clone()),
             modrinth: ModrinthSource::new(http.clone()),
             curseforge: CurseForgeSource::new(http.clone(), curseforge_api_key().as_deref()),
+            curseforge_archive: ZipCurseForgeArchive::default(),
             mrpack: ZipMrpackArchive::new(),
             packwiz: PackwizFiles::new(http.clone()),
             pack_files: StdPackFiles,

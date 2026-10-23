@@ -22,6 +22,7 @@ vi.mock("../../ipc/client", async (importOriginal) => ({
 
 const labels = esCommon.modpacks;
 const summary = {
+  source: "modrinth",
   project: "1KVo5zza",
   title: "Fabulously Optimized",
   description: "Improve your graphics and performance",
@@ -110,7 +111,12 @@ describe("ModpacksPage", () => {
     const done = deferred<typeof installed>();
     let report: (event: ProgressEvent) => void = () => {};
     client.installModpack.mockImplementation(
-      (_project: string, _version: string, onProgress: (event: ProgressEvent) => void) => {
+      (
+        _source: string,
+        _project: string,
+        _version: string,
+        onProgress: (event: ProgressEvent) => void,
+      ) => {
         report = onProgress;
         return { operationId: "op", done: done.promise, cancel: vi.fn() };
       },
@@ -119,6 +125,7 @@ describe("ModpacksPage", () => {
     expect(within(row).getByText("26.2")).toBeInTheDocument();
     fireEvent.click(within(row).getByRole("button", { name: labels.install }));
     expect(client.installModpack).toHaveBeenCalledWith(
+      "modrinth",
       summary.project,
       version.id,
       expect.any(Function),
