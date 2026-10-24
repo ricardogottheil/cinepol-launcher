@@ -150,6 +150,8 @@ async fn versions_drop_what_does_not_fit_and_odd_dependencies_and_files() {
         // An unknown dependency type, and one naming nothing valid.
         versions[0]["dependencies"] = serde_json::json!([
             { "project_id": SODIUM, "dependency_type": "suggested" },
+            { "project_id": SODIUM, "dependency_type": null },
+            { "project_id": SODIUM },
             { "project_id": "../x", "version_id": null, "dependency_type": "required" },
             { "project_id": "P7dR8mSH", "dependency_type": "incompatible" }
         ]);
@@ -201,4 +203,43 @@ async fn projects_are_read_in_one_batch_and_only_mods_are_kept() {
     let unchanged = &serde_json::from_slice::<Value>(PROJECTS).unwrap()[1];
     assert_eq!(remaining.project, unchanged["id"].as_str().unwrap());
     assert_eq!(remaining.title, unchanged["title"].as_str().unwrap());
+}
+
+#[tokio::test]
+async fn undated_versions_come_last_in_the_order_given() {
+    let body = edited(IRIS_VERSIONS, |value| {
+        let versions = value.as_array_mut().unwrap();
+        versions[0]["date_published"] = Value::Null;
+        versions[1]
+            .as_object_mut()
+            .unwrap()
+            .remove("date_published");
+    });
+    let modrinth = source(vec![(versions_url(), body)]);
+    let versions = modrinth
+        .versions(IRIS, &target(LoaderKind::Quilt))
+        .await
+        .unwrap();
+    let ids: Vec<&str> = versions.iter().map(|version| version.id.as_str()).collect();
+    assert_eq!(ids[10..], ["bAo1Qhte", "zsoi0dso"]);
+}
+
+#[tokio::test]
+async fn projects_are_read_in_batches_of_a_hundred() {
+    let ids: Vec<String> = (0..150).map(|n| format!("mod{n:05}")).collect();
+    let encoded = |batch: &[String]| {
+        url(&format!(
+            "/projects?ids={}",
+            crate::infrastructure::modrinth::encode(&serde_json::to_string(batch).unwrap())
+        ))
+    };
+    let first = encoded(&ids[..100]);
+    let second = encoded(&ids[100..]);
+    let one = edited(PROJECTS, |value| {
+        value.as_array_mut().unwrap().truncate(1);
+    });
+    let modrinth = source(vec![(first.clone(), one.clone()), (second.clone(), one)]);
+    let projects = modrinth.projects(&ids).await.unwrap();
+    assert_eq!(modrinth.http.requests(), [first, second]);
+    assert_eq!(projects.len(), 2);
 }

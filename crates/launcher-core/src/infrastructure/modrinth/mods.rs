@@ -167,7 +167,7 @@ fn mod_version(version: wire::Version) -> ModVersion {
 
 /// A dependency with a known kind that names a valid project or version.
 fn dependency(raw: wire::Dependency) -> Option<ModDependency> {
-    let kind = match raw.dependency_type.as_str() {
+    let kind = match raw.dependency_type.as_deref().unwrap_or_default() {
         "required" => DependencyKind::Required,
         "optional" => DependencyKind::Optional,
         "incompatible" => DependencyKind::Incompatible,

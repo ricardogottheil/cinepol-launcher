@@ -76,8 +76,10 @@ pub(super) struct Dependency {
     pub version_id: Option<String>,
     #[serde(default)]
     pub project_id: Option<String>,
-    /// `required`, `optional`, `incompatible` or `embedded`.
-    pub dependency_type: String,
+    /// `required`, `optional`, `incompatible` or `embedded`. Missing or
+    /// `null` is tolerated: modpack versions share this type and ignore it.
+    #[serde(default)]
+    pub dependency_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
