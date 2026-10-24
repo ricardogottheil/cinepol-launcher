@@ -201,6 +201,8 @@ jobs:
 
       # The bundler notarizes only the .app; the DMG around it is signed but
       # not notarized, so Gatekeeper rejects the download itself.
+      # APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID come from $GITHUB_ENV,
+      # written by the macOS signing step above only when they are configured.
       - name: Notarize and staple the DMG (only when configured)
         if: runner.os == 'macOS' && env.APPLE_ID != ''
         shell: bash
@@ -211,10 +213,21 @@ jobs:
             echo "::error::expected one DMG, found ${#dmgs[@]}"
             exit 1
           fi
-          xcrun notarytool submit "${dmgs[0]}" \
-            --apple-id "${APPLE_ID}" --password "${APPLE_PASSWORD}" --team-id "${APPLE_TEAM_ID}" \
-            --wait
+          credentials=(--apple-id "${APPLE_ID}" --password "${APPLE_PASSWORD}" --team-id "${APPLE_TEAM_ID}")
+          result="$(xcrun notarytool submit "${dmgs[0]}" "${credentials[@]}" \
+            --wait --timeout 30m --output-format json)" || true
+          status="$(jq -r '.status // empty' <<< "${result}")"
+          if [ "${status}" != "Accepted" ]; then
+            echo "::error::DMG notarization did not succeed (status: ${status:-unknown})"
+            id="$(jq -r '.id // empty' <<< "${result}")"
+            if [ -n "${id}" ]; then
+              xcrun notarytool log "${id}" "${credentials[@]}"
+            fi
+            exit 1
+          fi
           xcrun stapler staple "${dmgs[0]}"
+          # Assess the stapled DMG the way Gatekeeper assesses a downloaded
+          # file; a rejection fails the job.
           spctl -a -vvv -t open --context context:primary-signature "${dmgs[0]}"
 
       - name: Collect the release files
