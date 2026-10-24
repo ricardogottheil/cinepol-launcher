@@ -7,7 +7,7 @@ export type AppInfo = { name: string, version: string, };
 
 export type AppUpdateStatusDto = { "kind": "notConfigured" } | { "kind": "upToDate" } | { "kind": "available", version: string, currentVersion: string, notes?: string, };
 
-export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "loader" | "modpack" | "natives" | "launching";
+export type ProgressStageDto = "metadata" | "libraries" | "assets" | "java" | "loader" | "modpack" | "mods" | "natives" | "launching";
 
 export type ProgressUnitDto = "steps" | "bytes";
 

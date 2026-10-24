@@ -1,0 +1,159 @@
+//! In-memory mod catalog and registry for the mod use cases' tests.
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use crate::domain::instance::InstanceId;
+use crate::domain::integrity::{Checksum, HashAlgorithm};
+use crate::domain::modpack::{ModpackSourceError, PackFileError};
+use crate::domain::mods::{
+    DependencyKind, ModDependency, ModFile, ModPage, ModQuery, ModRegistry, ModRegistryStore,
+    ModSource, ModSummary, ModTarget, ModVersion, ReleaseChannel,
+};
+
+use super::sha512_hex;
+
+/// A mod catalog in memory. `versions` answers like the real catalog: only
+/// the versions that fit the target, in the order they were added (add them
+/// newest first). Records every project whose versions were asked for.
+#[derive(Debug, Default)]
+pub struct FakeModSource {
+    pub titles: HashMap<String, String>,
+    pub versions: Vec<ModVersion>,
+    pub asked: Mutex<Vec<String>>,
+}
+
+impl FakeModSource {
+    /// Adds a project and its versions, newest first.
+    pub fn with(mut self, project: &str, title: &str, versions: Vec<ModVersion>) -> Self {
+        self.titles.insert(project.into(), title.into());
+        self.versions.extend(versions);
+        self
+    }
+
+    pub fn asked(&self) -> Vec<String> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+impl ModSource for FakeModSource {
+    async fn search(&self, _query: &ModQuery) -> Result<ModPage, ModpackSourceError> {
+        Ok(ModPage {
+            items: Vec::new(),
+            total: Some(0),
+        })
+    }
+
+    async fn versions(
+        &self,
+        project: &str,
+        target: &ModTarget,
+    ) -> Result<Vec<ModVersion>, ModpackSourceError> {
+        self.asked.lock().unwrap().push(project.into());
+        Ok(self
+            .versions
+            .iter()
+            .filter(|version| version.project == project && target.accepts(version))
+            .cloned()
+            .collect())
+    }
+
+    async fn version(&self, id: &str) -> Result<ModVersion, ModpackSourceError> {
+        self.versions
+            .iter()
+            .find(|version| version.id == id)
+            .cloned()
+            .ok_or_else(|| ModpackSourceError::NotFound(id.into()))
+    }
+
+    async fn projects(&self, ids: &[String]) -> Result<Vec<ModSummary>, ModpackSourceError> {
+        Ok(ids
+            .iter()
+            .filter_map(|id| {
+                self.titles.get(id).map(|title| ModSummary {
+                    project: id.clone(),
+                    title: title.clone(),
+                    description: String::new(),
+                    icon_url: None,
+                    downloads: None,
+                })
+            })
+            .collect())
+    }
+}
+
+/// The body a [`mod_version`]'s file downloads as, so hashes line up.
+pub fn mod_jar(id: &str) -> Vec<u8> {
+    format!("jar of {id}").into_bytes()
+}
+
+/// A release of `project` with a downloadable jar whose body is
+/// [`mod_jar`]`(id)`, built for `game` on `loaders`.
+pub fn mod_version(
+    project: &str,
+    id: &str,
+    game: &str,
+    loaders: &[crate::domain::loader::LoaderKind],
+) -> ModVersion {
+    use crate::domain::instance::GameVersion;
+    let checksum = |algorithm, value: String| Checksum::parse(algorithm, &value).ok();
+    ModVersion {
+        id: id.into(),
+        project: project.into(),
+        name: id.into(),
+        version_number: id.into(),
+        channel: ReleaseChannel::Release,
+        game_versions: GameVersion::parse(game).into_iter().collect(),
+        loaders: loaders.to_vec(),
+        published: None,
+        file: checksum(HashAlgorithm::Sha512, sha512_hex(&mod_jar(id))).map(|sha512| ModFile {
+            url: format!("https://cdn.modrinth.com/data/{project}/versions/{id}/{id}.jar"),
+            filename: format!("{id}.jar"),
+            size: mod_jar(id).len() as u64,
+            sha512,
+            sha1: None,
+        }),
+        dependencies: Vec::new(),
+    }
+}
+
+/// `version` with one more dependency on `project` (and a pinned version).
+pub fn depends(
+    mut version: ModVersion,
+    kind: DependencyKind,
+    project: Option<&str>,
+    pinned: Option<&str>,
+) -> ModVersion {
+    version.dependencies.push(ModDependency {
+        project: project.map(Into::into),
+        version: pinned.map(Into::into),
+        kind,
+    });
+    version
+}
+
+/// Keeps registries in memory.
+#[derive(Debug, Default)]
+pub struct InMemoryModRegistryStore {
+    pub registries: Mutex<HashMap<InstanceId, ModRegistry>>,
+}
+
+impl ModRegistryStore for InMemoryModRegistryStore {
+    async fn load(&self, id: &InstanceId) -> Result<ModRegistry, PackFileError> {
+        Ok(self
+            .registries
+            .lock()
+            .unwrap()
+            .get(id)
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    async fn save(&self, id: &InstanceId, registry: &ModRegistry) -> Result<(), PackFileError> {
+        self.registries
+            .lock()
+            .unwrap()
+            .insert(id.clone(), registry.clone());
+        Ok(())
+    }
+}

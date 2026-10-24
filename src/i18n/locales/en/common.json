@@ -145,7 +145,8 @@
     "natives": "Preparing natives",
     "launching": "Starting the game",
     "loader": "Installing the loader",
-    "modpack": "Installing the modpack files"
+    "modpack": "Installing the modpack files",
+    "mods": "Installing the mods"
   },
   "accounts": {
     "offline": "Offline",

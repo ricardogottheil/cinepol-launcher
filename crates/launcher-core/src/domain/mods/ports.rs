@@ -1,7 +1,8 @@
 use std::future::Future;
 
-use super::{ModPage, ModQuery, ModSummary, ModTarget, ModVersion};
-use crate::domain::modpack::ModpackSourceError;
+use super::{ModPage, ModQuery, ModRegistry, ModSummary, ModTarget, ModVersion};
+use crate::domain::instance::InstanceId;
+use crate::domain::modpack::{ModpackSourceError, PackFileError};
 
 /// A catalog of individual mods. It shares the modpack catalogs' errors.
 pub trait ModSource: Send + Sync {
@@ -26,4 +27,18 @@ pub trait ModSource: Send + Sync {
         &self,
         ids: &[String],
     ) -> impl Future<Output = Result<Vec<ModSummary>, ModpackSourceError>> + Send;
+}
+
+/// The per-instance record of the mods the launcher installed.
+pub trait ModRegistryStore: Send + Sync {
+    /// The saved registry, or an empty one when the instance has none.
+    fn load(
+        &self,
+        id: &InstanceId,
+    ) -> impl Future<Output = Result<ModRegistry, PackFileError>> + Send;
+    fn save(
+        &self,
+        id: &InstanceId,
+        registry: &ModRegistry,
+    ) -> impl Future<Output = Result<(), PackFileError>> + Send;
 }

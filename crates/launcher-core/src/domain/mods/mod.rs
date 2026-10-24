@@ -1,9 +1,13 @@
 //! Individual mods: catalog search, versions and their dependencies, and
 //! which versions fit an instance.
 
+mod plan;
 mod ports;
+mod registry;
 
-pub use ports::ModSource;
+pub use plan::{MAX_PLANNED_MODS, ModInstallPlan, ModPlanError, PlannedMod, find_conflict};
+pub use ports::{ModRegistryStore, ModSource};
+pub use registry::{InstalledMod, ModRegistry};
 
 use crate::domain::instance::GameVersion;
 use crate::domain::integrity::Checksum;

@@ -73,6 +73,7 @@ pub enum ProgressStageDto {
     Java,
     Loader,
     Modpack,
+    Mods,
     Natives,
     Launching,
 }
@@ -86,6 +87,7 @@ impl From<ProgressStage> for ProgressStageDto {
             ProgressStage::Java => Self::Java,
             ProgressStage::Loader => Self::Loader,
             ProgressStage::Modpack => Self::Modpack,
+            ProgressStage::Mods => Self::Mods,
             ProgressStage::Natives => Self::Natives,
             ProgressStage::Launching => Self::Launching,
         }

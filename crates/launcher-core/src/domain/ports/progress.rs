@@ -9,6 +9,8 @@ pub enum ProgressStage {
     Loader,
     /// Modpack files (mods, configs, overrides).
     Modpack,
+    /// Mods installed one by one, with their dependencies.
+    Mods,
     Natives,
     Launching,
 }
