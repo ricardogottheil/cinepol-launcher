@@ -14,6 +14,7 @@ import type {
   ErrorCode,
   Events,
   GameVersionsDto,
+  InstalledModDto,
   InstallSummaryDto,
   InstanceDto,
   InstanceSettingsDto,
@@ -25,6 +26,10 @@ import type {
   LogLineDto,
   ManualDownloadsDto,
   ManualFileDto,
+  ModEntryDto,
+  ModInstallPreviewDto,
+  ModOriginDto,
+  ModPageDto,
   ModpackCatalogsDto,
   ModpackDetailsDto,
   ModpackExportDto,
@@ -33,9 +38,12 @@ import type {
   ModpackSummaryDto,
   ModpackUpdateDto,
   ModpackVersionDto,
+  ModSummaryDto,
+  ModUpdateDto,
   PackFilesDto,
   PackwizInstallDto,
   PackwizUpdateDto,
+  PlannedModDto,
   PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
@@ -66,6 +74,7 @@ export type {
   DeviceCodeDto,
   ErrorCode,
   GameVersionsDto,
+  InstalledModDto,
   InstallSummaryDto,
   InstanceDto,
   InstanceSettingsDto,
@@ -77,6 +86,10 @@ export type {
   LogLineDto,
   ManualDownloadsDto,
   ManualFileDto,
+  ModEntryDto,
+  ModInstallPreviewDto,
+  ModOriginDto,
+  ModPageDto,
   ModpackCatalogsDto,
   ModpackDetailsDto,
   ModpackExportDto,
@@ -85,9 +98,12 @@ export type {
   ModpackSummaryDto,
   ModpackUpdateDto,
   ModpackVersionDto,
+  ModSummaryDto,
+  ModUpdateDto,
   PackFilesDto,
   PackwizInstallDto,
   PackwizUpdateDto,
+  PlannedModDto,
   PremiumNameDto,
   ProgressEvent,
   ProgressStageDto,
@@ -136,6 +152,11 @@ const BACKEND_CODES = {
   updates_not_configured: true,
   update_changed: true,
   update_failed: true,
+  no_mod_loader: true,
+  mod_incompatible: true,
+  no_compatible_version: true,
+  mod_up_to_date: true,
+  too_many_dependencies: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -520,6 +541,77 @@ export function updateModpack(
 /** Asks where to save and exports the instance; resolves `null` when the picker is closed. */
 export function exportMrpack(instanceId: string): Promise<ModpackExportDto | null> {
   return call("export_mrpack", { instanceId });
+}
+
+export interface ModSearch {
+  instanceId: string;
+  query: string;
+  /** Zero-based. */
+  page: number;
+  pageSize: number;
+}
+
+/** One page of Modrinth mods that run on the instance's game version and loader. */
+export function searchMods(search: ModSearch): Promise<ModPageDto> {
+  return call("search_mods", { ...search });
+}
+
+/** What installing a mod would write: the mod first, then the dependencies it brings. */
+export function previewModInstall(
+  instanceId: string,
+  project: string,
+): Promise<ModInstallPreviewDto> {
+  return call("preview_mod_install", { instanceId, project });
+}
+
+/** Installs a mod and its required dependencies into the instance. */
+export function installMod(
+  instanceId: string,
+  project: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<InstalledModDto[]> {
+  return startOperation("install_mod", (operationId) =>
+    call("install_mod", { operationId, instanceId, project, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Replaces an installed mod with its newest compatible version. */
+export function updateMod(
+  instanceId: string,
+  project: string,
+  onProgress: (event: ProgressEvent) => void,
+): RunningOperation<InstalledModDto[]> {
+  return startOperation("update_mod", (operationId) =>
+    call("update_mod", { operationId, instanceId, project, onProgress: channel(onProgress) }),
+  );
+}
+
+/** Every jar in the instance's `mods/` folder, sorted by title. */
+export function listInstanceMods(instanceId: string): Promise<ModEntryDto[]> {
+  return call("list_instance_mods", { instanceId });
+}
+
+/** Turns a mod on or off (`ModEntryDto.filename`). */
+export async function setModEnabled(
+  instanceId: string,
+  filename: string,
+  enabled: boolean,
+): Promise<void> {
+  await call("set_mod_enabled", { instanceId, filename, enabled });
+}
+
+/** Removes a mod, and with `removeOrphans` the dependencies nothing else needs; resolves the files removed. */
+export function removeMod(
+  instanceId: string,
+  filename: string,
+  removeOrphans: boolean,
+): Promise<string[]> {
+  return call("remove_mod", { instanceId, filename, removeOrphans });
+}
+
+/** The installed mods that have a newer compatible version. */
+export function checkModUpdates(instanceId: string): Promise<ModUpdateDto[]> {
+  return call("check_mod_updates", { instanceId });
 }
 
 /** Installs the packwiz pack at an https `pack.toml` URL, game and loader included. */

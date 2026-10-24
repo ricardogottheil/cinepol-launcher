@@ -4,6 +4,7 @@
 use launcher_core::application::account_capes::AccountCapesError;
 use launcher_core::application::account_skin::AccountSkinError;
 use launcher_core::application::change_skin::ChangeSkinError;
+use launcher_core::application::check_mod_updates::CheckModUpdatesError;
 use launcher_core::application::create_instance::CreateInstanceError;
 use launcher_core::application::create_offline_profile::CreateOfflineProfileError;
 use launcher_core::application::duplicate_instance::DuplicateInstanceError;
@@ -11,16 +12,22 @@ use launcher_core::application::edit_server_list::EditServerListError;
 use launcher_core::application::export_mrpack::ExportMrpackError;
 use launcher_core::application::install_curseforge::InstallCurseForgeError;
 use launcher_core::application::install_instance::InstallError;
+use launcher_core::application::install_mod::InstallModError;
 use launcher_core::application::install_modpack::InstallModpackError;
 use launcher_core::application::install_packwiz::InstallPackwizError;
 use launcher_core::application::launch_instance::LaunchError;
+use launcher_core::application::list_instance_mods::ListInstanceModsError;
 use launcher_core::application::list_loader_versions::ListLoaderVersionsError;
 use launcher_core::application::login_microsoft::LoginError;
 use launcher_core::application::modpack_files::PackSyncError;
+use launcher_core::application::preview_mod_install::PreviewModInstallError;
 use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
+use launcher_core::application::remove_mod::RemoveModError;
 use launcher_core::application::resolve_manual_downloads::ResolveManualDownloadsError;
 use launcher_core::application::run_progress_demo::ProgressDemoError;
+use launcher_core::application::search_mods::SearchModsError;
+use launcher_core::application::set_mod_enabled::SetModEnabledError;
 use launcher_core::application::update_curseforge::UpdateCurseForgeError;
 use launcher_core::application::update_instance_settings::UpdateInstanceSettingsError;
 use launcher_core::application::update_modpack::UpdateModpackError;
@@ -34,6 +41,7 @@ use launcher_core::domain::loader::{LoaderInstallError, LoaderMetadataError};
 use launcher_core::domain::modpack::curseforge::CurseForgeError;
 use launcher_core::domain::modpack::mrpack::MrpackError;
 use launcher_core::domain::modpack::{ModpackSourceError, PackFileError};
+use launcher_core::domain::mods::ModPlanError;
 use launcher_core::domain::ports::DownloadError;
 use serde::Serialize;
 use ts_rs::TS;
@@ -89,6 +97,17 @@ pub enum ErrorCode {
     UpdateChanged,
     /// The update did not download, verify or install.
     UpdateFailed,
+    /// The instance has no mod loader (Vanilla), so it cannot run mods.
+    NoModLoader,
+    /// A mod cannot run together with another one; `details` names the other.
+    ModIncompatible,
+    /// A mod has no version for the instance's game version and loader;
+    /// `details` names the mod.
+    NoCompatibleVersion,
+    /// The mod is already the newest compatible version; `details` names it.
+    ModUpToDate,
+    /// A mod would bring in too many dependencies to install safely.
+    TooManyDependencies,
     Internal,
 }
 
@@ -120,6 +139,12 @@ impl AppError {
 
     pub fn invalid_input(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::InvalidInput, message)
+    }
+
+    /// Adds what the UI shows with the code, such as a mod's title.
+    pub fn with_details(mut self, details: impl Into<String>) -> Self {
+        self.details = Some(details.into());
+        self
     }
 }
 
@@ -672,6 +697,125 @@ impl From<launcher_core::domain::update::AppUpdateError> for AppError {
     }
 }
 
+fn instance_code(error: &InstanceRepositoryError) -> ErrorCode {
+    match error {
+        InstanceRepositoryError::NotFound(_) => ErrorCode::NotFound,
+        InstanceRepositoryError::Storage(_) => ErrorCode::Internal,
+    }
+}
+
+/// A mod plan failure, with the mod the UI names in `details`.
+fn mod_plan_error(error: &ModPlanError) -> AppError {
+    let message = error.to_string();
+    match error {
+        ModPlanError::NoLoader => AppError::new(ErrorCode::NoModLoader, message),
+        ModPlanError::AlreadyInstalled { title } => {
+            AppError::new(ErrorCode::AlreadyExists, message).with_details(title.clone())
+        }
+        ModPlanError::NoCompatibleVersion { title } => {
+            AppError::new(ErrorCode::NoCompatibleVersion, message).with_details(title.clone())
+        }
+        ModPlanError::Incompatible { with, .. } => {
+            AppError::new(ErrorCode::ModIncompatible, message).with_details(with.clone())
+        }
+        ModPlanError::TooManyDependencies => AppError::new(ErrorCode::TooManyDependencies, message),
+        ModPlanError::Source(source) => AppError::new(source_code(source), message),
+    }
+}
+
+impl From<SearchModsError> for AppError {
+    fn from(error: SearchModsError) -> Self {
+        let code = match &error {
+            SearchModsError::Instance(instance) => instance_code(instance),
+            SearchModsError::Source(source) => source_code(source),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<PreviewModInstallError> for AppError {
+    fn from(error: PreviewModInstallError) -> Self {
+        match &error {
+            PreviewModInstallError::Instance(instance) => {
+                Self::new(instance_code(instance), error.to_string())
+            }
+            PreviewModInstallError::Files(files) => {
+                Self::new(pack_file_code(files), error.to_string())
+            }
+            PreviewModInstallError::Plan(plan) => mod_plan_error(plan),
+        }
+    }
+}
+
+impl From<InstallModError> for AppError {
+    fn from(error: InstallModError) -> Self {
+        let message = error.to_string();
+        let code = match &error {
+            InstallModError::Plan(plan) => return mod_plan_error(plan),
+            InstallModError::FileTaken { filename } => {
+                return Self::new(ErrorCode::AlreadyExists, message).with_details(filename.clone());
+            }
+            InstallModError::UpToDate { title } => {
+                return Self::new(ErrorCode::ModUpToDate, message).with_details(title.clone());
+            }
+            InstallModError::Instance(instance) => instance_code(instance),
+            InstallModError::Download(DownloadError::Io { .. }) | InstallModError::Scratch(_) => {
+                ErrorCode::Internal
+            }
+            InstallModError::Download(_) => ErrorCode::Network,
+            InstallModError::Files(files) => pack_file_code(files),
+            InstallModError::NotInstalled { .. } => ErrorCode::NotFound,
+            InstallModError::Cancelled => ErrorCode::Cancelled,
+        };
+        Self::new(code, message)
+    }
+}
+
+impl From<ListInstanceModsError> for AppError {
+    fn from(error: ListInstanceModsError) -> Self {
+        let code = match &error {
+            ListInstanceModsError::Instance(instance) => instance_code(instance),
+            ListInstanceModsError::Files(files) => pack_file_code(files),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<SetModEnabledError> for AppError {
+    fn from(error: SetModEnabledError) -> Self {
+        let code = match &error {
+            SetModEnabledError::Instance(instance) => instance_code(instance),
+            SetModEnabledError::Files(files) => pack_file_code(files),
+            SetModEnabledError::NotAMod(_) => ErrorCode::InvalidInput,
+            SetModEnabledError::NotFound(_) => ErrorCode::NotFound,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<RemoveModError> for AppError {
+    fn from(error: RemoveModError) -> Self {
+        let code = match &error {
+            RemoveModError::Instance(instance) => instance_code(instance),
+            RemoveModError::Files(files) => pack_file_code(files),
+            RemoveModError::NotAMod(_) => ErrorCode::InvalidInput,
+            RemoveModError::NotFound(_) => ErrorCode::NotFound,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<CheckModUpdatesError> for AppError {
+    fn from(error: CheckModUpdatesError) -> Self {
+        let code = match &error {
+            CheckModUpdatesError::Instance(instance) => instance_code(instance),
+            CheckModUpdatesError::Files(files) => pack_file_code(files),
+            CheckModUpdatesError::Source(source) => source_code(source),
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -692,6 +836,65 @@ mod tests {
             ))
             .code,
             ErrorCode::InvalidInput
+        );
+    }
+
+    #[test]
+    fn maps_mod_errors_to_codes_naming_the_mod() {
+        let incompatible = AppError::from(InstallModError::Plan(ModPlanError::Incompatible {
+            title: "Iris".into(),
+            with: "OptiFabric".into(),
+        }));
+        assert_eq!(incompatible.code, ErrorCode::ModIncompatible);
+        assert_eq!(incompatible.details.as_deref(), Some("OptiFabric"));
+
+        let no_version = AppError::from(PreviewModInstallError::Plan(
+            ModPlanError::NoCompatibleVersion {
+                title: "Sodium".into(),
+            },
+        ));
+        assert_eq!(no_version.code, ErrorCode::NoCompatibleVersion);
+        assert_eq!(no_version.details.as_deref(), Some("Sodium"));
+
+        let up_to_date = AppError::from(InstallModError::UpToDate {
+            title: "Iris".into(),
+        });
+        assert_eq!(up_to_date.code, ErrorCode::ModUpToDate);
+        assert_eq!(up_to_date.details.as_deref(), Some("Iris"));
+
+        assert_eq!(
+            AppError::from(PreviewModInstallError::Plan(ModPlanError::NoLoader)).code,
+            ErrorCode::NoModLoader
+        );
+        assert_eq!(
+            AppError::from(InstallModError::Plan(ModPlanError::AlreadyInstalled {
+                title: "Iris".into()
+            }))
+            .code,
+            ErrorCode::AlreadyExists
+        );
+        assert_eq!(
+            AppError::from(InstallModError::Plan(ModPlanError::TooManyDependencies)).code,
+            ErrorCode::TooManyDependencies
+        );
+        assert_eq!(
+            AppError::from(InstallModError::NotInstalled {
+                project: "iris".into()
+            })
+            .code,
+            ErrorCode::NotFound
+        );
+        assert_eq!(
+            AppError::from(InstallModError::Cancelled).code,
+            ErrorCode::Cancelled
+        );
+        assert_eq!(
+            AppError::from(RemoveModError::NotAMod("../x".into())).code,
+            ErrorCode::InvalidInput
+        );
+        assert_eq!(
+            AppError::from(SetModEnabledError::NotFound("a.jar".into())).code,
+            ErrorCode::NotFound
         );
     }
 

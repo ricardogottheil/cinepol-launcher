@@ -4,6 +4,7 @@
 
 use launcher_core::application::account_capes::CapeTexture;
 use launcher_core::application::account_skin::SkinTexture;
+use launcher_core::application::check_mod_updates::ModUpdate;
 use launcher_core::application::check_premium_name::PremiumNameCheck;
 use launcher_core::application::export_mrpack::ExportSummary;
 use launcher_core::application::install_instance::InstallSummary;
@@ -18,6 +19,9 @@ use launcher_core::domain::loader::LoaderRelease;
 use launcher_core::domain::modpack::sync::ManualFile;
 use launcher_core::domain::modpack::{
     ModpackPage, ModpackSourceKind, ModpackSummary, ModpackVersion,
+};
+use launcher_core::domain::mods::{
+    InstalledMod, ModEntry, ModInstallPlan, ModOrigin, ModPage, ModSummary,
 };
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
 use launcher_core::domain::server_list::ServerList;
@@ -366,6 +370,213 @@ impl From<&ModpackPage> for ModpackPageDto {
         Self {
             items: page.items.iter().map(ModpackSummaryDto::from).collect(),
             total: page.total,
+        }
+    }
+}
+
+/// A mod in a catalog search.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModSummaryDto {
+    pub project: String,
+    pub title: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    #[ts(type = "number | null")]
+    pub downloads: Option<u64>,
+}
+
+impl From<&ModSummary> for ModSummaryDto {
+    fn from(summary: &ModSummary) -> Self {
+        Self {
+            project: summary.project.clone(),
+            title: summary.title.clone(),
+            description: summary.description.clone(),
+            icon_url: summary.icon_url.clone(),
+            downloads: summary.downloads,
+        }
+    }
+}
+
+/// One page of mods that run on the instance searched for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModPageDto {
+    pub items: Vec<ModSummaryDto>,
+    #[ts(type = "number | null")]
+    pub total: Option<u64>,
+}
+
+impl From<&ModPage> for ModPageDto {
+    fn from(page: &ModPage) -> Self {
+        Self {
+            items: page.items.iter().map(ModSummaryDto::from).collect(),
+            total: page.total,
+        }
+    }
+}
+
+/// A mod an install would write.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannedModDto {
+    pub project: String,
+    pub title: String,
+    pub version_number: String,
+    /// Whether it is the mod the player picked, rather than a dependency.
+    pub requested: bool,
+    /// Titles of the planned mods that need it.
+    pub required_by: Vec<String>,
+}
+
+/// What installing a mod would write: the picked mod first, then the
+/// required dependencies the instance does not have yet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModInstallPreviewDto {
+    pub mods: Vec<PlannedModDto>,
+}
+
+impl From<&ModInstallPlan> for ModInstallPreviewDto {
+    fn from(plan: &ModInstallPlan) -> Self {
+        let title_of = |project: &String| {
+            plan.mods
+                .iter()
+                .find(|planned| &planned.version.project == project)
+                .map_or_else(|| project.clone(), |planned| planned.title.clone())
+        };
+        Self {
+            mods: plan
+                .mods
+                .iter()
+                .map(|planned| PlannedModDto {
+                    project: planned.version.project.clone(),
+                    title: planned.title.clone(),
+                    version_number: planned.version.version_number.clone(),
+                    requested: planned.requested,
+                    required_by: planned.required_by.iter().map(title_of).collect(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// A mod an install or update wrote.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledModDto {
+    pub project: String,
+    pub title: String,
+    pub version_number: String,
+    pub filename: String,
+}
+
+impl From<&InstalledMod> for InstalledModDto {
+    fn from(installed: &InstalledMod) -> Self {
+        Self {
+            project: installed.project.clone(),
+            title: installed.title.clone(),
+            version_number: installed.version_number.clone(),
+            filename: installed.filename.clone(),
+        }
+    }
+}
+
+/// Where a jar in `mods/` came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ModOriginDto {
+    /// Installed with the launcher's mod browser.
+    Launcher,
+    /// Added by hand or by a pack, and recognised by Modrinth.
+    Identified,
+    /// Not known to Modrinth.
+    Unknown,
+}
+
+impl From<ModOrigin> for ModOriginDto {
+    fn from(origin: ModOrigin) -> Self {
+        match origin {
+            ModOrigin::Launcher => Self::Launcher,
+            ModOrigin::Identified => Self::Identified,
+            ModOrigin::Unknown => Self::Unknown,
+        }
+    }
+}
+
+/// A jar in an instance's `mods/` folder.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModEntryDto {
+    /// The jar's name without `.disabled`; commands take this name.
+    pub filename: String,
+    pub enabled: bool,
+    /// The mod's title, or the file name when it is unknown.
+    pub title: String,
+    pub origin: ModOriginDto,
+    pub project: Option<String>,
+    pub version_number: Option<String>,
+    /// Whether the player added it, rather than another mod needing it.
+    pub requested: bool,
+    /// Titles of the installed mods that need it.
+    pub required_by: Vec<String>,
+    /// Titles of the dependencies nothing else would need once it is removed.
+    pub orphans: Vec<String>,
+}
+
+impl ModEntryDto {
+    /// Maps every entry, naming projects by the titles the list knows.
+    pub fn list(entries: &[ModEntry]) -> Vec<Self> {
+        let title_of = |project: &String| {
+            entries
+                .iter()
+                .filter_map(|entry| entry.record.as_ref())
+                .find(|record| &record.project == project)
+                .map_or_else(|| project.clone(), |record| record.title.clone())
+        };
+        entries
+            .iter()
+            .map(|entry| {
+                let record = entry.record.as_ref();
+                Self {
+                    filename: entry.filename.clone(),
+                    enabled: entry.enabled,
+                    title: entry.title().to_owned(),
+                    origin: entry.origin.into(),
+                    project: record.map(|record| record.project.clone()),
+                    version_number: record.map(|record| record.version_number.clone()),
+                    requested: record.is_none_or(|record| record.requested),
+                    required_by: record
+                        .map(|record| record.required_by.iter().map(title_of).collect())
+                        .unwrap_or_default(),
+                    orphans: entry.orphans.iter().map(title_of).collect(),
+                }
+            })
+            .collect()
+    }
+}
+
+/// A newer compatible version of an installed mod.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateDto {
+    pub project: String,
+    pub title: String,
+    pub filename: String,
+    /// The installed version label.
+    pub current: String,
+    /// The version label the update installs.
+    pub version_number: String,
+}
+
+impl From<&ModUpdate> for ModUpdateDto {
+    fn from(update: &ModUpdate) -> Self {
+        Self {
+            project: update.project.clone(),
+            title: update.title.clone(),
+            filename: update.filename.clone(),
+            current: update.current.clone(),
+            version_number: update.version.version_number.clone(),
         }
     }
 }

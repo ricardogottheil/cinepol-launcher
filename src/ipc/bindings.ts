@@ -17,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -157,6 +157,58 @@ indexed: number,
  */
 overrides: number, };
 
+export type ModSummaryDto = { project: string, title: string, description: string, iconUrl: string | null, downloads: number | null, };
+
+export type ModPageDto = { items: Array<ModSummaryDto>, total: number | null, };
+
+export type PlannedModDto = { project: string, title: string, versionNumber: string, 
+/**
+ * Whether it is the mod the player picked, rather than a dependency.
+ */
+requested: boolean, 
+/**
+ * Titles of the planned mods that need it.
+ */
+requiredBy: Array<string>, };
+
+export type ModInstallPreviewDto = { mods: Array<PlannedModDto>, };
+
+export type InstalledModDto = { project: string, title: string, versionNumber: string, filename: string, };
+
+export type ModOriginDto = "launcher" | "identified" | "unknown";
+
+export type ModEntryDto = { 
+/**
+ * The jar's name without `.disabled`; commands take this name.
+ */
+filename: string, enabled: boolean, 
+/**
+ * The mod's title, or the file name when it is unknown.
+ */
+title: string, origin: ModOriginDto, project: string | null, versionNumber: string | null, 
+/**
+ * Whether the player added it, rather than another mod needing it.
+ */
+requested: boolean, 
+/**
+ * Titles of the installed mods that need it.
+ */
+requiredBy: Array<string>, 
+/**
+ * Titles of the dependencies nothing else would need once it is removed.
+ */
+orphans: Array<string>, };
+
+export type ModUpdateDto = { project: string, title: string, filename: string, 
+/**
+ * The installed version label.
+ */
+current: string, 
+/**
+ * The version label the update installs.
+ */
+versionNumber: string, };
+
 export type ManualFileDto = { name: string, filename: string, pageUrl: string, };
 
 export type PackwizInstallDto = { instance: InstanceDto, files: PackFilesDto, install: InstallSummaryDto, pending: Array<ManualFileDto>, };
@@ -249,6 +301,14 @@ export interface Commands {
   import_curseforge_zip: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: ModpackInstallDto | null };
   get_modpack_catalogs: { args: Record<string, never>; result: ModpackCatalogsDto };
   update_modpack: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: ModpackUpdateDto };
+  search_mods: { args: { instanceId: string; query: string; page: number; pageSize: number }; result: ModPageDto };
+  preview_mod_install: { args: { instanceId: string; project: string }; result: ModInstallPreviewDto };
+  install_mod: { args: { operationId: string; instanceId: string; project: string; onProgress: Channel<ProgressEvent> }; result: InstalledModDto[] };
+  update_mod: { args: { operationId: string; instanceId: string; project: string; onProgress: Channel<ProgressEvent> }; result: InstalledModDto[] };
+  list_instance_mods: { args: { instanceId: string }; result: ModEntryDto[] };
+  set_mod_enabled: { args: { instanceId: string; filename: string; enabled: boolean }; result: null };
+  remove_mod: { args: { instanceId: string; filename: string; removeOrphans: boolean }; result: string[] };
+  check_mod_updates: { args: { instanceId: string }; result: ModUpdateDto[] };
   install_packwiz: { args: { operationId: string; url: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto };
   import_packwiz: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto | null };
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
