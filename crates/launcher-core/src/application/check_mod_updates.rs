@@ -41,7 +41,8 @@ pub struct CheckModUpdatesDeps<'a, I, S, P, M> {
 }
 
 /// The updates for the mods the launcher knows (installed or recognised),
-/// sorted by title. A mod the catalog no longer has is skipped.
+/// sorted by title. A mod the catalog cannot answer for is skipped; only
+/// when it answers for none is its error returned.
 pub async fn check_mod_updates<I, S, P, M>(
     deps: &CheckModUpdatesDeps<'_, I, S, P, M>,
     id: &InstanceId,
@@ -61,11 +62,23 @@ where
     let saved = deps.registry.load(id).await?;
     let inventory = read_mod_inventory(deps.source, deps.files, &mods_dir, &saved).await?;
     let mut updates = Vec::new();
+    let (mut answered, mut failure) = (false, None);
     for installed in inventory.registry.mods() {
         let versions = match deps.source.versions(&installed.project, &target).await {
-            Ok(versions) => versions,
-            Err(ModpackSourceError::NotFound(_)) => continue,
-            Err(error) => return Err(error.into()),
+            Ok(versions) => {
+                answered = true;
+                versions
+            }
+            // Gone from the catalog: nothing to update to.
+            Err(ModpackSourceError::NotFound(_)) => {
+                answered = true;
+                continue;
+            }
+            Err(error) => {
+                tracing::warn!(project = %installed.project, %error, "could not check a mod for updates");
+                failure.get_or_insert(error);
+                continue;
+            }
         };
         if let Some(version) = available_update(&versions, &target, &installed.version) {
             updates.push(ModUpdate {
@@ -76,6 +89,9 @@ where
                 version: version.clone(),
             });
         }
+    }
+    if let (false, Some(error)) = (answered, failure) {
+        return Err(error.into());
     }
     updates.sort_by_cached_key(|update| update.title.to_lowercase());
     Ok(updates)
@@ -113,15 +129,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn lists_newer_versions_and_never_offers_an_older_release() {
-        let dir = tempfile::tempdir().unwrap();
-        let paths = LauncherPaths::new(dir.path());
-        let instances = InMemoryInstanceRepository::default();
-        fabric_instance(&instances, &id()).await;
+    /// Sodium 3 is out over the installed 2; the player runs a Lithium beta
+    /// newer than its latest release; Iris is current; one mod is gone from
+    /// the catalog. Versions of the `failing` projects cannot be read.
+    fn catalog(failing: &[&str]) -> FakeModSource {
         let mut lithium_beta = mod_version("lithium", "lithium-4b", "1.21.1", &[Fabric]);
         lithium_beta.channel = ReleaseChannel::Beta;
-        let source = FakeModSource::default()
+        let mut source = FakeModSource::default()
             .with(
                 "sodium",
                 "Sodium",
@@ -130,7 +144,6 @@ mod tests {
                     mod_version("sodium", "sodium-2", "1.21.1", &[Fabric]),
                 ],
             )
-            // The player runs a beta newer than the latest release.
             .with(
                 "lithium",
                 "Lithium",
@@ -144,6 +157,18 @@ mod tests {
                 "Iris",
                 vec![mod_version("iris", "iris-2", "1.21.1", &[Fabric])],
             );
+        source.versions_fail_for = failing
+            .iter()
+            .map(|project| (*project).to_owned())
+            .collect();
+        source
+    }
+
+    async fn check(failing: &[&str]) -> Result<Vec<ModUpdate>, CheckModUpdatesError> {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = LauncherPaths::new(dir.path());
+        let instances = InMemoryInstanceRepository::default();
+        fabric_instance(&instances, &id()).await;
         let mods_dir = paths.game_dir(&id()).join(MODS_DIR);
         std::fs::create_dir_all(&mods_dir).unwrap();
         let registry = InMemoryModRegistryStore::default();
@@ -161,7 +186,7 @@ mod tests {
             .save(&id(), &ModRegistry::new(records))
             .await
             .unwrap();
-
+        let source = catalog(failing);
         let deps = CheckModUpdatesDeps {
             instances: &instances,
             source: &source,
@@ -169,11 +194,25 @@ mod tests {
             registry: &registry,
             paths: &paths,
         };
-        let updates = check_mod_updates(&deps, &id()).await.unwrap();
+        check_mod_updates(&deps, &id()).await
+    }
+
+    #[tokio::test]
+    async fn lists_newer_versions_and_never_offers_an_older_release() {
+        let updates = check(&[]).await.unwrap();
         assert_eq!(updates.len(), 1);
         assert_eq!(updates[0].project, "sodium");
         assert_eq!(updates[0].current, "sodium-2");
         assert_eq!(updates[0].filename, "sodium-2.jar");
         assert_eq!(updates[0].version.id, "sodium-3");
+    }
+
+    #[tokio::test]
+    async fn one_mod_the_catalog_cannot_answer_for_does_not_hide_the_others() {
+        assert_eq!(check(&["lithium"]).await.unwrap().len(), 1);
+        assert!(matches!(
+            check(&["sodium", "lithium", "iris", "gone"]).await,
+            Err(CheckModUpdatesError::Source(ModpackSourceError::Network(_)))
+        ));
     }
 }

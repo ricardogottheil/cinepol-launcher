@@ -26,6 +26,8 @@ pub struct FakeModSource {
     pub asked: Mutex<Vec<String>>,
     pub projects_fail: bool,
     pub identify_fails: bool,
+    /// Projects whose versions cannot be read (the catalog times out).
+    pub versions_fail_for: Vec<String>,
 }
 
 impl FakeModSource {
@@ -55,6 +57,13 @@ impl ModSource for FakeModSource {
         target: &ModTarget,
     ) -> Result<Vec<ModVersion>, ModpackSourceError> {
         self.asked.lock().unwrap().push(project.into());
+        if self
+            .versions_fail_for
+            .iter()
+            .any(|failing| failing == project)
+        {
+            return Err(ModpackSourceError::Network("timed out".into()));
+        }
         Ok(self
             .versions
             .iter()

@@ -13,6 +13,7 @@
 //! new mod needs is enabled again, and disabled again when the install
 //! fails afterwards.
 
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -168,6 +169,8 @@ where
     let restore = old
         .as_ref()
         .map(|old| (backup.as_path(), old.path.as_path()));
+    // Set when the old jar could not be put back: its only copy is the backup.
+    let keep_backup = Cell::new(false);
     let result: Result<Vec<InstalledMod>, InstallModError> = async {
         deps.fs.create_dir_all(&staging).await?;
         if let Some(old) = &old {
@@ -186,7 +189,9 @@ where
         let placed = match jars_written {
             Ok(placed) => placed,
             Err(error) => {
-                undo(deps.files, &mods_dir, &[], &[], restore).await;
+                if !undo(deps.files, &mods_dir, &[], &[], restore).await {
+                    keep_backup.set(true);
+                }
                 return Err(error);
             }
         };
@@ -195,7 +200,9 @@ where
             && old.path != destinations[0]
             && let Err(error) = deps.files.remove_file(&old.path).await
         {
-            undo(deps.files, &mods_dir, &placed, &[], restore).await;
+            if !undo(deps.files, &mods_dir, &placed, &[], restore).await {
+                keep_backup.set(true);
+            }
             return Err(error.into());
         }
         let mut enabled = Vec::new();
@@ -204,12 +211,18 @@ where
                 continue;
             };
             if let Err(error) = set_jar_enabled(deps.files, &mods_dir, filename, true).await {
-                undo(deps.files, &mods_dir, &placed, &enabled, restore).await;
+                if !undo(deps.files, &mods_dir, &placed, &enabled, restore).await {
+                    keep_backup.set(true);
+                }
                 return Err(error.into());
             }
             enabled.push(filename);
         }
 
+        if old.is_some() {
+            // The new version says afresh which installed mods it needs.
+            registry.remove(project);
+        }
         for (dependency, needer) in &plan.present {
             if let Some(existing) = registry.get_mut(dependency) {
                 existing.required_by.insert(needer.clone());
@@ -228,13 +241,19 @@ where
         }
         if let Err(error) = deps.registry.save(id, &registry).await {
             // Jars the registry does not know about would load unseen.
-            undo(deps.files, &mods_dir, &placed, &enabled, restore).await;
+            if !undo(deps.files, &mods_dir, &placed, &enabled, restore).await {
+                keep_backup.set(true);
+            }
             return Err(error.into());
         }
         Ok(written)
     }
     .await;
-    release_dir(deps.fs, &staging).await;
+    if keep_backup.get() {
+        tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
+    } else {
+        release_dir(deps.fs, &staging).await;
+    }
     result
 }
 
@@ -416,14 +435,15 @@ where
 
 /// Best-effort undo of a failed install: the jars it wrote are removed, the
 /// dependencies it enabled are disabled again, and the jar an update set
-/// aside is put back (`(backup, original)`).
+/// aside is put back (`(backup, original)`). Returns false when that jar
+/// could not be put back, so the backup must be kept.
 async fn undo<P: PackFiles>(
     files: &P,
     mods_dir: &Path,
     placed: &[PathBuf],
     enabled: &[&str],
     restore: Option<(&Path, &Path)>,
-) {
+) -> bool {
     remove_all(files, placed).await;
     for filename in enabled {
         if let Err(error) = set_jar_enabled(files, mods_dir, filename, false).await {
@@ -434,7 +454,9 @@ async fn undo<P: PackFiles>(
         && let Err(error) = files.place(backup, original).await
     {
         tracing::warn!(path = %original.display(), %error, "could not put a mod back after a failed update");
+        return false;
     }
+    true
 }
 
 /// Best-effort removal of jars this install wrote; nothing else was there.

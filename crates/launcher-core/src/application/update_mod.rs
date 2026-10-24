@@ -260,6 +260,117 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dependency_the_new_version_drops_is_no_longer_needed_by_it() {
+        let mut world = world().await;
+        let with_api = |id: &str| {
+            depends(
+                mod_version("sodium", id, "1.21.1", &[Fabric]),
+                Required,
+                Some("fabric-api"),
+                None,
+            )
+        };
+        // Reinstall from a catalog where Sodium 2 needs Fabric API.
+        world.source = catalog(&[]).with("sodium", "Sodium", vec![with_api("sodium-2")]);
+        std::fs::remove_dir_all(mods_dir(&world)).unwrap();
+        world
+            .registry
+            .save(&id(), &crate::domain::mods::ModRegistry::default())
+            .await
+            .unwrap();
+        install_mod(
+            &deps(&world),
+            &id(),
+            "iris",
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        let registry = world.registry.load(&id()).await.unwrap();
+        assert!(
+            registry
+                .get("fabric-api")
+                .unwrap()
+                .required_by
+                .contains("sodium")
+        );
+
+        world.source = catalog(&["sodium-3", "sodium-2"]);
+        update(&world, "sodium").await.unwrap();
+        let registry = world.registry.load(&id()).await.unwrap();
+        assert!(registry.get("fabric-api").unwrap().required_by.is_empty());
+        // Nothing needs Fabric API any more.
+        assert_eq!(
+            registry.orphans_after_removing("iris"),
+            ["fabric-api", "sodium"]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_placement_or_removal_leaves_the_old_jar_in_place() {
+        let world = world().await;
+        // The old jar is set aside, then writing the new one fails.
+        world.files.fail_places_after(1);
+        assert!(update(&world, "sodium").await.is_err());
+        assert_eq!(jars_in(&world), ["iris-2.jar", "sodium-2.jar"]);
+
+        world.files.fail_places_after(usize::MAX);
+        world.files.fail_removes_after(0);
+        assert!(update(&world, "sodium").await.is_err());
+        assert!(jars_in(&world).contains(&"sodium-2.jar".to_owned()));
+        let registry = world.registry.load(&id()).await.unwrap();
+        assert_eq!(registry.get("sodium").unwrap().version, "sodium-2");
+    }
+
+    #[tokio::test]
+    async fn a_new_jar_under_the_old_name_replaces_it_and_is_undone_on_failure() {
+        let mut world = world().await;
+        let same_name = |id: &str| {
+            let mut version = mod_version("sodium", id, "1.21.1", &[Fabric]);
+            if let Some(file) = version.file.as_mut() {
+                file.filename = "sodium-2.jar".into();
+            }
+            version
+        };
+        world.source = catalog(&[]).with(
+            "sodium",
+            "Sodium",
+            vec![same_name("sodium-3"), same_name("sodium-2")],
+        );
+
+        world.registry.fail_saves();
+        assert!(update(&world, "sodium").await.is_err());
+        assert_eq!(
+            std::fs::read(mods_dir(&world).join("sodium-2.jar")).unwrap(),
+            mod_jar("sodium-2")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_old_jar_survives_in_scratch_when_it_cannot_be_put_back() {
+        let world = world().await;
+        // Setting the old jar aside and writing the new one work; putting
+        // the old one back after the failed save does not.
+        world.files.fail_places_after(2);
+        world.registry.fail_saves();
+        assert!(update(&world, "sodium").await.is_err());
+        let mut kept = Vec::new();
+        let mut stack = vec![world.paths.root().to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.file_name().is_some_and(|name| name == "previous.jar") {
+                    kept.push(std::fs::read(path).unwrap());
+                }
+            }
+        }
+        assert_eq!(kept, [mod_jar("sodium-2")]);
+    }
+
+    #[tokio::test]
     async fn refuses_mods_that_are_current_or_not_installed() {
         let world = world().await;
         assert_eq!(
