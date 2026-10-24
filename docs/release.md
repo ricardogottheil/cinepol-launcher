@@ -93,6 +93,8 @@ tag, fix the problem and tag again.
 - Hardened Runtime is enabled in `tauri.conf.json` (`bundle.macOS.hardenedRuntime`).
 - Releases are signed with a Developer ID Application certificate (G2 Sub-CA)
   and notarized with an app-specific password, from the `APPLE_*` secrets.
+  The bundler notarizes only the `.app`, so the workflow notarizes and staples
+  the DMG in a separate step and fails if Gatekeeper does not accept it.
   The current certificate expires on 2027-11-23 (check with
   `security find-certificate -c "Developer ID Application" -p | openssl x509 -noout -dates`);
   renew it before then and replace `APPLE_CERTIFICATE` and

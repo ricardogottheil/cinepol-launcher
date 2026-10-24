@@ -199,6 +199,24 @@ jobs:
           --bundles ${{ matrix.bundles }}
           --config src-tauri/tauri.release.conf.json
 
+      # The bundler notarizes only the .app; the DMG around it is signed but
+      # not notarized, so Gatekeeper rejects the download itself.
+      - name: Notarize and staple the DMG (only when configured)
+        if: runner.os == 'macOS' && env.APPLE_ID != ''
+        shell: bash
+        run: |
+          shopt -s nullglob
+          dmgs=("target/${{ matrix.target }}/release/bundle/dmg/"*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ]; then
+            echo "::error::expected one DMG, found ${#dmgs[@]}"
+            exit 1
+          fi
+          xcrun notarytool submit "${dmgs[0]}" \
+            --apple-id "${APPLE_ID}" --password "${APPLE_PASSWORD}" --team-id "${APPLE_TEAM_ID}" \
+            --wait
+          xcrun stapler staple "${dmgs[0]}"
+          spctl -a -vvv -t open --context context:primary-signature "${dmgs[0]}"
+
       - name: Collect the release files
         shell: bash
         run: >-
