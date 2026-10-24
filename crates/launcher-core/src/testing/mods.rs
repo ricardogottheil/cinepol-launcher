@@ -28,6 +28,7 @@ pub struct FakeModSource {
     pub identify_fails: bool,
     /// Projects whose versions cannot be read (the catalog times out).
     pub versions_fail_for: Vec<String>,
+    pub searches: Mutex<Vec<ModQuery>>,
 }
 
 impl FakeModSource {
@@ -41,10 +42,16 @@ impl FakeModSource {
     pub fn asked(&self) -> Vec<String> {
         self.asked.lock().unwrap().clone()
     }
+
+    /// Every query `search` received.
+    pub fn searched(&self) -> Vec<ModQuery> {
+        self.searches.lock().unwrap().clone()
+    }
 }
 
 impl ModSource for FakeModSource {
-    async fn search(&self, _query: &ModQuery) -> Result<ModPage, ModpackSourceError> {
+    async fn search(&self, query: &ModQuery) -> Result<ModPage, ModpackSourceError> {
+        self.searches.lock().unwrap().push(query.clone());
         Ok(ModPage {
             items: Vec::new(),
             total: Some(0),
