@@ -304,8 +304,14 @@ function Management({ instance, busy }: { instance: InstanceDto; busy: boolean }
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);
-            // The instance page has nothing left to show.
-            remove.mutate(undefined, { onSuccess: () => void navigate({ to: "/instances" }) });
+            // The instance page has nothing left to show. The refetched list may
+            // unmount this panel first, and a per-call onSuccess would then be
+            // skipped; the promise still settles. A failure shows through
+            // remove.error.
+            remove.mutateAsync().then(
+              () => navigate({ to: "/instances" }),
+              () => {},
+            );
           }}
         >
           <p className="m-0">{t("instances.settings.deleteBody")}</p>

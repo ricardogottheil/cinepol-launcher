@@ -39,7 +39,8 @@ export function InstanceDetailPage() {
       ) : instances.isError ? (
         <p className="m-0 text-stale">{t(`errors.${toIpcError(instances.error).code}`)}</p>
       ) : instance ? (
-        <InstanceDetail instance={instance} />
+        // Another instance's page starts fresh: its own tab, no stale errors.
+        <InstanceDetail key={instance.id} instance={instance} />
       ) : (
         <p className="m-0 text-silk-dim">{t("instances.notFound")}</p>
       )}

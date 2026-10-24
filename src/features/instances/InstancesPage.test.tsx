@@ -153,6 +153,26 @@ describe("InstancesPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(esCommon.errors.internal);
   });
 
+  it("starts another instance's page fresh", async () => {
+    client.listInstances.mockResolvedValue([instance, { ...instance, id: "fo", name: "FO" }]);
+    client.listServers.mockResolvedValue({ servers: [] });
+    client.openInstanceFolder.mockRejectedValue(new IpcError("internal", "no file manager"));
+    const router = renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("tab", { name: labels.tabs.settings }));
+    fireEvent.click(screen.getByRole("button", { name: labels.openFolder }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    await act(() =>
+      router.navigate({ to: "/instances/$instanceId", params: { instanceId: "fo" } }),
+    );
+    expect(await screen.findByRole("heading", { level: 1, name: "FO" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: labels.tabs.servers })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("says when the instance of a page does not exist", async () => {
     renderAt("/instances/missing");
     expect(await screen.findByText(labels.notFound)).toBeInTheDocument();
