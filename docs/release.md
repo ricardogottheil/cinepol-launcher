@@ -91,6 +91,28 @@ tag, fix the problem and tag again.
 ## macOS notes
 
 - Hardened Runtime is enabled in `tauri.conf.json` (`bundle.macOS.hardenedRuntime`).
+- Releases are signed with a Developer ID Application certificate (G2 Sub-CA)
+  and notarized with an app-specific password, from the `APPLE_*` secrets.
+  The current certificate expires on 2027-11-23 (check with
+  `security find-certificate -c "Developer ID Application" -p | openssl x509 -noout -dates`);
+  renew it before then and replace `APPLE_CERTIFICATE` and
+  `APPLE_CERTIFICATE_PASSWORD`. Notarized releases keep opening after it
+  expires; only new builds need a valid certificate.
+- To check a signed build locally, sign it with the identity from
+  `security find-identity -v -p codesigning` (set `APPLE_SIGNING_IDENTITY`
+  before `pnpm tauri build`), then notarize and check it:
+
+  ```sh
+  xcrun notarytool store-credentials <profile> --apple-id <apple-id> --team-id <team-id>
+  xcrun notarytool submit "<file>.dmg" --keychain-profile <profile> --wait
+  xcrun stapler staple "<file>.dmg"
+  spctl -a -vvv -t open --context context:primary-signature "<file>.dmg"
+  ```
+
+  `spctl` must answer `accepted` with `source=Notarized Developer ID`.
+- Switching from ad-hoc to Developer ID signing changes the app's code
+  identity, so macOS may ask once for permission to read the accounts the
+  previous build saved in the keychain.
 - Unsigned or un-notarized downloads get the `com.apple.quarantine` attribute and
   Gatekeeper blocks them. Developers testing a local unsigned build can clear it
   with `xattr -dr com.apple.quarantine "/Applications/Cinepol Launcher.app"`.
