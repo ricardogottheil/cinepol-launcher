@@ -77,7 +77,9 @@ function InstanceDetail({ instance }: { instance: InstanceDto }) {
             />
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => openFolder.mutate()}>{t("instances.openFolder")}</Button>
+            <Button onClick={() => openFolder.mutate()} disabled={openFolder.isPending}>
+              {t("instances.openFolder")}
+            </Button>
             {idle ? (
               <>
                 {packSource ? (

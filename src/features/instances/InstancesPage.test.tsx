@@ -5,6 +5,7 @@ import { App } from "../../app/App";
 import { createAppRouter } from "../../app/router";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError, type LogLineDto, type ProgressEvent } from "../../ipc/client";
+import { createTestQueryClient } from "../../test/render";
 import { CINEPOL_SESSION, useActivityStore } from "./activityStore";
 
 const client = vi.hoisted(() => ({
@@ -79,7 +80,7 @@ function deferred<T>() {
 
 function renderAt(path: string) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
-  render(<App router={router} />);
+  render(<App router={router} queryClient={createTestQueryClient()} />);
   return router;
 }
 
@@ -151,6 +152,19 @@ describe("InstancesPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: labels.openFolder }));
     expect(await screen.findByRole("alert")).toHaveTextContent(esCommon.errors.internal);
+  });
+
+  it("opens the folder once while the file manager is starting", async () => {
+    const opened = deferred<undefined>();
+    client.openInstanceFolder.mockReturnValue(opened.promise);
+    renderAt("/instances/survival");
+    const button = await screen.findByRole("button", { name: labels.openFolder });
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    fireEvent.click(button);
+    expect(client.openInstanceFolder).toHaveBeenCalledOnce();
+    await act(async () => opened.resolve(undefined));
+    await waitFor(() => expect(button).toBeEnabled());
   });
 
   it("starts another instance's page fresh", async () => {
@@ -295,10 +309,7 @@ describe("InstancesPage", () => {
     await screen.findByRole("option", { name: "1.21.11" });
     fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "quilt" } });
     fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "Q" } });
-    // The app's query client retries a failed lookup twice before it gives up.
-    expect(
-      await screen.findByText(esCommon.errors.loader_unavailable, {}, { timeout: 5000 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(esCommon.errors.loader_unavailable)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.create })).toBeDisabled();
   });
 
