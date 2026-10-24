@@ -26,6 +26,10 @@ const SEARCH: &[u8] = fixture!("search.json");
 const IRIS_VERSIONS: &[u8] = fixture!("iris-versions.json");
 const SODIUM_VERSION: &[u8] = fixture!("version.json");
 const PROJECTS: &[u8] = fixture!("projects.json");
+/// `POST /version_files` for the Iris 1.8.8 and Sodium jars and an unknown digest.
+const VERSION_FILES: &[u8] = fixture!("version-files.json");
+const IRIS_JAR: &str = "2e6ba2ffa1e1a6799288245a7e0ac68ee8df1d41b98362189df58f535cae34fa9277801e4136633467341b7dae5be0e5c698011b480b3d91b66d3dd4f7567aa6";
+const SODIUM_JAR: &str = "6d4958fd3c23c0e5fdcbfcdaa3e73511bf89a0988370ab94c93e740ec2452649165b3a331351e12d392ccf924affdc042b3fc01b2e6289b7d9c7c4591c7dbeeb";
 
 const IRIS: &str = "YL57xq9U";
 const SODIUM: &str = "AANobbMI";
@@ -242,4 +246,45 @@ async fn projects_are_read_in_batches_of_a_hundred() {
     let projects = modrinth.projects(&ids).await.unwrap();
     assert_eq!(modrinth.http.requests(), [first, second]);
     assert_eq!(projects.len(), 2);
+}
+
+#[tokio::test]
+async fn identify_posts_valid_digests_once_and_maps_them_to_versions() {
+    let unknown = "f".repeat(128);
+    let modrinth = source(vec![(url("/version_files"), VERSION_FILES.to_vec())]);
+    let identified = modrinth
+        .identify(&[
+            IRIS_JAR.to_uppercase(),
+            SODIUM_JAR.to_owned(),
+            IRIS_JAR.to_owned(),
+            unknown.clone(),
+            "not a digest".to_owned(),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(identified.len(), 2);
+    let iris = &identified[IRIS_JAR];
+    assert_eq!(iris.project, IRIS);
+    assert_eq!(iris.id, "zsoi0dso");
+    assert_eq!(iris.version_number, "1.8.8+1.21.1-fabric");
+    assert_eq!(identified[SODIUM_JAR].project, SODIUM);
+
+    let posts = modrinth.http.posts();
+    assert_eq!(posts.len(), 1);
+    let body: Value = serde_json::from_slice(&posts[0].1).unwrap();
+    assert_eq!(
+        body,
+        serde_json::json!({ "hashes": [IRIS_JAR, SODIUM_JAR, unknown], "algorithm": "sha512" })
+    );
+}
+
+#[tokio::test]
+async fn identify_ignores_digests_it_did_not_ask_for() {
+    let modrinth = source(vec![(url("/version_files"), VERSION_FILES.to_vec())]);
+    let identified = modrinth.identify(&[SODIUM_JAR.to_owned()]).await.unwrap();
+    assert_eq!(identified.keys().collect::<Vec<_>>(), [SODIUM_JAR]);
+    // Nothing to look up asks nothing.
+    let quiet = source(Vec::new());
+    assert!(quiet.identify(&[]).await.unwrap().is_empty());
+    assert!(quiet.http.posts().is_empty());
 }

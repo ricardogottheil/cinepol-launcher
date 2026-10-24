@@ -148,28 +148,10 @@ impl<H: HttpClient> ModpackSource for ModrinthSource<H> {
         &self,
         sha512: &[String],
     ) -> Result<HashMap<String, Vec<String>>, ModpackSourceError> {
-        // Valid digests only, lowercased, each once, in the order asked.
-        let mut seen = HashSet::new();
-        let hashes: Vec<String> = sha512
-            .iter()
-            .filter_map(|hash| Checksum::parse(HashAlgorithm::Sha512, hash).ok())
-            .map(|checksum| checksum.value().to_owned())
-            .filter(|hash| seen.insert(hash.clone()))
-            .collect();
-        let url = format!("{}/version_files", self.base_url);
         let mut known = HashMap::new();
-        for batch in hashes.chunks(KNOWN_FILES_BATCH) {
-            let body = serde_json::to_vec(&wire::VersionFilesRequest {
-                hashes: batch,
-                algorithm: "sha512",
-            })
-            .map_err(|error| ModpackSourceError::InvalidResponse(error.to_string()))?;
-            let answer = self
-                .http
-                .post_json(&url, body)
-                .await
-                .map_err(|error| source_error(error, "version_files"))?;
-            let mut answer: wire::VersionFilesResponse = parse(&answer)?;
+        for batch in unique_sha512(sha512).chunks(KNOWN_FILES_BATCH) {
+            let mut answer: HashMap<String, wire::VersionFilesEntry> =
+                self.version_files(batch).await?;
             for hash in batch {
                 let Some(version) = answer.remove(hash) else {
                     continue;
@@ -192,6 +174,39 @@ impl<H: HttpClient> ModpackSource for ModrinthSource<H> {
         }
         Ok(known)
     }
+}
+
+impl<H: HttpClient> ModrinthSource<H> {
+    /// `POST /version_files` for one batch of sha512 digests: each known
+    /// digest to the version holding it.
+    async fn version_files<T: serde::de::DeserializeOwned>(
+        &self,
+        sha512: &[String],
+    ) -> Result<HashMap<String, T>, ModpackSourceError> {
+        let url = format!("{}/version_files", self.base_url);
+        let body = serde_json::to_vec(&wire::VersionFilesRequest {
+            hashes: sha512,
+            algorithm: "sha512",
+        })
+        .map_err(|error| ModpackSourceError::InvalidResponse(error.to_string()))?;
+        let answer = self
+            .http
+            .post_json(&url, body)
+            .await
+            .map_err(|error| source_error(error, "version_files"))?;
+        parse(&answer)
+    }
+}
+
+/// Valid sha512 digests only, lowercased, each once, in the order given.
+fn unique_sha512(sha512: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    sha512
+        .iter()
+        .filter_map(|hash| Checksum::parse(HashAlgorithm::Sha512, hash).ok())
+        .map(|checksum| checksum.value().to_owned())
+        .filter(|hash| seen.insert(hash.clone()))
+        .collect()
 }
 
 fn modpack_version(version: wire::Version) -> ModpackVersion {

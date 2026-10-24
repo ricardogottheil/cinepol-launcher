@@ -1,7 +1,7 @@
 //! Modrinth API v2 answers, as far as the launcher reads them. Unknown
 //! fields are ignored; optional data may be missing or `null`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -94,9 +94,6 @@ pub(super) struct VersionFile {
     #[serde(default)]
     pub hashes: BTreeMap<String, String>,
 }
-
-/// `POST /version_files` answer: each known hash to the version holding it.
-pub(super) type VersionFilesResponse = HashMap<String, VersionFilesEntry>;
 
 /// The part of a version `POST /version_files` needs; the rest is ignored.
 #[derive(Debug, Deserialize)]

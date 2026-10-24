@@ -7,6 +7,10 @@
 //! file under the same name is never overwritten. When moving a jar or
 //! saving the registry fails, the jars this install moved are removed again,
 //! so a failed or cancelled install leaves `mods/` as it was.
+//!
+//! Jars the launcher did not install but the catalog recognises count as
+//! installed, and are recorded with the install. A disabled dependency the
+//! new mod needs is enabled again once the install is recorded.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -14,6 +18,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
+use crate::application::mod_inventory::{read_mod_inventory, set_jar_enabled};
 use crate::application::modpack_files::{release_dir, scratch_dir};
 use crate::application::plan_mod_install::plan_mod_install;
 use crate::domain::instance::{InstanceId, InstanceRepository, InstanceRepositoryError};
@@ -96,10 +101,12 @@ where
         game_version: instance.game_version.clone(),
         loader: instance.loader.kind(),
     };
-    let mut registry = deps.registry.load(id).await?;
+    let mods_dir = deps.paths.game_dir(id).join(MODS_DIR);
+    let saved = deps.registry.load(id).await?;
+    let inventory = read_mod_inventory(deps.source, deps.files, &mods_dir, &saved).await?;
+    let mut registry = inventory.registry;
     let plan = plan_mod_install(deps.source, &target, &registry, project).await?;
     let jars = jars(&plan.mods)?;
-    let mods_dir = deps.paths.game_dir(id).join(MODS_DIR);
     let adopted = adoptable(deps.files, &mods_dir, &jars).await?;
     if cancel.is_cancelled() {
         return Err(InstallModError::Cancelled);
@@ -126,6 +133,16 @@ where
         // Jars the registry does not know about would load unseen.
         remove_all(deps.files, &placed).await;
         return Err(error.into());
+    }
+    for entry in &inventory.entries {
+        let needed = entry.record.as_ref().is_some_and(|record| {
+            plan.present
+                .iter()
+                .any(|(dependency, _)| *dependency == record.project)
+        });
+        if needed && !entry.enabled {
+            set_jar_enabled(deps.files, &mods_dir, &entry.filename, true).await?;
+        }
     }
     Ok(written)
 }
@@ -482,6 +499,45 @@ mod tests {
         let downloader = downloader();
         assert!(install(&world, &downloader).await.is_err());
         assert_eq!(jars_in(&world), ["sodium-2.jar"]);
+    }
+
+    #[tokio::test]
+    async fn a_recognised_loose_jar_counts_as_installed_and_is_recorded() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        // Sodium, put there by hand under another name.
+        std::fs::write(
+            mods_dir(&world).join("Sodium (copy).jar"),
+            mod_jar("sodium-2"),
+        )
+        .unwrap();
+        let downloader = downloader();
+        install(&world, &downloader).await.unwrap();
+        assert_eq!(downloader.requests().len(), 1);
+        assert_eq!(jars_in(&world), ["Sodium (copy).jar", "iris-2.jar"]);
+        let registry = world.registry.load(&id()).await.unwrap();
+        let sodium = registry.get("sodium").unwrap();
+        assert_eq!(sodium.filename, "Sodium (copy).jar");
+        assert!(sodium.requested);
+        assert_eq!(sodium.required_by, BTreeSet::from(["iris".to_owned()]));
+    }
+
+    #[tokio::test]
+    async fn a_disabled_dependency_is_enabled_again() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(
+            mods_dir(&world).join("sodium-2.jar.disabled"),
+            mod_jar("sodium-2"),
+        )
+        .unwrap();
+        let downloader = downloader();
+        install(&world, &downloader).await.unwrap();
+        assert_eq!(jars_in(&world), ["iris-2.jar", "sodium-2.jar"]);
+        assert_eq!(
+            std::fs::read(mods_dir(&world).join("sodium-2.jar")).unwrap(),
+            mod_jar("sodium-2")
+        );
     }
 
     #[tokio::test]

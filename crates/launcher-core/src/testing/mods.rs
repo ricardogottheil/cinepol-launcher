@@ -17,13 +17,15 @@ use super::sha512_hex;
 /// A mod catalog in memory. `versions` answers like the real catalog: only
 /// the versions that fit the target, in the order they were added (add them
 /// newest first). Records every project whose versions were asked for;
-/// `projects_fail` makes the title lookup fail.
+/// `projects_fail` makes the title lookup fail, `identify_fails` the hash
+/// lookup. `identify` knows the jar of every version added.
 #[derive(Debug, Default)]
 pub struct FakeModSource {
     pub titles: HashMap<String, String>,
     pub versions: Vec<ModVersion>,
     pub asked: Mutex<Vec<String>>,
     pub projects_fail: bool,
+    pub identify_fails: bool,
 }
 
 impl FakeModSource {
@@ -67,6 +69,23 @@ impl ModSource for FakeModSource {
             .find(|version| version.id == id)
             .cloned()
             .ok_or_else(|| ModpackSourceError::NotFound(id.into()))
+    }
+
+    async fn identify(
+        &self,
+        sha512: &[String],
+    ) -> Result<HashMap<String, ModVersion>, ModpackSourceError> {
+        if self.identify_fails {
+            return Err(ModpackSourceError::Network("offline".into()));
+        }
+        Ok(self
+            .versions
+            .iter()
+            .filter_map(|version| {
+                let hash = version.file.as_ref()?.sha512.value().to_owned();
+                sha512.contains(&hash).then(|| (hash, version.clone()))
+            })
+            .collect())
     }
 
     async fn projects(&self, ids: &[String]) -> Result<Vec<ModSummary>, ModpackSourceError> {

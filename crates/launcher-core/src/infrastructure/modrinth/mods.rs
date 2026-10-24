@@ -1,7 +1,9 @@
 //! Individual mods from Modrinth: search for a target, its fitting versions
 //! with their dependencies, single versions, and project batches.
 
-use super::{checked_id, encode, publication_key, wire};
+use std::collections::HashMap;
+
+use super::{KNOWN_FILES_BATCH, checked_id, encode, publication_key, unique_sha512, wire};
 use crate::domain::instance::GameVersion;
 use crate::domain::integrity::{Checksum, HashAlgorithm};
 use crate::domain::launch::RelativePath;
@@ -130,6 +132,23 @@ impl<H: HttpClient> ModSource for ModrinthSource<H> {
             );
         }
         Ok(projects)
+    }
+
+    async fn identify(
+        &self,
+        sha512: &[String],
+    ) -> Result<HashMap<String, ModVersion>, ModpackSourceError> {
+        let mut identified = HashMap::new();
+        for batch in unique_sha512(sha512).chunks(KNOWN_FILES_BATCH) {
+            let answer: HashMap<String, wire::Version> = self.version_files(batch).await?;
+            for (hash, version) in answer {
+                // Only digests that were asked for, of versions with a valid project.
+                if batch.contains(&hash) && checked_id(&version.project_id).is_ok() {
+                    identified.insert(hash, mod_version(version));
+                }
+            }
+        }
+        Ok(identified)
     }
 }
 

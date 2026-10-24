@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::future::Future;
 
 use super::{ModPage, ModQuery, ModRegistry, ModSummary, ModTarget, ModVersion};
@@ -27,6 +28,12 @@ pub trait ModSource: Send + Sync {
         &self,
         ids: &[String],
     ) -> impl Future<Output = Result<Vec<ModSummary>, ModpackSourceError>> + Send;
+    /// The versions whose jar has one of these sha512 digests, by digest;
+    /// digests the catalog does not know are left out.
+    fn identify(
+        &self,
+        sha512: &[String],
+    ) -> impl Future<Output = Result<HashMap<String, ModVersion>, ModpackSourceError>> + Send;
 }
 
 /// The per-instance record of the mods the launcher installed.
