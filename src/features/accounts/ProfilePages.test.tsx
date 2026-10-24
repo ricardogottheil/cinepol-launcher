@@ -26,12 +26,22 @@ vi.mock("./SkinViewer", () => ({
   SkinViewer: ({
     texture,
     slim,
+    cape,
     label,
   }: {
     texture: string | null;
     slim: boolean;
+    cape: string | null;
     label: string;
-  }) => <div role="img" aria-label={label} data-texture={texture ?? ""} data-slim={String(slim)} />,
+  }) => (
+    <div
+      role="img"
+      aria-label={label}
+      data-texture={texture ?? ""}
+      data-slim={String(slim)}
+      data-cape={cape ?? ""}
+    />
+  ),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -178,11 +188,15 @@ describe("profile page", () => {
     expect(screen.getByText(labels.skinOffline)).toBeInTheDocument();
   });
 
-  it("removes the active profile after a confirmation", async () => {
+  it("deletes the active profile after a confirmation", async () => {
     renderAt("/profile");
     fireEvent.click(await screen.findByRole("button", { name: labels.remove }));
     expect(client.removeAccount).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: labels.confirmRemove }));
+    const dialog = screen.getByRole("alertdialog", {
+      name: labels.removeTitle.replace("{{name}}", "Steve"),
+    });
+    expect(within(dialog).getByText(labels.removeBody)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: labels.confirmRemove }));
     await waitFor(() => expect(client.removeAccount).toHaveBeenCalledWith("1"));
   });
 });
@@ -380,6 +394,58 @@ describe("skin and capes", () => {
     await waitFor(() => expect(client.getAccountSkin).toHaveBeenCalledTimes(2));
   });
 
+  it("chooses the model before the PNG and uploads the skin with it", async () => {
+    renderAt("/profile");
+    const slim = await screen.findByRole("radio", { name: labels.slim });
+    expect(screen.getByRole("radio", { name: labels.classic })).toBeChecked();
+
+    fireEvent.click(slim);
+    const png = await choosePng(64, 64);
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+    await waitFor(() => expect(viewer).toHaveAttribute("data-slim", "true"));
+    fireEvent.click(await screen.findByRole("button", { name: labels.applySkin }));
+
+    await waitFor(() =>
+      expect(client.changeAccountSkin).toHaveBeenCalledWith("9", base64Of(png.bytes), "slim"),
+    );
+  });
+
+  it("starts from the model of the current skin", async () => {
+    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,OLD", slim: true });
+    renderAt("/profile");
+    await waitFor(() => expect(screen.getByRole("radio", { name: labels.slim })).toBeChecked());
+  });
+
+  it("wears the active cape on the figure", async () => {
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+    ]);
+    renderAt("/profile");
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    await waitFor(() => expect(viewer).toHaveAttribute("data-cape", "data:image/png;base64,C1"));
+  });
+
+  it("explains a refused cape, keeps the choice and never sends it again by itself", async () => {
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+      { id: "c2", alias: "Pan", active: false, dataUrl: "data:image/png;base64,C2" },
+    ]);
+    client.setAccountCape.mockRejectedValue(new IpcError("cape_not_owned", "400"));
+    renderAt("/profile");
+    const capes = await screen.findByRole("group", { name: labels.capesTitle });
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+
+    fireEvent.click(within(capes).getByRole("button", { name: /Pan/ }));
+    fireEvent.click(await screen.findByRole("button", { name: labels.applyCape }));
+
+    expect(await screen.findByText(esCommon.errors.cape_not_owned)).toBeInTheDocument();
+    expect(viewer).toHaveAttribute("data-cape", "data:image/png;base64,C2");
+    expect(within(capes).getByRole("button", { name: /Migrator/ })).toHaveTextContent(
+      labels.capeWorn,
+    );
+    expect(client.setAccountCape).toHaveBeenCalledOnce();
+  });
+
   it("refuses an image that is not a skin without uploading it", async () => {
     renderAt("/profile");
     await choosePng(128, 128);
@@ -408,25 +474,67 @@ describe("skin and capes", () => {
     expect(client.changeAccountSkin).toHaveBeenCalledOnce();
   });
 
-  it("lists the owned capes and wears one or none", async () => {
+  it("previews a cape on the figure without wearing it, then wears it with Apply", async () => {
     client.listAccountCapes.mockResolvedValue([
-      { id: "c1", alias: "Migrator", active: true, dataUrl: null },
-      { id: "c2", alias: "Pan", active: false, dataUrl: null },
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+      { id: "c2", alias: "Pan", active: false, dataUrl: "data:image/png;base64,C2" },
     ]);
     renderAt("/profile");
     const capes = await screen.findByRole("group", { name: labels.capesTitle });
-    expect(within(capes).getByRole("button", { name: "Migrator" })).toHaveAttribute(
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+    expect(within(capes).getByRole("button", { name: /Migrator/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    fireEvent.click(within(capes).getByRole("button", { name: "Pan" }));
-    await waitFor(() => expect(client.setAccountCape).toHaveBeenCalledWith("9", "c2"));
-    await waitFor(() =>
-      expect(within(capes).getByRole("button", { name: labels.noCape })).toBeEnabled(),
+    expect(within(capes).getByRole("button", { name: /Migrator/ })).toHaveTextContent(
+      labels.capeWorn,
     );
+    expect(screen.queryByRole("button", { name: labels.applyCape })).not.toBeInTheDocument();
+
+    fireEvent.click(within(capes).getByRole("button", { name: /Pan/ }));
+    await waitFor(() => expect(viewer).toHaveAttribute("data-cape", "data:image/png;base64,C2"));
+    expect(within(capes).getByRole("button", { name: /Pan/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(client.setAccountCape).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: labels.applyCape }));
+    await waitFor(() => expect(client.setAccountCape).toHaveBeenCalledWith("9", "c2"));
+    expect(client.setAccountCape).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: labels.applyCape })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("wears no cape when that is the choice applied", async () => {
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+    ]);
+    renderAt("/profile");
+    const capes = await screen.findByRole("group", { name: labels.capesTitle });
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+
     fireEvent.click(within(capes).getByRole("button", { name: labels.noCape }));
+    await waitFor(() => expect(viewer).toHaveAttribute("data-cape", ""));
+    fireEvent.click(screen.getByRole("button", { name: labels.applyCape }));
     await waitFor(() => expect(client.setAccountCape).toHaveBeenCalledWith("9", null));
-    expect(client.listAccountCapes).toHaveBeenCalledWith("9");
+  });
+
+  it("discards a cape preview without sending anything", async () => {
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+      { id: "c2", alias: "Pan", active: false, dataUrl: "data:image/png;base64,C2" },
+    ]);
+    renderAt("/profile");
+    const capes = await screen.findByRole("group", { name: labels.capesTitle });
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+
+    fireEvent.click(within(capes).getByRole("button", { name: /Pan/ }));
+    fireEvent.click(await screen.findByRole("button", { name: labels.discardCape }));
+    await waitFor(() => expect(viewer).toHaveAttribute("data-cape", "data:image/png;base64,C1"));
+    expect(screen.queryByRole("button", { name: labels.applyCape })).not.toBeInTheDocument();
+    expect(client.setAccountCape).not.toHaveBeenCalled();
   });
 
   it("says when the account has no capes", async () => {

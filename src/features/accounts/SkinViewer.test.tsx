@@ -1,10 +1,12 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import es from "../../i18n/locales/es/common.json";
 import { SkinViewer } from "./SkinViewer";
 
 interface ViewerOptions {
   skin?: string;
   model?: string;
+  cape?: string;
   enableControls?: boolean;
   fov?: number;
 }
@@ -15,7 +17,9 @@ const fakes = vi.hoisted(() => {
   const control = { failSetup: false };
 
   class FakeFunctionAnimation {
-    constructor(readonly fn: unknown) {}
+    constructor(
+      readonly fn: (player: FakeViewer["playerObject"], progress: number, delta: number) => void,
+    ) {}
   }
 
   class FakeViewer {
@@ -29,9 +33,23 @@ const fakes = vi.hoisted(() => {
     readonly globalLight = { intensity: 3 };
     readonly cameraLight = { intensity: 0.6 };
     readonly playerObject = {
-      position: { x: 0 },
-      skin: { leftArm: { rotation: { z: 0 } } },
+      skin: { leftArm: { rotation: { z: 0 } }, rightArm: { rotation: { z: 0 } } },
+      cape: { rotation: { x: 0 } },
     };
+    readonly playerWrapper = { rotation: { y: 0 } };
+    readonly controls = {
+      enableZoom: true,
+      enablePan: false,
+      minPolarAngle: 0,
+      maxPolarAngle: Math.PI,
+      listeners: new Map<string, () => void>(),
+      addEventListener(type: string, listener: () => void) {
+        this.listeners.set(type, listener);
+      },
+    };
+    autoRotate = false;
+    autoRotateSpeed = 1;
+    readonly loadCape = vi.fn();
     readonly renderer = { forceContextLoss: vi.fn() };
     animation: unknown = null;
     renderPaused = false;
@@ -63,6 +81,8 @@ vi.mock("three", () => ({
 
 const TEXTURE = "data:image/png;base64,AAAA";
 const OTHER_TEXTURE = "blob:skin-2";
+const CAPE = "data:image/png;base64,CAPE";
+const OTHER_CAPE = "data:image/png;base64,CAPE2";
 
 function mockReducedMotion(reduced: boolean) {
   vi.stubGlobal(
@@ -101,16 +121,42 @@ describe("SkinViewer", () => {
     expect(screen.getByRole("img").contains(lastViewer().canvas)).toBe(true);
   });
 
-  it("creates the viewer with the texture and the default model, without controls", async () => {
+  it("creates the viewer with the texture and the default model, turnable but not zoomable", async () => {
     render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
 
     await waitFor(() => expect(fakes.viewers).toHaveLength(1));
-    expect(lastViewer().options).toMatchObject({
+    const viewer = lastViewer();
+    expect(viewer.options).toMatchObject({
       skin: TEXTURE,
       model: "default",
-      enableControls: false,
+      enableControls: true,
       fov: 28,
     });
+    expect(viewer.options.cape).toBeUndefined();
+    expect(viewer.controls.enableZoom).toBe(false);
+    expect(viewer.controls.enablePan).toBe(false);
+  });
+
+  it("starts at three quarters so the cape shows from the side", async () => {
+    render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
+
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    expect(Math.abs(lastViewer().playerWrapper.rotation.y)).toBeGreaterThan(0.3);
+  });
+
+  it("wears the cape, and swaps it without rebuilding the viewer", async () => {
+    const { rerender } = render(
+      <SkinViewer texture={TEXTURE} slim={false} cape={CAPE} label="Skin" />,
+    );
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    const viewer = lastViewer();
+    expect(viewer.options.cape).toBe(CAPE);
+
+    rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
+    await waitFor(() => expect(viewer.loadCape).toHaveBeenLastCalledWith(OTHER_CAPE));
+    rerender(<SkinViewer texture={TEXTURE} slim={false} cape={null} label="Skin" />);
+    await waitFor(() => expect(viewer.loadCape).toHaveBeenLastCalledWith(null));
+    expect(fakes.viewers).toHaveLength(1);
   });
 
   it("uses the slim model when the skin is slim", async () => {
@@ -120,21 +166,60 @@ describe("SkinViewer", () => {
     expect(lastViewer().options.model).toBe("slim");
   });
 
-  it("waves when motion is allowed", async () => {
+  it("breathes and turns slowly by itself when motion is allowed, until the player drags it", async () => {
     render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
 
     await waitFor(() => expect(fakes.viewers).toHaveLength(1));
-    expect(lastViewer().animation).toBeInstanceOf(fakes.FakeFunctionAnimation);
+    const viewer = lastViewer();
+    expect(viewer.animation).toBeInstanceOf(fakes.FakeFunctionAnimation);
+    expect(viewer.autoRotate).toBe(true);
+
+    viewer.controls.listeners.get("start")?.();
+    expect(viewer.autoRotate).toBe(false);
   });
 
-  it("holds a static raised-arm pose under reduced motion", async () => {
+  it("stands still, arms down and cape out, under reduced motion", async () => {
     mockReducedMotion(true);
     render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
 
     await waitFor(() => expect(fakes.viewers).toHaveLength(1));
     const viewer = lastViewer();
     expect(viewer.animation).toBeNull();
-    expect(viewer.playerObject.skin.leftArm.rotation.z).toBeGreaterThan(Math.PI / 2);
+    expect(viewer.autoRotate).toBe(false);
+    expect(Math.abs(viewer.playerObject.skin.leftArm.rotation.z)).toBeLessThan(0.2);
+    expect(viewer.playerObject.cape.rotation.x).toBeGreaterThan(0);
+  });
+
+  it("turns with the buttons, a step each way, and stops turning by itself", async () => {
+    mockReducedMotion(true);
+    render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    const viewer = lastViewer();
+    const start = viewer.playerWrapper.rotation.y;
+
+    fireEvent.click(screen.getByRole("button", { name: es.accounts.turnRight }));
+    const right = viewer.playerWrapper.rotation.y;
+    expect(right).not.toBeCloseTo(start);
+    fireEvent.click(screen.getByRole("button", { name: es.accounts.turnLeft }));
+    expect(viewer.playerWrapper.rotation.y).toBeCloseTo(start);
+    expect(viewer.autoRotate).toBe(false);
+  });
+
+  it("eases a button turn over the next frames when motion is allowed", async () => {
+    render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    const viewer = lastViewer();
+    const start = viewer.playerWrapper.rotation.y;
+
+    fireEvent.click(screen.getByRole("button", { name: es.accounts.turnRight }));
+    expect(viewer.autoRotate).toBe(false);
+    const animation = viewer.animation as InstanceType<typeof fakes.FakeFunctionAnimation>;
+    animation.fn(viewer.playerObject, 0, 0.016);
+    const partway = viewer.playerWrapper.rotation.y;
+    expect(partway).not.toBeCloseTo(start);
+    for (let frame = 0; frame < 120; frame += 1) animation.fn(viewer.playerObject, 0, 0.016);
+    const settled = viewer.playerWrapper.rotation.y;
+    expect(Math.abs(settled - start)).toBeGreaterThan(Math.abs(partway - start));
   });
 
   it("disposes the viewer and releases its WebGL context on unmount", async () => {

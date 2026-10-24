@@ -200,10 +200,19 @@ App shell (`src/app/shell/`):
   "View profile" and "Add profile". Heads come from the skin's face and hat
   layer (`PlayerHead`); profiles without a skin show their initial, never one
   of the game's default players.
-- **Profile page**: the head and name, the 3D skin (a picked PNG previews on
-  it before it is applied), the label -> value sheet, then for premium
-  profiles "Change skin" (PNG, model, apply once) and the capes as toggle
-  buttons (a click wears one; no request while moving through them).
+- **Profile page**: the head and name, the 3D skin with the worn cape, the
+  label -> value sheet, then for premium profiles "Change skin" and "Cape".
+  The figure rests (arms down, cape out, a slow breath) at a front
+  three-quarter view and turns slowly by itself until the player drags it;
+  two turn buttons under it do the same from the keyboard. Under reduced
+  motion it stands still and the buttons turn it at once. No zoom or pan.
+  "Change skin" picks the model first (Classic / Slim as two plates, each
+  with a small figure whose arms are 4 or 3 pixels wide, as on
+  minecraft.net), then the PNG; both preview on the figure before one
+  "Apply". The capes are toggle buttons that only preview on the figure; the
+  worn one is marked "Worn", and "Apply cape" wears the chosen one with one
+  request. "Delete profile" reads in `hazard` and asks in the destructive
+  `ConfirmDialog`, like deleting an instance.
 - **Modpacks**: tabs Explore / Installed / Import (`nav-label`, the current
   tab underlined in `silk`). Explore puts the filters on top and the packs as
   cards (icon, title as a stretched link, two-line description, loader

@@ -13,9 +13,75 @@ export interface SkinDraft {
 }
 
 /**
- * Picks a PNG, previews it on the 3D figure (the page owns the draft) and
- * applies it with one request. Nothing retries: Mojang may suspend accounts
- * that keep hitting its limit.
+ * A front view of the player with the arms drawn in full: 4 pixels wide for
+ * Classic, 3 for Slim, the one difference between the two models.
+ */
+function ModelFigure({ slim }: { slim: boolean }) {
+  const arm = slim ? 3 : 4;
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 32" className="h-12 w-6" shapeRendering="crispEdges">
+      <g className="text-hairline-lit" fill="currentColor">
+        <rect x="4" y="0" width="8" height="8" />
+        <rect x="4" y="8" width="8" height="12" />
+        <rect x="4" y="20" width="4" height="12" />
+        <rect x="8" y="20" width="4" height="12" />
+      </g>
+      <g fill="currentColor">
+        <rect x={4 - arm} y="8" width={arm} height="12" />
+        <rect x="12" y="8" width={arm} height="12" />
+      </g>
+    </svg>
+  );
+}
+
+/** Classic or Slim as two plates, chosen before the PNG as on minecraft.net. */
+function ModelChoice({
+  slim,
+  disabled,
+  onChange,
+}: {
+  slim: boolean;
+  disabled: boolean;
+  onChange: (slim: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const name = useId();
+  return (
+    <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
+      <legend className="plate mb-3 p-0 text-engrave">{t("accounts.modelLabel")}</legend>
+      <div className="flex flex-wrap gap-3">
+        {(["classic", "slim"] as const).map((model) => (
+          <label
+            key={model}
+            className={cx(
+              "flex min-w-[132px] cursor-pointer items-center gap-4 rounded-control border border-hairline-lit px-4 py-3 text-silk-dim",
+              "transition-colors duration-[160ms] ease-settle hover:border-engrave hover:text-silk",
+              "has-checked:border-silk-dim has-checked:bg-panel has-checked:text-silk",
+              "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-silk",
+              "has-disabled:cursor-wait",
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              className="sr-only"
+              checked={slim === (model === "slim")}
+              disabled={disabled}
+              onChange={() => onChange(model === "slim")}
+            />
+            <ModelFigure slim={model === "slim"} />
+            <span>{t(`accounts.${model}`)}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/**
+ * Chooses the model, then a PNG, previews both on the 3D figure (the page owns
+ * the draft) and applies them with one request. Nothing retries: Mojang may
+ * suspend accounts that keep hitting its limit.
  */
 export function SkinChanger({
   accountId,
@@ -31,7 +97,15 @@ export function SkinChanger({
   const { t } = useTranslation();
   const change = useChangeSkin(accountId);
   const [invalid, setInvalid] = useState(false);
+  // Null until the player picks a model; until then it follows the current skin.
+  const [chosenSlim, setChosenSlim] = useState<boolean | null>(null);
+  const slim = draft?.slim ?? chosenSlim ?? currentSlim;
   const heading = useId();
+
+  function chooseModel(next: boolean) {
+    setChosenSlim(next);
+    if (draft) onDraft({ ...draft, slim: next });
+  }
 
   async function pick(event: ChangeEvent<HTMLInputElement>) {
     const chosen = event.target.files?.[0];
@@ -40,7 +114,7 @@ export function SkinChanger({
     change.reset();
     const file = await readSkinFile(chosen);
     setInvalid(file === null);
-    onDraft(file ? { file, slim: draft?.slim ?? currentSlim } : null);
+    onDraft(file ? { file, slim } : null);
   }
 
   function apply() {
@@ -66,6 +140,7 @@ export function SkinChanger({
         {t("accounts.changeSkinTitle")}
       </h2>
       <p className="m-0 max-w-[480px] text-[0.875rem] text-silk-dim">{t("accounts.skinHint")}</p>
+      <ModelChoice slim={slim} disabled={change.isPending} onChange={chooseModel} />
       <div className="flex flex-wrap items-center gap-3">
         <label
           className={cx(
@@ -85,21 +160,6 @@ export function SkinChanger({
       </div>
       {draft ? (
         <div className="flex flex-col gap-4">
-          <fieldset className="m-0 flex flex-wrap gap-5 border-0 p-0">
-            <legend className="plate mb-2 p-0 text-engrave">{t("accounts.modelLabel")}</legend>
-            {(["classic", "slim"] as const).map((model) => (
-              <label key={model} className="flex cursor-pointer items-center gap-2 text-silk-dim">
-                <input
-                  type="radio"
-                  name={`${heading}-model`}
-                  className="accent-silk"
-                  checked={draft.slim === (model === "slim")}
-                  onChange={() => onDraft({ ...draft, slim: model === "slim" })}
-                />
-                {t(`accounts.${model}`)}
-              </label>
-            ))}
-          </fieldset>
           <p className="plate m-0 text-engrave">{t("accounts.previewNote")}</p>
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={apply} disabled={change.isPending}>
@@ -122,22 +182,47 @@ export function SkinChanger({
   );
 }
 
+/** A cape picked on the page but not worn yet; `id` null means no cape. */
+export interface CapeChoice {
+  id: string | null;
+}
+
 /**
- * The capes the account owns, plus "no cape", as toggle buttons: only a click
- * (or Enter) wears one, so moving through them never sends a request.
+ * The capes the account owns, plus "no cape", as toggle buttons. A click only
+ * previews one on the figure (the page owns the choice); Apply wears it with
+ * one request.
  */
-export function CapePicker({ accountId }: { accountId: string }) {
+export function CapePicker({
+  accountId,
+  choice,
+  onChoice,
+}: {
+  accountId: string;
+  choice: CapeChoice | null;
+  onChoice: (choice: CapeChoice | null) => void;
+}) {
   const { t } = useTranslation();
   const capes = useAccountCapes(accountId);
   const wear = useSetCape(accountId);
   const heading = useId();
 
   const list = capes.data ?? [];
-  const none = !list.some((cape) => cape.active);
+  const worn = list.find((cape) => cape.active)?.id ?? null;
+  const selected = choice ? choice.id : worn;
   const options = [
-    { id: null, alias: t("accounts.noCape"), active: none, dataUrl: null },
+    { id: null, alias: t("accounts.noCape"), dataUrl: null },
     ...list.map((cape) => ({ ...cape, id: cape.id as string | null })),
   ];
+
+  function select(id: string | null) {
+    wear.reset();
+    onChoice(id === worn ? null : { id });
+  }
+
+  function apply() {
+    if (!choice) return;
+    wear.mutate(choice.id, { onSuccess: () => onChoice(null) });
+  }
 
   return (
     <section className="flex flex-col gap-4 border-t border-hairline pt-6">
@@ -160,14 +245,12 @@ export function CapePicker({ accountId }: { accountId: string }) {
             <button
               key={cape.id ?? "none"}
               type="button"
-              aria-pressed={cape.active}
+              aria-pressed={cape.id === selected}
               disabled={wear.isPending}
-              onClick={() => {
-                if (!cape.active) wear.mutate(cape.id);
-              }}
+              onClick={() => select(cape.id)}
               className={cx(
-                "flex cursor-pointer flex-col items-center gap-3 rounded-control border px-3 py-4 text-[0.875rem] transition-colors duration-[160ms] ease-settle disabled:cursor-wait",
-                cape.active
+                "flex min-w-0 cursor-pointer flex-col items-center gap-3 rounded-control border px-3 py-4 text-[0.875rem] transition-colors duration-[160ms] ease-settle disabled:cursor-wait",
+                cape.id === selected
                   ? "border-silk-dim bg-panel text-silk"
                   : "border-hairline-lit text-silk-dim hover:border-engrave hover:text-silk",
               )}
@@ -180,11 +263,27 @@ export function CapePicker({ accountId }: { accountId: string }) {
                   className="block h-16 w-10 rounded-plate border border-dashed border-hairline-lit"
                 />
               )}
-              <span className="truncate">{cape.alias}</span>
+              <span className="max-w-full truncate">{cape.alias}</span>
+              {cape.id === worn ? (
+                <span className="plate -mt-1 text-engrave">{t("accounts.capeWorn")}</span>
+              ) : null}
             </button>
           ))}
         </fieldset>
       )}
+      {choice ? (
+        <div className="flex flex-col gap-4">
+          <p className="plate m-0 text-engrave">{t("accounts.previewNote")}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={apply} disabled={wear.isPending}>
+              {wear.isPending ? t("accounts.applyingCape") : t("accounts.applyCape")}
+            </Button>
+            <Button onClick={() => onChoice(null)} disabled={wear.isPending}>
+              {t("accounts.discardCape")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <p role="status" className="m-0 text-[0.875rem] text-stale">
         {wear.error ? t(`errors.${toIpcError(wear.error).code}`) : null}
       </p>

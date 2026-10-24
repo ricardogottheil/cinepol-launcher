@@ -84,6 +84,10 @@ export function useChangeSkin(accountId: string) {
   });
 }
 
+/**
+ * Wears a cape (or none). It settles only after the capes are read again, so
+ * "worn" never shows a cape Mojang has not confirmed.
+ */
 export function useSetCape(accountId: string) {
   const queryClient = useQueryClient();
   return useMutation({

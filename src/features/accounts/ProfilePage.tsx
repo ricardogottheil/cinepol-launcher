@@ -2,32 +2,46 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, plateLinkClass } from "../../components/ui/Button";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { PlayerHead } from "../../components/ui/PlayerHead";
 import { SpecSheet } from "../../components/ui/SpecSheet";
 import { type AccountDto, toIpcError } from "../../ipc/client";
 import { SkinViewer } from "./SkinViewer";
-import { CapePicker, SkinChanger, type SkinDraft } from "./SkinWardrobe";
-import { useAccountSkin, useAccounts, useRemoveAccount } from "./useAccounts";
+import { type CapeChoice, CapePicker, SkinChanger, type SkinDraft } from "./SkinWardrobe";
+import { useAccountCapes, useAccountSkin, useAccounts, useRemoveAccount } from "./useAccounts";
 
+/** Deleting reads in `hazard` and asks first, like deleting an instance. */
 function RemoveProfile({ account }: { account: AccountDto }) {
   const { t } = useTranslation();
   const remove = useRemoveAccount();
   const [confirming, setConfirming] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-6">
-      {confirming ? (
-        <>
-          <Button onClick={() => remove.mutate(account.id)} disabled={remove.isPending}>
-            {t("accounts.confirmRemove")}
-          </Button>
-          <Button onClick={() => setConfirming(false)}>{t("accounts.keep")}</Button>
-        </>
-      ) : (
-        <Button onClick={() => setConfirming(true)}>{t("accounts.remove")}</Button>
-      )}
+      <Button
+        onClick={() => setConfirming(true)}
+        disabled={remove.isPending}
+        className="border-hazard/60 text-hazard hover:border-hazard hover:text-hazard"
+      >
+        {t("accounts.remove")}
+      </Button>
       <p role="status" className="m-0 text-[0.875rem] text-stale">
         {remove.error ? t(`errors.${toIpcError(remove.error).code}`) : null}
       </p>
+      {confirming ? (
+        <ConfirmDialog
+          destructive
+          title={t("accounts.removeTitle", { name: account.username })}
+          confirmLabel={t("accounts.confirmRemove")}
+          cancelLabel={t("accounts.keep")}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            remove.mutate(account.id);
+          }}
+        >
+          <p className="m-0">{t("accounts.removeBody")}</p>
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }
@@ -36,8 +50,14 @@ function Profile({ account }: { account: AccountDto }) {
   const { t } = useTranslation();
   const premium = account.kind === "microsoft";
   const skin = useAccountSkin(premium ? account.id : null);
-  // A picked skin shows on the figure before it is applied.
+  const capes = useAccountCapes(premium ? account.id : null);
+  // A picked skin or cape shows on the figure before it is applied.
   const [draft, setDraft] = useState<SkinDraft | null>(null);
+  const [capeChoice, setCapeChoice] = useState<CapeChoice | null>(null);
+  const shownCape = capeChoice
+    ? capes.data?.find((owned) => owned.id === capeChoice.id)
+    : capes.data?.find((owned) => owned.active);
+  const cape = shownCape?.dataUrl ?? null;
   return (
     <div className="grid grid-cols-1 gap-10 @3xl:grid-cols-[320px_1fr]">
       <section aria-label={t("accounts.skinTitle")} className="flex flex-col gap-4">
@@ -45,6 +65,7 @@ function Profile({ account }: { account: AccountDto }) {
           <SkinViewer
             texture={draft?.file.dataUrl ?? skin.data?.dataUrl ?? null}
             slim={draft ? draft.slim : (skin.data?.slim ?? false)}
+            cape={cape}
             label={t("accounts.skinLabel")}
             className="w-full"
           />
@@ -69,7 +90,7 @@ function Profile({ account }: { account: AccountDto }) {
               draft={draft}
               onDraft={setDraft}
             />
-            <CapePicker accountId={account.id} />
+            <CapePicker accountId={account.id} choice={capeChoice} onChoice={setCapeChoice} />
           </>
         ) : null}
         <RemoveProfile account={account} />
