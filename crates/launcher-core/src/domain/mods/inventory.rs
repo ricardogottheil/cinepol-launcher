@@ -29,6 +29,8 @@ pub struct ModEntry {
     pub origin: ModOrigin,
     /// What is known about it; `None` for [`ModOrigin::Unknown`].
     pub record: Option<InstalledMod>,
+    /// The projects removing this mod would leave needed by nothing.
+    pub orphans: Vec<String>,
 }
 
 impl ModEntry {

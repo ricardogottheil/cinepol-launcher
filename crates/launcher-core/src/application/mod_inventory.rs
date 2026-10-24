@@ -86,6 +86,7 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
                 sha512,
                 origin,
                 record,
+                orphans: Vec::new(),
             }
         })
         .collect();
@@ -120,8 +121,18 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
         prune(&mut record);
         record
     }));
-    for record in entries.iter_mut().filter_map(|entry| entry.record.as_mut()) {
+    for entry in &mut entries {
+        let Some(record) = entry.record.as_mut() else {
+            continue;
+        };
         prune(record);
+        // Only the copy the registry keeps stands for its project.
+        if registry
+            .get(&record.project)
+            .is_some_and(|kept| kept.filename == entry.filename)
+        {
+            entry.orphans = registry.orphans_after_removing(&record.project);
+        }
     }
     entries.sort_by_cached_key(|entry| (entry.title().to_lowercase(), entry.filename.clone()));
     Ok(ModInventory { entries, registry })
@@ -151,6 +162,15 @@ pub async fn set_jar_enabled<P: PackFiles>(
     }
     files.place(&from, &to).await?;
     files.remove_file(&from).await
+}
+
+/// `filename` as a single safe mod jar name in its enabled form (`x.jar`),
+/// the name the player-facing use cases take.
+pub fn checked_jar(filename: &str) -> Option<RelativePath> {
+    let enabled_jar = mod_jar_name(filename) == Some((filename, true));
+    RelativePath::parse(filename)
+        .ok()
+        .filter(|_| enabled_jar && RelativePath::is_file_name(filename))
 }
 
 /// The record of a jar the launcher did not install. The player is taken

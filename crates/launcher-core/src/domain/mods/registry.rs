@@ -53,6 +53,39 @@ impl ModRegistry {
             .find(|installed| installed.project == project)
     }
 
+    /// Removes a project's record, and the project from what others need.
+    pub fn remove(&mut self, project: &str) -> Option<InstalledMod> {
+        let index = self
+            .mods
+            .iter()
+            .position(|installed| installed.project == project)?;
+        let removed = self.mods.remove(index);
+        for installed in &mut self.mods {
+            installed.required_by.remove(project);
+        }
+        Some(removed)
+    }
+
+    /// The mods left needed by nothing once `project` is removed: mods the
+    /// player did not ask for, whose every dependent is removed too.
+    pub fn orphans_after_removing(&self, project: &str) -> Vec<String> {
+        let mut left = self.clone();
+        if left.remove(project).is_none() {
+            return Vec::new();
+        }
+        let mut orphans = Vec::new();
+        while let Some(orphan) = left
+            .mods
+            .iter()
+            .find(|installed| !installed.requested && installed.required_by.is_empty())
+            .map(|installed| installed.project.clone())
+        {
+            left.remove(&orphan);
+            orphans.push(orphan);
+        }
+        orphans
+    }
+
     /// Adds a mod, replacing the record of the same project.
     pub fn insert(&mut self, installed: InstalledMod) {
         match self.get_mut(&installed.project) {
@@ -78,6 +111,41 @@ mod tests {
             required_by: BTreeSet::new(),
             incompatible: BTreeSet::new(),
         }
+    }
+
+    fn needed_by(mut installed: InstalledMod, needers: &[&str]) -> InstalledMod {
+        installed.requested = false;
+        installed.required_by = needers.iter().map(|needer| (*needer).to_owned()).collect();
+        installed
+    }
+
+    #[test]
+    fn removing_a_mod_orphans_the_dependencies_only_it_needed() {
+        // Iris needs Sodium and Indium; Indium needs Sodium; Lithium needs
+        // Fabric API, which the player also asked for.
+        let mut fabric_api = installed("fabric-api", "1");
+        fabric_api.required_by = BTreeSet::from(["lithium".to_owned()]);
+        let registry = ModRegistry::new([
+            installed("iris", "1"),
+            needed_by(installed("indium", "1"), &["iris"]),
+            needed_by(installed("sodium", "1"), &["iris", "indium"]),
+            installed("lithium", "1"),
+            fabric_api,
+        ]);
+        assert_eq!(
+            registry.orphans_after_removing("iris"),
+            ["indium", "sodium"]
+        );
+        assert!(registry.orphans_after_removing("lithium").is_empty());
+        assert!(registry.orphans_after_removing("missing").is_empty());
+
+        let mut left = registry.clone();
+        assert!(left.remove("indium").is_some());
+        assert_eq!(
+            left.get("sodium").unwrap().required_by,
+            BTreeSet::from(["iris".to_owned()])
+        );
+        assert!(left.remove("indium").is_none());
     }
 
     #[test]

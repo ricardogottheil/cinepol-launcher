@@ -109,6 +109,32 @@ impl ModSource for FakeModSource {
     }
 }
 
+/// Saves a Fabric 1.21.1 instance called `id` into `instances`.
+pub async fn fabric_instance(
+    instances: &crate::testing::InMemoryInstanceRepository,
+    id: &InstanceId,
+) {
+    use crate::domain::instance::{
+        GameVersion, Instance, InstanceName, InstanceOrigin, InstanceRepository,
+    };
+    use crate::domain::loader::{LoaderKind, LoaderSpec, LoaderVersion};
+    let fabric = LoaderSpec::new(
+        LoaderKind::Fabric,
+        Some(LoaderVersion::parse("0.19.5").unwrap()),
+    )
+    .unwrap();
+    instances
+        .save(&Instance::new(
+            id.clone(),
+            InstanceName::parse("Survival").unwrap(),
+            GameVersion::parse("1.21.1").unwrap(),
+            fabric,
+            InstanceOrigin::Custom,
+        ))
+        .await
+        .unwrap();
+}
+
 /// The body a [`mod_version`]'s file downloads as, so hashes line up.
 pub fn mod_jar(id: &str) -> Vec<u8> {
     format!("jar of {id}").into_bytes()

@@ -44,7 +44,9 @@ pub use modpack::{
     FakeMrpackArchive, FakePackFiles, FakePackwizSource, InMemoryPackManifestStore, WrittenPack,
     sha1_hex, sha512_hex,
 };
-pub use mods::{FakeModSource, InMemoryModRegistryStore, depends, mod_jar, mod_version};
+pub use mods::{
+    FakeModSource, InMemoryModRegistryStore, depends, fabric_instance, mod_jar, mod_version,
+};
 pub use server::{
     FakeServerConfigSource, FakeServerStatusProbe, InMemorySavedServerRepository,
     InMemorySettingsRepository,
