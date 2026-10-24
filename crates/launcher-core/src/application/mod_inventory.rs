@@ -6,6 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use crate::domain::integrity::HashAlgorithm;
+use crate::domain::launch::RelativePath;
 use crate::domain::modpack::{PackFileError, PackFiles};
 use crate::domain::mods::{
     DISABLED_SUFFIX, InstalledMod, ModEntry, ModOrigin, ModRegistry, ModSource, ModVersion,
@@ -53,6 +54,8 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
             .iter()
             .find(|installed| installed.filename == filename && installed.sha512 == sha512)
     };
+    // A name the registry would refuse to load again is never recorded.
+    let recordable = |filename: &str| RelativePath::is_file_name(filename);
     let loose: Vec<String> = jars
         .iter()
         .filter(|(filename, _, sha512)| tracked(filename, sha512).is_none())
@@ -66,7 +69,8 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
         .map(|(filename, enabled, sha512)| {
             let (origin, record) = if let Some(record) = tracked(&filename, &sha512) {
                 (ModOrigin::Launcher, Some(record.clone()))
-            } else if let Some(version) = identified.get(&sha512) {
+            } else if let Some(version) = identified.get(&sha512).filter(|_| recordable(&filename))
+            {
                 let title = titles
                     .get(&version.project)
                     .cloned()
@@ -124,7 +128,8 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
 }
 
 /// Turns `mods_dir/<filename>` on or off by renaming it to or from
-/// `<filename>.disabled`. Doing what is already done is not an error.
+/// `<filename>.disabled`. Doing what is already done is not an error; a
+/// different file already under the target name is.
 pub async fn set_jar_enabled<P: PackFiles>(
     files: &P,
     mods_dir: &Path,
@@ -136,6 +141,13 @@ pub async fn set_jar_enabled<P: PackFiles>(
     let (from, to) = if enabled { (off, on) } else { (on, off) };
     if files.digest(&from, HashAlgorithm::Sha512).await?.is_none() {
         return Ok(());
+    }
+    // Another jar under the target name is never replaced.
+    if files.digest(&to, HashAlgorithm::Sha512).await?.is_some() {
+        return Err(PackFileError::Io {
+            path: to.display().to_string(),
+            reason: "a file with this name already exists".into(),
+        });
     }
     files.place(&from, &to).await?;
     files.remove_file(&from).await
@@ -191,5 +203,44 @@ async fn titles<'a, S: ModSource>(
             tracing::warn!(%error, "could not read mod titles; using file names");
             HashMap::new()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+    use crate::testing::FakePackFiles;
+
+    #[tokio::test]
+    async fn toggles_a_jar_and_never_replaces_another_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = FakePackFiles::default();
+        std::fs::write(dir.path().join("a.jar"), b"a").unwrap();
+        set_jar_enabled(&files, dir.path(), "a.jar", false)
+            .await
+            .unwrap();
+        assert!(!dir.path().join("a.jar").exists());
+        assert_eq!(
+            std::fs::read(dir.path().join("a.jar.disabled")).unwrap(),
+            b"a"
+        );
+        // Already disabled: nothing to do.
+        set_jar_enabled(&files, dir.path(), "a.jar", false)
+            .await
+            .unwrap();
+
+        std::fs::write(dir.path().join("a.jar"), b"another a").unwrap();
+        assert!(
+            set_jar_enabled(&files, dir.path(), "a.jar", true)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("a.jar")).unwrap(),
+            b"another a"
+        );
+        assert!(dir.path().join("a.jar.disabled").exists());
     }
 }

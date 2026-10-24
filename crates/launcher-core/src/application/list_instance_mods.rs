@@ -255,6 +255,17 @@ mod tests {
         assert_eq!(entries[0].title(), "lithium.jar");
     }
 
+    // Windows cannot create such a name; macOS and Linux can.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_jar_whose_name_the_registry_refuses_is_never_recorded() {
+        let world = world().await;
+        put(&world, "sodium:2.jar", &mod_jar("sodium-2"));
+        let entries = list_instance_mods(&deps(&world), &id()).await.unwrap();
+        assert_eq!(entries[0].origin, ModOrigin::Unknown);
+        assert!(entries[0].record.is_none());
+    }
+
     #[tokio::test]
     async fn an_unreachable_catalog_lists_loose_jars_as_unknown() {
         let mut world = world().await;

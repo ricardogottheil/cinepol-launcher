@@ -10,7 +10,8 @@
 //!
 //! Jars the launcher did not install but the catalog recognises count as
 //! installed, and are recorded with the install. A disabled dependency the
-//! new mod needs is enabled again once the install is recorded.
+//! new mod needs is enabled again, and disabled again when the install
+//! fails afterwards.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -117,6 +118,17 @@ where
     let placed = write_jars(deps, &mods_dir, &jars, &adopted, &staging, reporter, cancel).await;
     release_dir(deps.fs, &staging).await;
     let placed = placed?;
+    let mut enabled = Vec::new();
+    for (dependency, _) in &plan.present {
+        let Some(filename) = disabled_copy(&inventory.entries, &registry, dependency) else {
+            continue;
+        };
+        if let Err(error) = set_jar_enabled(deps.files, &mods_dir, filename, true).await {
+            undo(deps.files, &mods_dir, &placed, &enabled).await;
+            return Err(error.into());
+        }
+        enabled.push(filename);
+    }
 
     for (dependency, needer) in &plan.present {
         if let Some(existing) = registry.get_mut(dependency) {
@@ -132,13 +144,8 @@ where
     }
     if let Err(error) = deps.registry.save(id, &registry).await {
         // Jars the registry does not know about would load unseen.
-        remove_all(deps.files, &placed).await;
+        undo(deps.files, &mods_dir, &placed, &enabled).await;
         return Err(error.into());
-    }
-    for (dependency, _) in &plan.present {
-        if let Some(filename) = disabled_copy(&inventory.entries, &registry, dependency) {
-            set_jar_enabled(deps.files, &mods_dir, filename, true).await?;
-        }
     }
     Ok(written)
 }
@@ -269,6 +276,17 @@ where
         placed.push(destination);
     }
     Ok(placed)
+}
+
+/// Best-effort undo of a failed install: the jars it wrote are removed and
+/// the dependencies it enabled are disabled again.
+async fn undo<P: PackFiles>(files: &P, mods_dir: &Path, placed: &[PathBuf], enabled: &[&str]) {
+    remove_all(files, placed).await;
+    for filename in enabled {
+        if let Err(error) = set_jar_enabled(files, mods_dir, filename, false).await {
+            tracing::warn!(%filename, %error, "could not disable a mod again after a failed install");
+        }
+    }
 }
 
 /// Best-effort removal of jars this install wrote; nothing else was there.
@@ -578,6 +596,21 @@ mod tests {
         );
         let registry = world.registry.load(&id()).await.unwrap();
         assert_eq!(registry.get("sodium").unwrap().filename, "sodium-2.jar");
+    }
+
+    #[tokio::test]
+    async fn a_failed_install_disables_the_dependency_it_enabled_again() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(
+            mods_dir(&world).join("sodium-2.jar.disabled"),
+            mod_jar("sodium-2"),
+        )
+        .unwrap();
+        world.registry.fail_saves();
+        let downloader = downloader();
+        assert!(install(&world, &downloader).await.is_err());
+        assert_eq!(jars_in(&world), ["sodium-2.jar.disabled"]);
     }
 
     #[tokio::test]
