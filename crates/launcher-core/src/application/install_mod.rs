@@ -13,9 +13,9 @@
 //! new mod needs is enabled again, and disabled again when the install
 //! fails afterwards.
 
-use std::cell::Cell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
@@ -170,7 +170,7 @@ where
         .as_ref()
         .map(|old| (backup.as_path(), old.path.as_path()));
     // Set when the old jar could not be put back: its only copy is the backup.
-    let keep_backup = Cell::new(false);
+    let keep_backup = AtomicBool::new(false);
     let result: Result<Vec<InstalledMod>, InstallModError> = async {
         deps.fs.create_dir_all(&staging).await?;
         if let Some(old) = &old {
@@ -190,7 +190,7 @@ where
             Ok(placed) => placed,
             Err(error) => {
                 if !undo(deps.files, &mods_dir, &[], &[], restore).await {
-                    keep_backup.set(true);
+                    keep_backup.store(true, Ordering::Relaxed);
                 }
                 return Err(error);
             }
@@ -201,7 +201,7 @@ where
             && let Err(error) = deps.files.remove_file(&old.path).await
         {
             if !undo(deps.files, &mods_dir, &placed, &[], restore).await {
-                keep_backup.set(true);
+                keep_backup.store(true, Ordering::Relaxed);
             }
             return Err(error.into());
         }
@@ -212,7 +212,7 @@ where
             };
             if let Err(error) = set_jar_enabled(deps.files, &mods_dir, filename, true).await {
                 if !undo(deps.files, &mods_dir, &placed, &enabled, restore).await {
-                    keep_backup.set(true);
+                    keep_backup.store(true, Ordering::Relaxed);
                 }
                 return Err(error.into());
             }
@@ -242,14 +242,14 @@ where
         if let Err(error) = deps.registry.save(id, &registry).await {
             // Jars the registry does not know about would load unseen.
             if !undo(deps.files, &mods_dir, &placed, &enabled, restore).await {
-                keep_backup.set(true);
+                keep_backup.store(true, Ordering::Relaxed);
             }
             return Err(error.into());
         }
         Ok(written)
     }
     .await;
-    if keep_backup.get() {
+    if keep_backup.load(Ordering::Relaxed) {
         tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
     } else {
         release_dir(deps.fs, &staging).await;
@@ -627,6 +627,25 @@ mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    #[tokio::test]
+    async fn installs_and_updates_can_run_on_any_thread() {
+        // The app runs commands on a multi-threaded runtime.
+        fn assert_send<T: Send>(_: T) {}
+        let world = world(LoaderKind::Fabric).await;
+        let downloader = downloader();
+        let deps = deps(&world, &downloader);
+        let reporter = RecordingReporter::default();
+        let cancel = CancellationToken::new();
+        assert_send(install_mod(&deps, &id(), "iris", &reporter, &cancel));
+        assert_send(crate::application::update_mod::update_mod(
+            &deps,
+            &id(),
+            "iris",
+            &reporter,
+            &cancel,
+        ));
     }
 
     #[tokio::test]
