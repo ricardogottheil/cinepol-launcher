@@ -31,6 +31,16 @@ pub struct ModUpdate {
     pub version: ModVersion,
 }
 
+/// What an update check found.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ModUpdates {
+    /// Sorted by title.
+    pub updates: Vec<ModUpdate>,
+    /// Titles of the mods the catalog could not answer for, sorted: they may
+    /// have an update too.
+    pub unchecked: Vec<String>,
+}
+
 /// Everything checking for mod updates talks to.
 pub struct CheckModUpdatesDeps<'a, I, S, P, M> {
     pub instances: &'a I,
@@ -41,12 +51,12 @@ pub struct CheckModUpdatesDeps<'a, I, S, P, M> {
 }
 
 /// The updates for the mods the launcher knows (installed or recognised),
-/// sorted by title. A mod the catalog cannot answer for is skipped; only
-/// when it answers for none is its error returned.
+/// sorted by title. A mod the catalog cannot answer for is listed as
+/// unchecked; only when it answers for none is its error returned.
 pub async fn check_mod_updates<I, S, P, M>(
     deps: &CheckModUpdatesDeps<'_, I, S, P, M>,
     id: &InstanceId,
-) -> Result<Vec<ModUpdate>, CheckModUpdatesError>
+) -> Result<ModUpdates, CheckModUpdatesError>
 where
     I: InstanceRepository,
     S: ModSource,
@@ -61,7 +71,7 @@ where
     let mods_dir = deps.paths.game_dir(id).join(MODS_DIR);
     let saved = deps.registry.load(id).await?;
     let inventory = read_mod_inventory(deps.source, deps.files, &mods_dir, &saved).await?;
-    let mut updates = Vec::new();
+    let mut checked = ModUpdates::default();
     let (mut answered, mut failure) = (false, None);
     for installed in inventory.registry.mods() {
         let versions = match deps.source.versions(&installed.project, &target).await {
@@ -77,11 +87,12 @@ where
             Err(error) => {
                 tracing::warn!(project = %installed.project, %error, "could not check a mod for updates");
                 failure.get_or_insert(error);
+                checked.unchecked.push(installed.title.clone());
                 continue;
             }
         };
         if let Some(version) = available_update(&versions, &target, &installed.version) {
-            updates.push(ModUpdate {
+            checked.updates.push(ModUpdate {
                 project: installed.project.clone(),
                 title: installed.title.clone(),
                 filename: installed.filename.clone(),
@@ -93,8 +104,13 @@ where
     if let (false, Some(error)) = (answered, failure) {
         return Err(error.into());
     }
-    updates.sort_by_cached_key(|update| update.title.to_lowercase());
-    Ok(updates)
+    checked
+        .updates
+        .sort_by_cached_key(|update| update.title.to_lowercase());
+    checked
+        .unchecked
+        .sort_by_cached_key(|title| title.to_lowercase());
+    Ok(checked)
 }
 
 #[cfg(test)]
@@ -164,7 +180,7 @@ mod tests {
         source
     }
 
-    async fn check(failing: &[&str]) -> Result<Vec<ModUpdate>, CheckModUpdatesError> {
+    async fn check(failing: &[&str]) -> Result<ModUpdates, CheckModUpdatesError> {
         let dir = tempfile::tempdir().unwrap();
         let paths = LauncherPaths::new(dir.path());
         let instances = InMemoryInstanceRepository::default();
@@ -199,7 +215,9 @@ mod tests {
 
     #[tokio::test]
     async fn lists_newer_versions_and_never_offers_an_older_release() {
-        let updates = check(&[]).await.unwrap();
+        let checked = check(&[]).await.unwrap();
+        assert!(checked.unchecked.is_empty());
+        let updates = checked.updates;
         assert_eq!(updates.len(), 1);
         assert_eq!(updates[0].project, "sodium");
         assert_eq!(updates[0].current, "sodium-2");
@@ -209,7 +227,10 @@ mod tests {
 
     #[tokio::test]
     async fn one_mod_the_catalog_cannot_answer_for_does_not_hide_the_others() {
-        assert_eq!(check(&["lithium"]).await.unwrap().len(), 1);
+        let checked = check(&["lithium", "iris"]).await.unwrap();
+        assert_eq!(checked.updates.len(), 1);
+        // The mods that could not be checked are named, never shown as current.
+        assert_eq!(checked.unchecked, ["IRIS", "LITHIUM"]);
         assert!(matches!(
             check(&["sodium", "lithium", "iris", "gone"]).await,
             Err(CheckModUpdatesError::Source(ModpackSourceError::Network(_)))

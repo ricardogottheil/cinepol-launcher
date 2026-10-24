@@ -30,7 +30,7 @@ use tokio_util::sync::CancellationToken;
 use super::modpacks::hold;
 use super::parse_instance_id;
 use crate::dto::{
-    InstalledModDto, ModEntryDto, ModInstallPreviewDto, ModPageDto, ModUpdateDto, ProgressEvent,
+    InstalledModDto, ModEntryDto, ModInstallPreviewDto, ModPageDto, ModUpdatesDto, ProgressEvent,
 };
 use crate::error::AppError;
 use crate::progress::ChannelReporter;
@@ -170,12 +170,13 @@ pub async fn remove_mod(
     Ok(remove(&deps, &id, &filename, remove_orphans).await?)
 }
 
-/// The installed mods that have a newer compatible version.
+/// The installed mods that have a newer compatible version, and the ones
+/// that could not be checked.
 #[tauri::command]
 pub async fn check_mod_updates(
     state: State<'_, AppState>,
     instance_id: String,
-) -> Result<Vec<ModUpdateDto>, AppError> {
+) -> Result<ModUpdatesDto, AppError> {
     let id = parse_instance_id(&instance_id)?;
     let deps = CheckModUpdatesDeps {
         instances: &state.instances,
@@ -184,8 +185,8 @@ pub async fn check_mod_updates(
         registry: &state.mod_registry,
         paths: &state.paths,
     };
-    let updates = check_updates(&deps, &id).await?;
-    Ok(updates.iter().map(ModUpdateDto::from).collect())
+    let checked = check_updates(&deps, &id).await?;
+    Ok(ModUpdatesDto::from(&checked))
 }
 
 async fn write(

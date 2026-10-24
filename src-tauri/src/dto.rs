@@ -4,7 +4,7 @@
 
 use launcher_core::application::account_capes::CapeTexture;
 use launcher_core::application::account_skin::SkinTexture;
-use launcher_core::application::check_mod_updates::ModUpdate;
+use launcher_core::application::check_mod_updates::{ModUpdate, ModUpdates};
 use launcher_core::application::check_premium_name::PremiumNameCheck;
 use launcher_core::application::export_mrpack::ExportSummary;
 use launcher_core::application::install_instance::InstallSummary;
@@ -577,6 +577,25 @@ impl From<&ModUpdate> for ModUpdateDto {
             filename: update.filename.clone(),
             current: update.current.clone(),
             version_number: update.version.version_number.clone(),
+        }
+    }
+}
+
+/// What an update check found.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdatesDto {
+    pub updates: Vec<ModUpdateDto>,
+    /// Titles of the mods Modrinth could not answer for; they may have an
+    /// update too, so the UI says so instead of showing them as current.
+    pub unchecked: Vec<String>,
+}
+
+impl From<&ModUpdates> for ModUpdatesDto {
+    fn from(checked: &ModUpdates) -> Self {
+        Self {
+            updates: checked.updates.iter().map(ModUpdateDto::from).collect(),
+            unchecked: checked.unchecked.clone(),
         }
     }
 }

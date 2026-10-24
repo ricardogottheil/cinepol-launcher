@@ -40,6 +40,7 @@ import type {
   ModpackVersionDto,
   ModSummaryDto,
   ModUpdateDto,
+  ModUpdatesDto,
   PackFilesDto,
   PackwizInstallDto,
   PackwizUpdateDto,
@@ -100,6 +101,7 @@ export type {
   ModpackVersionDto,
   ModSummaryDto,
   ModUpdateDto,
+  ModUpdatesDto,
   PackFilesDto,
   PackwizInstallDto,
   PackwizUpdateDto,
@@ -157,6 +159,7 @@ const BACKEND_CODES = {
   no_compatible_version: true,
   mod_up_to_date: true,
   too_many_dependencies: true,
+  mod_backup_kept: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -609,8 +612,8 @@ export function removeMod(
   return call("remove_mod", { instanceId, filename, removeOrphans });
 }
 
-/** The installed mods that have a newer compatible version. */
-export function checkModUpdates(instanceId: string): Promise<ModUpdateDto[]> {
+/** The installed mods that have a newer compatible version, and those that could not be checked. */
+export function checkModUpdates(instanceId: string): Promise<ModUpdatesDto> {
   return call("check_mod_updates", { instanceId });
 }
 

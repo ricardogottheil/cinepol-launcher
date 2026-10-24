@@ -55,7 +55,8 @@ export function useModUpdates(instanceId: string, enabled = true) {
     queryKey: modUpdatesKey(instanceId),
     queryFn: () => checkModUpdates(instanceId),
     enabled,
-    staleTime: 5 * 60 * 1000,
+    // A check that missed some mods is asked again rather than trusted for minutes.
+    staleTime: (query) => (query.state.data?.unchecked.length ? 0 : 5 * 60 * 1000),
   });
 }
 

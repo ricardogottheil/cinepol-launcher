@@ -63,8 +63,13 @@ mod tests {
             asked[0].target.loader,
             crate::domain::loader::LoaderKind::Fabric
         );
-        assert!(asked[0].page_size <= crate::domain::modpack::ModpackQuery::MAX_PAGE_SIZE);
+        assert_eq!(asked[0].page_size, 50);
         assert_eq!(page.total, Some(0));
+
+        search_mods(&instances, &source, &id, String::new(), 0, 0)
+            .await
+            .unwrap();
+        assert_eq!(source.searched()[1].page_size, 1);
 
         let other = InstanceId::parse("other").unwrap();
         assert!(matches!(

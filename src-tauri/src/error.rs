@@ -108,6 +108,9 @@ pub enum ErrorCode {
     ModUpToDate,
     /// A mod would bring in too many dependencies to install safely.
     TooManyDependencies,
+    /// A mod update failed and the old jar could not be put back; `details`
+    /// is where the launcher kept it.
+    ModBackupKept,
     Internal,
 }
 
@@ -758,6 +761,9 @@ impl From<InstallModError> for AppError {
             InstallModError::UpToDate { title } => {
                 return Self::new(ErrorCode::ModUpToDate, message).with_details(title.clone());
             }
+            InstallModError::PreviousKept { backup, .. } => {
+                return Self::new(ErrorCode::ModBackupKept, message).with_details(backup.clone());
+            }
             InstallModError::Instance(instance) => instance_code(instance),
             InstallModError::Download(DownloadError::Io { .. }) | InstallModError::Scratch(_) => {
                 ErrorCode::Internal
@@ -861,6 +867,14 @@ mod tests {
         });
         assert_eq!(up_to_date.code, ErrorCode::ModUpToDate);
         assert_eq!(up_to_date.details.as_deref(), Some("Iris"));
+
+        let kept = AppError::from(InstallModError::PreviousKept {
+            filename: "sodium.jar".into(),
+            backup: "/tmp/mods-1/previous.jar".into(),
+            error: Box::new(InstallModError::Cancelled),
+        });
+        assert_eq!(kept.code, ErrorCode::ModBackupKept);
+        assert_eq!(kept.details.as_deref(), Some("/tmp/mods-1/previous.jar"));
 
         assert_eq!(
             AppError::from(PreviewModInstallError::Plan(ModPlanError::NoLoader)).code,

@@ -354,7 +354,18 @@ mod tests {
         // the old one back after the failed save does not.
         world.files.fail_places_after(2);
         world.registry.fail_saves();
-        assert!(update(&world, "sodium").await.is_err());
+        // The error says where the old jar is, so the player can get it back.
+        let Err(InstallModError::PreviousKept {
+            filename,
+            backup,
+            error,
+        }) = update(&world, "sodium").await
+        else {
+            panic!("the kept backup was not reported");
+        };
+        assert_eq!(filename, "sodium-2.jar");
+        assert_eq!(std::fs::read(&backup).unwrap(), mod_jar("sodium-2"));
+        assert!(matches!(*error, InstallModError::Files(_)), "{error:?}");
         let mut kept = Vec::new();
         let mut stack = vec![world.paths.root().to_path_buf()];
         while let Some(dir) = stack.pop() {

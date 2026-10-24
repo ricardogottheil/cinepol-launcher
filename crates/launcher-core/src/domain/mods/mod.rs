@@ -56,9 +56,12 @@ pub struct ModQuery {
 }
 
 impl ModQuery {
-    /// Clamps the page size like a modpack search and trims the text.
+    /// The largest page the catalogs are asked for, as for modpacks.
+    pub const MAX_PAGE_SIZE: u32 = ModpackQuery::MAX_PAGE_SIZE;
+
+    /// Clamps the page size into `1..=MAX_PAGE_SIZE` and trims the text.
     pub fn normalized(mut self) -> Self {
-        self.page_size = self.page_size.clamp(1, ModpackQuery::MAX_PAGE_SIZE);
+        self.page_size = self.page_size.clamp(1, Self::MAX_PAGE_SIZE);
         self.text = self.text.trim().to_owned();
         self
     }

@@ -14,12 +14,12 @@ use crate::dto::{
     InstallSummaryDto, InstalledModDto, InstanceDto, InstanceOriginDto, InstanceSettingsDto,
     JavaChoiceDto, JavaKindDto, LaunchOutcomeDto, LoaderReleaseDto, LogLevelDto, LogLineDto,
     LogStreamDto, ManualDownloadsDto, ManualFileDto, ModEntryDto, ModInstallPreviewDto,
-    ModOriginDto, ModPageDto, ModSummaryDto, ModUpdateDto, ModpackCatalogsDto, ModpackDetailsDto,
-    ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto, ModpackUpdateDto,
-    ModpackVersionDto, PackFilesDto, PackwizInstallDto, PackwizUpdateDto, PlannedModDto,
-    PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto, SavedServerDto,
-    SavedServerFormDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto, ServerListDto,
-    ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
+    ModOriginDto, ModPageDto, ModSummaryDto, ModUpdateDto, ModUpdatesDto, ModpackCatalogsDto,
+    ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto,
+    ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto, PackwizUpdateDto,
+    PlannedModDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
+    SavedServerDto, SavedServerFormDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto,
+    ServerListDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -87,6 +87,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ModOriginDto::decl(cfg),
         ModEntryDto::decl(cfg),
         ModUpdateDto::decl(cfg),
+        ModUpdatesDto::decl(cfg),
         ManualFileDto::decl(cfg),
         PackwizInstallDto::decl(cfg),
         PackwizUpdateDto::decl(cfg),
@@ -429,7 +430,7 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
         command(
             "check_mod_updates",
             vec![("instanceId", string())],
-            format!("{}[]", ModUpdateDto::name(cfg)),
+            ModUpdatesDto::name(cfg),
         ),
         command(
             "install_packwiz",

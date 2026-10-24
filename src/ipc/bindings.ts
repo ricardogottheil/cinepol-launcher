@@ -17,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "mod_backup_kept" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -209,6 +209,13 @@ current: string,
  */
 versionNumber: string, };
 
+export type ModUpdatesDto = { updates: Array<ModUpdateDto>, 
+/**
+ * Titles of the mods Modrinth could not answer for; they may have an
+ * update too, so the UI says so instead of showing them as current.
+ */
+unchecked: Array<string>, };
+
 export type ManualFileDto = { name: string, filename: string, pageUrl: string, };
 
 export type PackwizInstallDto = { instance: InstanceDto, files: PackFilesDto, install: InstallSummaryDto, pending: Array<ManualFileDto>, };
@@ -308,7 +315,7 @@ export interface Commands {
   list_instance_mods: { args: { instanceId: string }; result: ModEntryDto[] };
   set_mod_enabled: { args: { instanceId: string; filename: string; enabled: boolean }; result: null };
   remove_mod: { args: { instanceId: string; filename: string; removeOrphans: boolean }; result: string[] };
-  check_mod_updates: { args: { instanceId: string }; result: ModUpdateDto[] };
+  check_mod_updates: { args: { instanceId: string }; result: ModUpdatesDto };
   install_packwiz: { args: { operationId: string; url: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto };
   import_packwiz: { args: { operationId: string; onProgress: Channel<ProgressEvent> }; result: PackwizInstallDto | null };
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };

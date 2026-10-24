@@ -136,6 +136,7 @@
     "no_compatible_version": "Este mod no tiene una versión para esta versión de Minecraft y este loader",
     "mod_up_to_date": "Este mod ya está actualizado",
     "too_many_dependencies": "Este mod necesita demasiados mods más para instalarlo automáticamente",
+    "mod_backup_kept": "La actualización falló y no se pudo restaurar la versión anterior. Se guardó una copia en la carpeta temporal del launcher",
     "catalog_not_configured": "Esta versión no puede usar ese catálogo de modpacks",
     "invalid_skin": "La imagen tiene que ser un PNG de 64×64 o 64×32",
     "skin_rejected": "Minecraft rechazó esta skin",

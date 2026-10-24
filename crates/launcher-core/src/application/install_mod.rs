@@ -59,6 +59,14 @@ pub enum InstallModError {
     UpToDate { title: String },
     #[error("the mod installation was cancelled")]
     Cancelled,
+    /// An update failed and the old jar could not be put back either; its
+    /// only copy is `backup`, which the launcher leaves in place.
+    #[error("{error}; the previous {filename} could not be put back and was kept at {backup}")]
+    PreviousKept {
+        filename: String,
+        backup: String,
+        error: Box<InstallModError>,
+    },
 }
 
 impl From<DownloadError> for InstallModError {
@@ -249,12 +257,20 @@ where
         Ok(written)
     }
     .await;
-    if keep_backup.load(Ordering::Relaxed) {
-        tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
-    } else {
-        release_dir(deps.fs, &staging).await;
+    match (result, &old) {
+        (Err(error), Some(old)) if keep_backup.load(Ordering::Relaxed) => {
+            tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
+            Err(InstallModError::PreviousKept {
+                filename: old.record.filename.clone(),
+                backup: backup.display().to_string(),
+                error: Box::new(error),
+            })
+        }
+        (result, _) => {
+            release_dir(deps.fs, &staging).await;
+            result
+        }
     }
-    result
 }
 
 /// The installed copy of a mod being updated.

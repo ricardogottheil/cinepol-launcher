@@ -7,6 +7,7 @@ import { createTestQueryClient } from "../../test/render";
 import {
   useInstanceMods,
   useModInstallPreview,
+  useModUpdates,
   useRemoveMod,
   useSetModEnabled,
   useWriteMod,
@@ -30,8 +31,7 @@ vi.mock("../../ipc/client", async (importOriginal) => ({
 const iris = { project: "iris", title: "Iris", versionNumber: "1.8.8", filename: "iris.jar" };
 const progress: ProgressEvent = { stage: "mods", done: 1, total: 2, unit: "steps" };
 
-function setup<T>(hook: () => T) {
-  const queryClient = createTestQueryClient();
+function setup<T>(hook: () => T, queryClient = createTestQueryClient()) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -126,5 +126,30 @@ describe("mod hooks", () => {
     const picked = setup(() => useModInstallPreview("survival", "iris"));
     await waitFor(() => expect(picked.result.current.isSuccess).toBe(true));
     expect(client.previewModInstall).toHaveBeenCalledWith("survival", "iris");
+  });
+
+  it("asks again for updates after a check that missed some mods, and trusts a complete one", async () => {
+    const sodium = {
+      project: "sodium",
+      title: "Sodium",
+      filename: "sodium.jar",
+      current: "2",
+      versionNumber: "3",
+    };
+    const partial = createTestQueryClient();
+    client.checkModUpdates.mockResolvedValue({ updates: [sodium], unchecked: ["Lithium"] });
+    const first = setup(() => useModUpdates("survival"), partial);
+    await waitFor(() => expect(first.result.current.data?.unchecked).toEqual(["Lithium"]));
+    setup(() => useModUpdates("survival"), partial);
+    await waitFor(() => expect(client.checkModUpdates).toHaveBeenCalledTimes(2));
+
+    client.checkModUpdates.mockClear();
+    const complete = createTestQueryClient();
+    client.checkModUpdates.mockResolvedValue({ updates: [sodium], unchecked: [] });
+    const again = setup(() => useModUpdates("survival"), complete);
+    await waitFor(() => expect(again.result.current.isSuccess).toBe(true));
+    const second = setup(() => useModUpdates("survival"), complete);
+    await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
+    expect(client.checkModUpdates).toHaveBeenCalledTimes(1);
   });
 });
