@@ -80,30 +80,30 @@ function ModelChoice({
 
 /**
  * Chooses the model, then a PNG, previews both on the 3D figure (the page owns
- * the draft) and applies them with one request. Nothing retries: Mojang may
- * suspend accounts that keep hitting its limit.
+ * the model and the draft) and applies them with one request. Nothing retries:
+ * Mojang may suspend accounts that keep hitting its limit.
  */
 export function SkinChanger({
   accountId,
-  currentSlim,
+  slim,
+  onModel,
   draft,
   onDraft,
 }: {
   accountId: string;
-  currentSlim: boolean;
+  /** The model on the figure: the draft's, the one chosen, or the current skin's. */
+  slim: boolean;
+  onModel: (slim: boolean) => void;
   draft: SkinDraft | null;
   onDraft: (draft: SkinDraft | null) => void;
 }) {
   const { t } = useTranslation();
   const change = useChangeSkin(accountId);
   const [invalid, setInvalid] = useState(false);
-  // Null until the player picks a model; until then it follows the current skin.
-  const [chosenSlim, setChosenSlim] = useState<boolean | null>(null);
-  const slim = draft?.slim ?? chosenSlim ?? currentSlim;
   const heading = useId();
 
   function chooseModel(next: boolean) {
-    setChosenSlim(next);
+    onModel(next);
     if (draft) onDraft({ ...draft, slim: next });
   }
 

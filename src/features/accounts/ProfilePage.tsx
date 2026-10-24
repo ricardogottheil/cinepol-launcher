@@ -51,8 +51,11 @@ function Profile({ account }: { account: AccountDto }) {
   const premium = account.kind === "microsoft";
   const skin = useAccountSkin(premium ? account.id : null);
   const capes = useAccountCapes(premium ? account.id : null);
-  // A picked skin or cape shows on the figure before it is applied.
+  // A picked model, skin or cape shows on the figure before it is applied.
   const [draft, setDraft] = useState<SkinDraft | null>(null);
+  // Null until the player picks a model; until then it follows the current skin.
+  const [chosenSlim, setChosenSlim] = useState<boolean | null>(null);
+  const slim = draft?.slim ?? chosenSlim ?? skin.data?.slim ?? false;
   const [pickedCape, setCapeChoice] = useState<CapeChoice | null>(null);
   // A picked cape the account no longer owns is no choice at all.
   const capeChoice =
@@ -69,7 +72,7 @@ function Profile({ account }: { account: AccountDto }) {
         {premium ? (
           <SkinViewer
             texture={draft?.file.dataUrl ?? skin.data?.dataUrl ?? null}
-            slim={draft ? draft.slim : (skin.data?.slim ?? false)}
+            slim={slim}
             cape={cape}
             label={t("accounts.skinLabel")}
             className="w-full"
@@ -91,7 +94,8 @@ function Profile({ account }: { account: AccountDto }) {
           <>
             <SkinChanger
               accountId={account.id}
-              currentSlim={skin.data?.slim ?? false}
+              slim={slim}
+              onModel={setChosenSlim}
               draft={draft}
               onDraft={setDraft}
             />

@@ -203,13 +203,14 @@ App shell (`src/app/shell/`):
 - **Profile page**: the head and name, the 3D skin with the worn cape, the
   label -> value sheet, then for premium profiles "Change skin" and "Cape".
   The figure rests (arms down, cape out, a slow breath) at a front
-  three-quarter view and turns slowly by itself until the player drags it;
-  two turn buttons under it do the same from the keyboard. Under reduced
+  three-quarter view and never turns by itself; dragging turns the figure
+  (the camera stays put), and two turn buttons under it do the same from the
+  keyboard. Under reduced
   motion it stands still and the buttons turn it at once. No zoom or pan.
   "Change skin" picks the model first (Classic / Slim as two plates, each
   with a small figure whose arms are 4 or 3 pixels wide, as on
   minecraft.net), then the PNG; both preview on the figure before one
-  "Apply". The capes are toggle buttons that only preview on the figure; the
+  "Apply", and a model picked alone already shows on the current skin. The capes are toggle buttons that only preview on the figure; the
   worn one is marked "Worn", and "Apply cape" wears the chosen one with one
   request. "Delete profile" reads in `hazard` and asks in the destructive
   `ConfirmDialog`, like deleting an instance.

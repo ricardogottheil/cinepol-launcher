@@ -410,6 +410,22 @@ describe("skin and capes", () => {
     );
   });
 
+  it("previews the chosen model on the current skin before any PNG", async () => {
+    renderAt("/profile");
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,OLD"),
+    );
+    expect(viewer).toHaveAttribute("data-slim", "false");
+
+    fireEvent.click(screen.getByRole("radio", { name: labels.slim }));
+    expect(viewer).toHaveAttribute("data-slim", "true");
+    expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,OLD");
+    fireEvent.click(screen.getByRole("radio", { name: labels.classic }));
+    expect(viewer).toHaveAttribute("data-slim", "false");
+    expect(client.changeAccountSkin).not.toHaveBeenCalled();
+  });
+
   it("starts from the model of the current skin", async () => {
     client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,OLD", slim: true });
     renderAt("/profile");

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { type PointerEvent, useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { SkinViewer as Viewer } from "skinview3d";
 import { cx } from "../../components/ui/cx";
@@ -21,11 +21,13 @@ export interface SkinViewerProps {
 // so nothing brightens the midtones. These are set so the side facing the
 // player shows the skin's own colors, the top a little brighter and the
 // underside half as bright. The figure turns, so the key rides on the camera.
-const FOV_DEG = 28;
 const HEMISPHERE_INTENSITY = 2.4;
 const KEY_INTENSITY = 1.6;
-/** Above and to the left of the camera, in camera space; it aims at the figure. */
-const KEY_OFFSET = [-30, 40, 0] as const;
+/**
+ * Above and to the left of the camera, in camera space; it aims at the figure.
+ * At skinview3d's default framing the camera stands about 44 units away.
+ */
+const KEY_OFFSET = [-17, 22, 0] as const;
 const WHITE_LIGHT = 0xffffff;
 /** Half the sky light, so the underside still reads. */
 const GROUND_LIGHT = 0x808080;
@@ -35,10 +37,8 @@ const THREE_QUARTER = -Math.PI / 5;
 const TURN_STEP = Math.PI / 4;
 /** How fast a button turn closes the gap to its target, per second. */
 const TURN_EASE = 9;
-/** Radians per second of the idle turn, slow enough to read every side. */
-const IDLE_TURN_SPEED = 0.45;
-/** Keep the camera near eye level so the figure never flips over. */
-const POLAR_SLACK = Math.PI / 6;
+/** Radians the figure turns per pixel dragged. */
+const DRAG_SPEED = 0.01;
 /** The idle pose of skinview3d's IdleAnimation: arms just off the body, cape out. */
 const ARM_REST = Math.PI * 0.02;
 const ARM_SWAY = 0.03;
@@ -70,7 +70,9 @@ function pose(player: Viewer["playerObject"], seconds: number) {
 }
 
 interface Turnable {
-  /** Turns the figure by `radians` and stops the idle turn. */
+  /** Turns the figure by `radians` at once, as a drag does. */
+  drag: (radians: number) => void;
+  /** Turns the figure by `radians`, eased when motion is allowed. */
   turn: (radians: number) => void;
   viewer: Viewer;
 }
@@ -83,6 +85,8 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement>(null);
   const turnableRef = useRef<Turnable | null>(null);
+  // Where the pointer was at the last move of a drag; null when not dragging.
+  const dragXRef = useRef<number | null>(null);
   // Read when a viewer is built; later changes go through loadCape.
   const capeRef = useRef(cape);
   capeRef.current = cape;
@@ -107,8 +111,8 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
           skin: texture,
           model: slim ? "slim" : "default",
           ...(initialCape ? { cape: initialCape } : {}),
-          fov: FOV_DEG,
-          enableControls: true,
+          // The camera never moves; dragging turns the figure (see onPointerMove).
+          enableControls: false,
           pixelRatio: "match-device",
         });
 
@@ -137,15 +141,6 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
         key.position.set(...KEY_OFFSET);
         viewer.camera.add(key);
 
-        // Drag to turn; no zoom or pan, so the figure never leaves the frame.
-        viewer.controls.enableZoom = false;
-        viewer.controls.enablePan = false;
-        viewer.controls.minPolarAngle = Math.PI / 2 - POLAR_SLACK;
-        viewer.controls.maxPolarAngle = Math.PI / 2 + POLAR_SLACK;
-        viewer.controls.addEventListener("start", () => {
-          viewer.autoRotate = false;
-        });
-
         const wrapper = viewer.playerWrapper;
         wrapper.rotation.y = THREE_QUARTER;
         let target: number | null = null;
@@ -154,8 +149,6 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
           // Nothing moves on its own; button turns land at once.
           pose(viewer.playerObject, 0);
         } else {
-          viewer.autoRotate = true;
-          viewer.autoRotateSpeed = IDLE_TURN_SPEED;
           viewer.animation = new skinview3d.FunctionAnimation((player, progress, delta) => {
             pose(player, progress);
             if (target === null) return;
@@ -171,8 +164,11 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
 
         turnableRef.current = {
           viewer,
+          drag: (radians) => {
+            target = null;
+            wrapper.rotation.y += radians;
+          },
           turn: (radians) => {
-            viewer.autoRotate = false;
             if (still) {
               wrapper.rotation.y += radians;
             } else {
@@ -248,6 +244,24 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
 
   const turn = (radians: number) => turnableRef.current?.turn(radians);
 
+  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragXRef.current = event.clientX;
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (dragXRef.current === null) return;
+    turnableRef.current?.drag((event.clientX - dragXRef.current) * DRAG_SPEED);
+    dragXRef.current = event.clientX;
+  }
+
+  function onPointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragXRef.current = null;
+  }
+
   return (
     <figure className={cx("m-0 flex w-full flex-col gap-3", className)}>
       <div
@@ -256,6 +270,10 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
         aria-label={label}
         aria-describedby={hint}
         className="relative aspect-3/4 w-full touch-none overflow-hidden rounded-plate border border-hairline bg-panel"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       />
       <figcaption className="flex items-center gap-3">
         <IconButton label={t("accounts.turnLeft")} onClick={() => turn(-TURN_STEP)}>
