@@ -257,19 +257,19 @@ where
         Ok(written)
     }
     .await;
+    // A kept backup may be the old jar's only copy: its folder is never removed.
+    if !keep_backup.load(Ordering::Relaxed) {
+        release_dir(deps.fs, &staging).await;
+        return result;
+    }
+    tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
     match (result, &old) {
-        (Err(error), Some(old)) if keep_backup.load(Ordering::Relaxed) => {
-            tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
-            Err(InstallModError::PreviousKept {
-                filename: old.record.filename.clone(),
-                backup: backup.display().to_string(),
-                error: Box::new(error),
-            })
-        }
-        (result, _) => {
-            release_dir(deps.fs, &staging).await;
-            result
-        }
+        (Err(error), Some(old)) => Err(InstallModError::PreviousKept {
+            filename: old.record.filename.clone(),
+            backup: backup.display().to_string(),
+            error: Box::new(error),
+        }),
+        (result, _) => result,
     }
 }
 

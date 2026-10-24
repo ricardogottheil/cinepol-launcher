@@ -16,6 +16,9 @@ import {
 /** Results per page; Modrinth allows up to 100, the launcher asks for fewer. */
 export const MOD_PAGE_SIZE = 20;
 
+/** How long an update check that missed some mods is trusted. */
+export const PARTIAL_CHECK_STALE_MS = 30 * 1000;
+
 export const instanceModsKey = (instanceId: string) => ["instance-mods", instanceId] as const;
 export const modUpdatesKey = (instanceId: string) => ["mod-updates", instanceId] as const;
 
@@ -55,8 +58,10 @@ export function useModUpdates(instanceId: string, enabled = true) {
     queryKey: modUpdatesKey(instanceId),
     queryFn: () => checkModUpdates(instanceId),
     enabled,
-    // A check that missed some mods is asked again rather than trusted for minutes.
-    staleTime: (query) => (query.state.data?.unchecked.length ? 0 : 5 * 60 * 1000),
+    // A check that missed some mods is asked again sooner, but not on every
+    // mount: the catalog is likely failing or throttling right then.
+    staleTime: (query) =>
+      query.state.data?.unchecked.length ? PARTIAL_CHECK_STALE_MS : 5 * 60 * 1000,
   });
 }
 

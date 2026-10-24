@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IpcError, type ProgressEvent } from "../../ipc/client";
 import { createTestQueryClient } from "../../test/render";
 import {
+  PARTIAL_CHECK_STALE_MS,
   useInstanceMods,
   useModInstallPreview,
   useModUpdates,
@@ -128,7 +129,7 @@ describe("mod hooks", () => {
     expect(client.previewModInstall).toHaveBeenCalledWith("survival", "iris");
   });
 
-  it("asks again for updates after a check that missed some mods, and trusts a complete one", async () => {
+  it("asks again for updates soon after a check that missed some mods, and trusts a complete one", async () => {
     const sodium = {
       project: "sodium",
       title: "Sodium",
@@ -140,8 +141,18 @@ describe("mod hooks", () => {
     client.checkModUpdates.mockResolvedValue({ updates: [sodium], unchecked: ["Lithium"] });
     const first = setup(() => useModUpdates("survival"), partial);
     await waitFor(() => expect(first.result.current.data?.unchecked).toEqual(["Lithium"]));
-    setup(() => useModUpdates("survival"), partial);
-    await waitFor(() => expect(client.checkModUpdates).toHaveBeenCalledTimes(2));
+    // Not on every mount: the catalog is likely failing right then.
+    const soon = setup(() => useModUpdates("survival"), partial);
+    await waitFor(() => expect(soon.result.current.isSuccess).toBe(true));
+    expect(client.checkModUpdates).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.now() + PARTIAL_CHECK_STALE_MS + 1);
+      setup(() => useModUpdates("survival"), partial);
+      await waitFor(() => expect(client.checkModUpdates).toHaveBeenCalledTimes(2));
+    } finally {
+      vi.useRealTimers();
+    }
 
     client.checkModUpdates.mockClear();
     const complete = createTestQueryClient();
