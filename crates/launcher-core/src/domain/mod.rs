@@ -10,6 +10,7 @@ pub mod java;
 pub mod launch;
 pub mod loader;
 pub mod modpack;
+pub mod mods;
 pub mod ports;
 pub mod saved_server;
 pub mod server;

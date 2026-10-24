@@ -44,10 +44,18 @@ pub(super) struct Project {
     pub loaders: Vec<String>,
 }
 
-/// One entry of `GET /project/{id}/version`, and the values of `POST /version_files`.
+/// One entry of `GET /project/{id}/version`, `GET /version/{id}`, and the
+/// values of `POST /version_files`.
 #[derive(Debug, Deserialize)]
 pub(super) struct Version {
     pub id: String,
+    #[serde(default)]
+    pub project_id: String,
+    /// `release`, `beta` or `alpha`.
+    #[serde(default)]
+    pub version_type: Option<String>,
+    #[serde(default)]
+    pub dependencies: Vec<Dependency>,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
@@ -60,6 +68,16 @@ pub(super) struct Version {
     pub date_published: Option<String>,
     #[serde(default)]
     pub files: Vec<VersionFile>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct Dependency {
+    #[serde(default)]
+    pub version_id: Option<String>,
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// `required`, `optional`, `incompatible` or `embedded`.
+    pub dependency_type: String,
 }
 
 #[derive(Debug, Deserialize)]

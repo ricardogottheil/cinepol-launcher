@@ -6,6 +6,7 @@
 //! HTTP 429. Every parameter is percent-encoded and project ids are checked
 //! before they become part of a URL.
 
+mod mods;
 mod wire;
 
 use std::collections::{HashMap, HashSet};
