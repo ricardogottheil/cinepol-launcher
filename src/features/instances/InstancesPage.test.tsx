@@ -111,7 +111,7 @@ describe("InstancesPage", () => {
     expect(within(row).getByText("1 h 5 min")).toBeInTheDocument();
   });
 
-  it("opens an instance on its own page with servers, settings and log tabs", async () => {
+  it("opens an instance on its own page with servers, mods, settings and log tabs", async () => {
     client.listServers.mockResolvedValue({ servers: [] });
     renderAt("/instances");
     const row = (await screen.findByRole("heading", { name: "Survival" })).closest("li");
@@ -129,6 +129,9 @@ describe("InstancesPage", () => {
     );
 
     fireEvent.keyDown(servers, { key: "ArrowRight" });
+    const mods = screen.getByRole("tab", { name: labels.tabs.mods });
+    expect(mods).toHaveFocus();
+    fireEvent.keyDown(mods, { key: "ArrowRight" });
     expect(screen.getByRole("tab", { name: labels.tabs.settings })).toHaveFocus();
     expect(await screen.findByRole("region", { name: labels.settings.title })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: labels.tabs.log }));

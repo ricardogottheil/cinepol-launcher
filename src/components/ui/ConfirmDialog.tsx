@@ -44,7 +44,9 @@ export function ConfirmDialog({
       return;
     }
     if (event.key !== "Tab" || !dialog.current) return;
-    const focusable = dialog.current.querySelectorAll<HTMLElement>("button:not([disabled])");
+    const focusable = dialog.current.querySelectorAll<HTMLElement>(
+      "button:not([disabled]), input:not([disabled])",
+    );
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) {

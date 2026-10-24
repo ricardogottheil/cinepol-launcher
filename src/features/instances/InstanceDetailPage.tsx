@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { cx } from "../../components/ui/cx";
 import { Readout } from "../../components/ui/Readout";
 import { type InstanceDto, toIpcError } from "../../ipc/client";
+import { type ModJobState, ModJobStatus, ModsPanel, useModJob } from "../mods/ModsPanel";
 import { useActivityStore } from "./activityStore";
 import { splitPlaytime } from "./formatPlaytime";
 import { InstallProgress, InstanceStatus, PlayControl } from "./InstanceActivity";
@@ -16,10 +17,10 @@ import { ServerListPanel } from "./ServerListPanel";
 import { useInstanceSession } from "./useInstanceSession";
 import { useInstances, useOpenInstanceFolder } from "./useInstances";
 
-type InstanceTab = "servers" | "settings" | "log";
-const TABS: InstanceTab[] = ["servers", "settings", "log"];
+type InstanceTab = "servers" | "mods" | "settings" | "log";
+const TABS: InstanceTab[] = ["servers", "mods", "settings", "log"];
 
-/** One instance: its spec sheet and actions, then servers, settings and log in tabs. */
+/** One instance: its spec sheet and actions, then servers, mods, settings and log in tabs. */
 export function InstanceDetailPage() {
   const { t } = useTranslation();
   const { instanceId } = useParams({ from: "/instances/$instanceId" });
@@ -56,6 +57,7 @@ function InstanceDetail({ instance }: { instance: InstanceDto }) {
   const { activity, busy, packSource, manual } = session;
   const idle = activity.kind !== "installing" && activity.kind !== "running";
   const [tab, setTab] = useState<InstanceTab>("servers");
+  const modJobs = useModJob(instance.id);
   // The game's output is what matters once it starts.
   const running = activity.kind === "running";
   useEffect(() => {
@@ -104,6 +106,7 @@ function InstanceDetail({ instance }: { instance: InstanceDto }) {
           </p>
         ) : null}
         <InstallProgress session={session} />
+        <ModJobStatus jobs={modJobs} />
         <InstanceStatus session={session} />
       </header>
 
@@ -118,7 +121,14 @@ function InstanceDetail({ instance }: { instance: InstanceDto }) {
         />
       ) : null}
 
-      <InstanceTabs instance={instance} busy={busy} logs={session.logs} tab={tab} onTab={setTab} />
+      <InstanceTabs
+        instance={instance}
+        busy={busy}
+        logs={session.logs}
+        tab={tab}
+        onTab={setTab}
+        modJobs={modJobs}
+      />
     </>
   );
 }
@@ -129,12 +139,14 @@ function InstanceTabs({
   logs,
   tab,
   onTab: setTab,
+  modJobs,
 }: {
   instance: InstanceDto;
   busy: boolean;
   logs: Parameters<typeof LogPanel>[0]["lines"];
   tab: InstanceTab;
   onTab: (tab: InstanceTab) => void;
+  modJobs: ModJobState;
 }) {
   const { t } = useTranslation();
   const ids = useId();
@@ -188,6 +200,8 @@ function InstanceTabs({
       <div role="tabpanel" id={`${ids}-${tab}-panel`} aria-labelledby={`${ids}-${tab}`}>
         {tab === "servers" ? (
           <ServerListPanel instanceId={instance.id} />
+        ) : tab === "mods" ? (
+          <ModsPanel instance={instance} busy={busy} jobs={modJobs} />
         ) : tab === "settings" ? (
           <InstanceSettingsPanel instance={instance} busy={busy} />
         ) : (
