@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { type InstanceDto, toIpcError } from "../../ipc/client";
@@ -15,6 +15,9 @@ export interface ModJob {
   update: boolean;
 }
 
+/** How long the line saying a job finished stays up. */
+export const MOD_NOTICE_MS = 6000;
+
 /**
  * One mod install or update at a time for an instance. The instance page owns
  * it, so the job and its progress outlive switching tabs.
@@ -22,6 +25,13 @@ export interface ModJob {
 export function useModJob(instanceId: string) {
   const [job, setJob] = useState<ModJob | null>(null);
   const writer = useWriteMod(instanceId);
+  const { isSuccess, reset } = writer;
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    const timer = setTimeout(reset, MOD_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [isSuccess, reset]);
   function start(next: ModJob) {
     setJob(next);
     writer.mutate({ project: next.project, update: next.update });

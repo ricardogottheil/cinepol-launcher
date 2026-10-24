@@ -4,10 +4,23 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Readout } from "../../components/ui/Readout";
 import { TextField } from "../../components/ui/TextField";
-import type { InstanceDto, ModInstallPreviewDto, ModSummaryDto } from "../../ipc/client";
+import {
+  type InstanceDto,
+  type ModInstallPreviewDto,
+  type ModSummaryDto,
+  toIpcError,
+} from "../../ipc/client";
 import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from "../modpacks/useModpacks";
 import { modErrorText } from "./modErrorText";
 import { MOD_PAGE_SIZE, useInstanceMods, useModInstallPreview, useModSearch } from "./useMods";
+
+/** Refusals about the mod itself; anything else (network, rate limit) may pass. */
+const FINAL_REFUSALS = new Set([
+  "mod_incompatible",
+  "no_compatible_version",
+  "too_many_dependencies",
+  "already_exists",
+]);
 
 /**
  * Modrinth mods that run on this instance: the filter is the instance's own
@@ -42,15 +55,25 @@ export function ModBrowser({
   );
   const [picked, setPicked] = useState<ModSummaryDto | null>(null);
   const preview = useModInstallPreview(instance.id, picked?.project ?? null);
-  // Why a mod cannot be installed, kept on its row once the preview says so.
-  const [refused, setRefused] = useState<Record<string, string>>({});
-  const previewError = preview.error;
+  // Why the last check of a mod failed, kept on its row; `final` when the
+  // mod itself cannot be installed, so retrying would only fail again.
+  const [refused, setRefused] = useState<Record<string, { text: string; final: boolean }>>({});
+  const previewError = preview.isFetching ? null : preview.error;
 
   useEffect(() => {
     if (!picked || !previewError) return;
-    setRefused((current) => ({ ...current, [picked.project]: modErrorText(t, previewError) }));
+    const final = FINAL_REFUSALS.has(toIpcError(previewError).code);
+    setRefused((current) => ({
+      ...current,
+      [picked.project]: { text: modErrorText(t, previewError), final },
+    }));
     setPicked(null);
   }, [picked, previewError, t]);
+
+  function pick(mod: ModSummaryDto) {
+    setRefused(({ [mod.project]: _, ...rest }) => rest);
+    setPicked(mod);
+  }
 
   const items = search.data?.items ?? [];
   const total = search.data?.total ?? null;
@@ -113,7 +136,9 @@ export function ModBrowser({
                         {mod.description}
                       </span>
                       {refused[mod.project] ? (
-                        <span className="text-[0.875rem] text-stale">{refused[mod.project]}</span>
+                        <span className="text-[0.875rem] text-stale">
+                          {refused[mod.project]?.text}
+                        </span>
                       ) : null}
                     </div>
                   </div>
@@ -125,11 +150,11 @@ export function ModBrowser({
                     />
                     <ResultAction
                       installed={installed.has(mod.project)}
-                      refused={mod.project in refused}
+                      refused={refused[mod.project]?.final ?? false}
                       checking={picked?.project === mod.project}
                       disabled={locked || picked !== null}
                       title={mod.title}
-                      onInstall={() => setPicked(mod)}
+                      onInstall={() => pick(mod)}
                     />
                   </div>
                 </li>

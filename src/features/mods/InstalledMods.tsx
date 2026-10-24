@@ -181,9 +181,11 @@ function ModRow({
             </span>
           )}
         </span>
-        <span className="readout-sm break-all text-engrave">
-          {entry.versionNumber ?? entry.filename}
-          {why ? <span className="text-silk-dim"> · {why}</span> : null}
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <span className="readout-sm break-all text-engrave">
+            {entry.versionNumber ?? entry.filename}
+          </span>
+          {why ? <span className="text-[0.875rem] text-silk-dim">· {why}</span> : null}
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -216,7 +218,7 @@ function RemoveDialog({
   const [withOrphans, setWithOrphans] = useState(true);
   return (
     <ConfirmDialog
-      title={t("mods.remove_title", { mod: entry.title })}
+      title={t("mods.removeTitle", { mod: entry.title })}
       confirmLabel={t("mods.remove")}
       cancelLabel={t("mods.cancel")}
       destructive

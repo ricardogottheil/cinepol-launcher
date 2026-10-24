@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import esCommon from "../../i18n/locales/es/common.json";
 import { type InstanceDto, IpcError, type ModEntryDto } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
-import { ModJobStatus, ModsPanel, useModJob } from "./ModsPanel";
+import { MOD_NOTICE_MS, ModJobStatus, ModsPanel, useModJob } from "./ModsPanel";
 
 const client = vi.hoisted(() => ({
   listInstanceMods: vi.fn(),
@@ -314,5 +314,74 @@ describe("ModsPanel", () => {
     expect(within(results).getByText(labels.notCompatible)).toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(client.installMod).not.toHaveBeenCalled();
+  });
+
+  it("lets the player retry a mod whose check failed for a passing reason", async () => {
+    client.searchMods.mockResolvedValue({
+      items: [
+        { project: "lithium", title: "Lithium", description: "", iconUrl: null, downloads: 1 },
+      ],
+      total: 1,
+    });
+    client.previewModInstall
+      .mockRejectedValueOnce(new IpcError("network", "offline"))
+      .mockResolvedValueOnce({
+        mods: [
+          {
+            project: "lithium",
+            title: "Lithium",
+            versionNumber: "0.13.0",
+            requested: true,
+            requiredBy: [],
+          },
+        ],
+      });
+    renderWithQuery(<Panel />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.add }));
+    const results = await screen.findByRole("region", { name: labels.results });
+    const install = await within(results).findByRole("button", {
+      name: `${labels.install} Lithium`,
+    });
+    fireEvent.click(install);
+
+    expect(await within(results).findByText(esCommon.errors.network)).toBeInTheDocument();
+    expect(within(results).queryByText(labels.notCompatible)).not.toBeInTheDocument();
+    fireEvent.click(within(results).getByRole("button", { name: `${labels.install} Lithium` }));
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+    expect(within(results).queryByText(esCommon.errors.network)).not.toBeInTheDocument();
+  });
+
+  it("clears the install notice after a while", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const operation = pendingOperation();
+      client.updateMod.mockImplementation(operation.start);
+      client.checkModUpdates.mockResolvedValue({
+        updates: [
+          {
+            project: "iris",
+            title: "Iris Shaders",
+            filename: "iris.jar",
+            current: "1.8.8",
+            versionNumber: "1.9.0",
+          },
+        ],
+        unchecked: [],
+      });
+      renderWithQuery(<Panel />);
+      await screen.findByRole("list", { name: labels.installedLabel });
+      fireEvent.click(screen.getByRole("button", { name: labels.checkUpdates }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: fill(labels.update, { version: "1.9.0" }) }),
+      );
+      await screen.findByText(fill(labels.updating, { mod: "Iris Shaders" }));
+      operation.finish([]);
+      const done = fill(labels.updatedDone, { mod: "Iris Shaders" });
+      expect(await screen.findByText(done)).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(MOD_NOTICE_MS);
+      expect(screen.queryByText(done)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

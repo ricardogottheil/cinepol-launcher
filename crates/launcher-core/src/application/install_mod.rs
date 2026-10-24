@@ -262,13 +262,15 @@ where
         release_dir(deps.fs, &staging).await;
         return result;
     }
-    tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
     match (result, &old) {
-        (Err(error), Some(old)) => Err(InstallModError::PreviousKept {
-            filename: old.record.filename.clone(),
-            backup: backup.display().to_string(),
-            error: Box::new(error),
-        }),
+        (Err(error), Some(old)) => {
+            tracing::error!(path = %backup.display(), "kept the previous mod jar after a failed update");
+            Err(InstallModError::PreviousKept {
+                filename: old.record.filename.clone(),
+                backup: backup.display().to_string(),
+                error: Box::new(error),
+            })
+        }
         (result, _) => result,
     }
 }
