@@ -26,7 +26,8 @@ use crate::domain::integrity::HashAlgorithm;
 use crate::domain::launch::LauncherPaths;
 use crate::domain::modpack::{PackFileError, PackFiles};
 use crate::domain::mods::{
-    InstalledMod, ModFile, ModPlanError, ModRegistryStore, ModSource, ModTarget, PlannedMod,
+    InstalledMod, ModEntry, ModFile, ModPlanError, ModRegistry, ModRegistryStore, ModSource,
+    ModTarget, PlannedMod,
 };
 use crate::domain::ports::{
     DownloadError, DownloadRequest, Downloader, FileSystem, FileSystemError, ProgressReporter,
@@ -134,17 +135,36 @@ where
         remove_all(deps.files, &placed).await;
         return Err(error.into());
     }
-    for entry in &inventory.entries {
-        let needed = entry.record.as_ref().is_some_and(|record| {
-            plan.present
-                .iter()
-                .any(|(dependency, _)| *dependency == record.project)
-        });
-        if needed && !entry.enabled {
-            set_jar_enabled(deps.files, &mods_dir, &entry.filename, true).await?;
+    for (dependency, _) in &plan.present {
+        if let Some(filename) = disabled_copy(&inventory.entries, &registry, dependency) {
+            set_jar_enabled(deps.files, &mods_dir, filename, true).await?;
         }
     }
     Ok(written)
+}
+
+/// The jar to enable for an installed `project` the new mod needs: the
+/// recorded copy, when it is disabled and no other copy is enabled.
+fn disabled_copy<'a>(
+    entries: &'a [ModEntry],
+    registry: &ModRegistry,
+    project: &str,
+) -> Option<&'a str> {
+    let of_project = |entry: &&ModEntry| {
+        entry
+            .record
+            .as_ref()
+            .is_some_and(|record| record.project == project)
+    };
+    if entries.iter().filter(of_project).any(|entry| entry.enabled) {
+        return None;
+    }
+    let recorded = registry.get(project)?;
+    entries
+        .iter()
+        .filter(of_project)
+        .find(|entry| entry.filename == recorded.filename && entry.sha512 == recorded.sha512)
+        .map(|entry| entry.filename.as_str())
 }
 
 /// Each planned mod with the jar it installs. The plan only picks versions
@@ -538,6 +558,26 @@ mod tests {
             std::fs::read(mods_dir(&world).join("sodium-2.jar")).unwrap(),
             mod_jar("sodium-2")
         );
+    }
+
+    #[tokio::test]
+    async fn a_disabled_spare_copy_stays_disabled_next_to_an_enabled_one() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(mods_dir(&world).join("sodium-2.jar"), mod_jar("sodium-2")).unwrap();
+        std::fs::write(
+            mods_dir(&world).join("sodium-old.jar.disabled"),
+            mod_jar("sodium-2"),
+        )
+        .unwrap();
+        let downloader = downloader();
+        install(&world, &downloader).await.unwrap();
+        assert_eq!(
+            jars_in(&world),
+            ["iris-2.jar", "sodium-2.jar", "sodium-old.jar.disabled"]
+        );
+        let registry = world.registry.load(&id()).await.unwrap();
+        assert_eq!(registry.get("sodium").unwrap().filename, "sodium-2.jar");
     }
 
     #[tokio::test]

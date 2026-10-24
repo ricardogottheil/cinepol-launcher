@@ -86,10 +86,16 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
         })
         .collect();
 
-    // Launcher records first, so an identified copy never replaces one.
+    // Launcher records first, so an identified copy never replaces one, and
+    // of several identified copies of a project an enabled one.
     let mut registry = ModRegistry::default();
     for origin in [ModOrigin::Launcher, ModOrigin::Identified] {
-        for entry in entries.iter().filter(|entry| entry.origin == origin) {
+        let mut candidates: Vec<&ModEntry> = entries
+            .iter()
+            .filter(|entry| entry.origin == origin)
+            .collect();
+        candidates.sort_by_key(|entry| !entry.enabled);
+        for entry in candidates {
             if let Some(record) = &entry.record
                 && registry.get(&record.project).is_none()
             {
