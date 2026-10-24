@@ -13,6 +13,7 @@ import {
   listLoaderVersions,
   listServers,
   type NewInstanceRequest,
+  openInstanceFolder,
   type ServerEditDto,
   updateInstanceSettings,
 } from "../../ipc/client";
@@ -84,6 +85,11 @@ export function useDeleteInstance(instanceId: string) {
     mutationFn: () => deleteInstance(instanceId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: instancesKey }),
   });
+}
+
+/** Opens the instance's game folder in the system's file manager. */
+export function useOpenInstanceFolder(instanceId: string) {
+  return useMutation({ mutationFn: () => openInstanceFolder(instanceId) });
 }
 
 /** While files wait for a manual download, the Downloads folder is checked this often. */

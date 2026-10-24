@@ -221,6 +221,13 @@ App shell (`src/app/shell/`):
   page (`/modpacks/<catalog>/<project>`) with its versions. Installed reuses
   the instance rows; Import groups the file pickers and packwiz. The tab, the
   catalog and the search survive opening a pack.
+- **Instances**: the list keeps each row to its spec sheet (name as a link,
+  version, loader, playtime), Play and one status line; rows are separated by
+  a single hairline, and empty status lines take no room. The name opens the
+  instance's own page (`/instances/<id>`): a back link, the name as `display-lg`,
+  the spec sheet and the actions (Open folder, Update, Export, Install, Play),
+  then tabs Servers / Settings / Log styled like the Modpacks tabs. Starting
+  the game switches to Log. Deleting the instance returns to the list.
 - **Servers**: CINEPOL pinned first on a `panel` plate with its live status
   and the page's only signal control (Play); then "Your servers" as rows
   (name, address readout, status lamp, players, version, latency, the

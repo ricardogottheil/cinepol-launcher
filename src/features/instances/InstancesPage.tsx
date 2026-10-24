@@ -17,9 +17,9 @@ export function InstancesPage() {
         ) : instances.isError ? (
           <p className="m-0 text-stale">{t(`errors.${toIpcError(instances.error).code}`)}</p>
         ) : instances.data.length === 0 ? (
-          <p className="m-0 border-t border-hairline pt-6 text-silk-dim">{t("instances.empty")}</p>
+          <p className="m-0 text-silk-dim">{t("instances.empty")}</p>
         ) : (
-          <ul className="m-0 list-none border-t border-hairline p-0">
+          <ul className="m-0 list-none divide-y divide-hairline p-0">
             {instances.data.map((instance) => (
               <InstanceRow key={instance.id} instance={instance} />
             ))}

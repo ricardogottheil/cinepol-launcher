@@ -209,6 +209,15 @@
   },
   "instances": {
     "title": "Instances",
+    "back": "Back to Instances",
+    "notFound": "This instance does not exist anymore.",
+    "openFolder": "Open folder",
+    "tabsLabel": "Instance sections",
+    "tabs": {
+      "servers": "Servers",
+      "settings": "Settings",
+      "log": "Log"
+    },
     "empty": "You have no instances yet.",
     "loading": "Loading instances",
     "newTitle": "New instance",
@@ -252,8 +261,6 @@
     "exported": "Saved to {{path}}",
     "exporting": "Exporting the modpack",
     "settings": {
-      "open": "Settings",
-      "close": "Close settings",
       "title": "Instance settings",
       "account": "Default account",
       "accountActive": "The active account",
@@ -296,8 +303,6 @@
       "waiting_other": "Waiting for {{count}} files"
     },
     "servers": {
-      "open": "Servers",
-      "close": "Close servers",
       "title": "Multiplayer servers",
       "empty": "No servers yet.",
       "name": "Name",

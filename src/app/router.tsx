@@ -9,6 +9,7 @@ import { AddProfilePage } from "../features/accounts/AddProfilePage";
 import { ProfilePage } from "../features/accounts/ProfilePage";
 import { DesignKitPage } from "../features/design-kit/DesignKitPage";
 import { HomePage } from "../features/home/HomePage";
+import { InstanceDetailPage } from "../features/instances/InstanceDetailPage";
 import { InstancesPage } from "../features/instances/InstancesPage";
 import { ModpackDetailPage } from "../features/modpacks/ModpackDetailPage";
 import { ModpacksPage } from "../features/modpacks/ModpacksPage";
@@ -33,6 +34,11 @@ const designRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   homeRoute,
   createRoute({ getParentRoute: () => rootRoute, path: "/instances", component: InstancesPage }),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/instances/$instanceId",
+    component: InstanceDetailPage,
+  }),
   createRoute({ getParentRoute: () => rootRoute, path: "/servers", component: ServersPage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/modpacks", component: ModpacksPage }),
   createRoute({

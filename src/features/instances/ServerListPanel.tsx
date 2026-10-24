@@ -74,11 +74,7 @@ export function ServerListPanel({ instanceId }: { instanceId: string }) {
   ];
 
   return (
-    <section
-      aria-label={t("instances.servers.title")}
-      className="flex flex-col gap-5 border-t border-hairline pt-6"
-    >
-      <h3 className="plate m-0 text-engrave">{t("instances.servers.title")}</h3>
+    <section aria-label={t("instances.servers.title")} className="flex flex-col gap-5">
       {servers.isPending ? (
         <p className="m-0 text-engrave">{t("instances.loading")}</p>
       ) : servers.isError ? (
@@ -86,11 +82,11 @@ export function ServerListPanel({ instanceId }: { instanceId: string }) {
       ) : list.length === 0 ? (
         <p className="m-0 text-silk-dim">{t("instances.servers.empty")}</p>
       ) : (
-        <ul className="m-0 list-none border-t border-hairline p-0">
+        <ul className="m-0 list-none divide-y divide-hairline p-0">
           {list.map((server, index) => (
             <li
               key={keys[index]}
-              className="flex flex-wrap items-center justify-between gap-4 border-b border-hairline py-3"
+              className="flex flex-wrap items-center justify-between gap-4 py-3"
             >
               <div className="flex min-w-0 items-center gap-4">
                 {server.icon ? (

@@ -51,7 +51,7 @@ export function NewInstanceForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5 border-t border-hairline pt-8">
+    <form onSubmit={submit} className="flex flex-col gap-5">
       <h2 className="display-md m-0 text-silk">{t("instances.newTitle")}</h2>
       <div className="flex flex-wrap items-start gap-4">
         <TextField

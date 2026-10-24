@@ -209,6 +209,15 @@
   },
   "instances": {
     "title": "Instancias",
+    "back": "Volver a Instancias",
+    "notFound": "Esta instancia ya no existe.",
+    "openFolder": "Abrir carpeta",
+    "tabsLabel": "Secciones de la instancia",
+    "tabs": {
+      "servers": "Servidores",
+      "settings": "Configuración",
+      "log": "Registro"
+    },
     "empty": "Todavía no tienes instancias.",
     "loading": "Cargando instancias",
     "newTitle": "Nueva instancia",
@@ -252,8 +261,6 @@
     "exported": "Guardado en {{path}}",
     "exporting": "Exportando el modpack",
     "settings": {
-      "open": "Configurar",
-      "close": "Cerrar configuración",
       "title": "Configuración de la instancia",
       "account": "Cuenta por defecto",
       "accountActive": "La cuenta activa",
@@ -296,8 +303,6 @@
       "waiting_other": "Faltan {{count}} archivos"
     },
     "servers": {
-      "open": "Servidores",
-      "close": "Cerrar servidores",
       "title": "Servidores multijugador",
       "empty": "Todavía no hay servidores.",
       "name": "Nombre",

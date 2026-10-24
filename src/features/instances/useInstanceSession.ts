@@ -1,0 +1,59 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import type { InstanceDto } from "../../ipc/client";
+import { CINEPOL_SESSION, useInstanceActivity } from "./activityStore";
+import { instancesKey, manualDownloadsKey, serversKey, useManualDownloads } from "./useInstances";
+
+export type PackSource = "modrinth" | "curseforge" | "packwiz";
+
+/**
+ * What an instance is doing right now, shared by its row in the list and its
+ * own page: the activity, the modpack it follows and the files it still waits
+ * for. Mount it once per screen; it refreshes the data the game or an update
+ * rewrites.
+ */
+export function useInstanceSession(instance: InstanceDto) {
+  const own = useInstanceActivity(instance.id);
+  const cinepolSession = useInstanceActivity(CINEPOL_SESSION);
+  // A Play on CINEPOL session started from Home runs this instance too.
+  const session =
+    instance.origin === "cinepolServer" && cinepolSession.activity.kind !== "idle"
+      ? cinepolSession
+      : own;
+  const packSource: PackSource | null =
+    instance.modpackSource === "modrinth" ||
+    instance.modpackSource === "curseforge" ||
+    instance.modpackSource === "packwiz"
+      ? instance.modpackSource
+      : null;
+  // packwiz and CurseForge packs may hold files the player downloads by hand.
+  const hasManualFiles = packSource === "packwiz" || packSource === "curseforge";
+  const manual = useManualDownloads(instance.id, hasManualFiles);
+  const waitingForFiles = (manual.data?.remaining.length ?? 0) > 0;
+
+  const queryClient = useQueryClient();
+  const { lastExit, notice } = session;
+  // The game rewrites servers.dat when it exits.
+  useEffect(() => {
+    if (lastExit) void queryClient.invalidateQueries({ queryKey: serversKey(instance.id) });
+  }, [lastExit, queryClient, instance.id]);
+
+  // An update may move the instance to another game or loader version, and a
+  // packwiz update may add files to download by hand.
+  useEffect(() => {
+    if (notice?.kind !== "updated") return;
+    void queryClient.invalidateQueries({ queryKey: instancesKey });
+    void queryClient.invalidateQueries({ queryKey: manualDownloadsKey(instance.id) });
+  }, [notice, queryClient, instance.id]);
+
+  return {
+    ...session,
+    busy: session.activity.kind !== "idle",
+    packSource,
+    hasManualFiles,
+    manual,
+    waitingForFiles,
+  };
+}
+
+export type InstanceSession = ReturnType<typeof useInstanceSession>;

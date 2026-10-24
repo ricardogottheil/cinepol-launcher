@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
@@ -41,11 +42,7 @@ export function InstanceSettingsPanel({
   const settings = useInstanceSettings(instance.id);
 
   return (
-    <section
-      aria-label={t("instances.settings.title")}
-      className="flex flex-col gap-6 border-t border-hairline pt-6"
-    >
-      <h3 className="plate m-0 text-engrave">{t("instances.settings.title")}</h3>
+    <section aria-label={t("instances.settings.title")} className="flex flex-col gap-6">
       {settings.isPending ? (
         <p className="m-0 text-engrave">{t("instances.loading")}</p>
       ) : settings.isError ? (
@@ -260,6 +257,7 @@ function Management({ instance, busy }: { instance: InstanceDto; busy: boolean }
   const [confirming, setConfirming] = useState(false);
   const duplicate = useDuplicateInstance(instance.id);
   const remove = useDeleteInstance(instance.id);
+  const navigate = useNavigate();
   const error = duplicate.error ?? remove.error;
 
   return (
@@ -306,7 +304,8 @@ function Management({ instance, busy }: { instance: InstanceDto; busy: boolean }
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);
-            remove.mutate();
+            // The instance page has nothing left to show.
+            remove.mutate(undefined, { onSuccess: () => void navigate({ to: "/instances" }) });
           }}
         >
           <p className="m-0">{t("instances.settings.deleteBody")}</p>

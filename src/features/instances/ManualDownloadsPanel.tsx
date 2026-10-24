@@ -39,11 +39,11 @@ export function ManualDownloadsPanel({
       ) : (
         <>
           <p className="m-0 text-silk-dim">{t("instances.manual.body")}</p>
-          <ul className="m-0 list-none border-t border-hairline p-0">
+          <ul className="m-0 list-none divide-y divide-hairline p-0">
             {remaining.map((file) => (
               <li
                 key={file.filename}
-                className="flex flex-wrap items-center justify-between gap-4 border-b border-hairline py-3"
+                className="flex flex-wrap items-center justify-between gap-4 py-3"
               >
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-silk">{file.name}</span>

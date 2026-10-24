@@ -1,10 +1,11 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { App } from "../../app/App";
+import { createAppRouter } from "../../app/router";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError, type LogLineDto, type ProgressEvent } from "../../ipc/client";
-import { renderWithQuery } from "../../test/render";
 import { CINEPOL_SESSION, useActivityStore } from "./activityStore";
-import { InstancesPage } from "./InstancesPage";
 
 const client = vi.hoisted(() => ({
   listInstances: vi.fn(),
@@ -28,6 +29,7 @@ const client = vi.hoisted(() => ({
   listServers: vi.fn(),
   editServerList: vi.fn(),
   openCrashReport: vi.fn(),
+  openInstanceFolder: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -75,6 +77,12 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function renderAt(path: string) {
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
+  render(<App router={router} />);
+  return router;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   useActivityStore.setState({ byInstance: {} });
@@ -95,16 +103,65 @@ beforeEach(() => {
 
 describe("InstancesPage", () => {
   it("lists instances with their spec readouts", async () => {
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     const row = (await screen.findByRole("heading", { name: "Survival" })).closest("li");
     if (!row) throw new Error("row not found");
     expect(within(row).getByText("26.2")).toBeInTheDocument();
     expect(within(row).getByText("1 h 5 min")).toBeInTheDocument();
   });
 
+  it("opens an instance on its own page with servers, settings and log tabs", async () => {
+    client.listServers.mockResolvedValue({ servers: [] });
+    renderAt("/instances");
+    const row = (await screen.findByRole("heading", { name: "Survival" })).closest("li");
+    if (!row) throw new Error("row not found");
+    expect(within(row).getByRole("button", { name: labels.play })).toBeEnabled();
+    expect(within(row).queryByRole("button", { name: labels.export })).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("link", { name: "Survival" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Survival" })).toBeInTheDocument();
+    expect(screen.getByText("1 h 5 min")).toBeInTheDocument();
+    const servers = screen.getByRole("tab", { name: labels.tabs.servers });
+    expect(servers).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("tabpanel", { name: labels.tabs.servers })).toHaveTextContent(
+      labels.servers.empty,
+    );
+
+    fireEvent.keyDown(servers, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: labels.tabs.settings })).toHaveFocus();
+    expect(await screen.findByRole("region", { name: labels.settings.title })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: labels.tabs.log }));
+    expect(screen.getByRole("tabpanel", { name: labels.tabs.log })).toHaveTextContent(
+      labels.logEmpty,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: labels.back }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: labels.title }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the instance's folder and says why it could not", async () => {
+    client.openInstanceFolder.mockResolvedValueOnce(undefined);
+    client.openInstanceFolder.mockRejectedValueOnce(new IpcError("internal", "no file manager"));
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("button", { name: labels.openFolder }));
+    await waitFor(() => expect(client.openInstanceFolder).toHaveBeenCalledWith("survival"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: labels.openFolder }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(esCommon.errors.internal);
+  });
+
+  it("says when the instance of a page does not exist", async () => {
+    renderAt("/instances/missing");
+    expect(await screen.findByText(labels.notFound)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: labels.back })).toBeInTheDocument();
+  });
+
   it("creates an instance on the latest release by default", async () => {
     client.createInstance.mockResolvedValue({ ...instance, id: "cinepol", name: "CINEPOL" });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     await screen.findByRole("option", { name: "1.21.11" });
     fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "CINEPOL" } });
     fireEvent.click(screen.getByRole("button", { name: labels.create }));
@@ -126,7 +183,7 @@ describe("InstancesPage", () => {
       { version: "0.19.4", stable: true },
     ]);
     client.createInstance.mockResolvedValue({ ...instance, id: "fab", name: "Fab" });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     await screen.findByRole("option", { name: "1.21.11" });
     fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "fabric" } });
     await waitFor(() => expect(client.listLoaderVersions).toHaveBeenCalledWith("fabric", "26.2"));
@@ -154,7 +211,7 @@ describe("InstancesPage", () => {
         : [{ version: "0.19.5", stable: true }],
     );
     client.createInstance.mockResolvedValue({ ...instance, id: "fab", name: "Fab" });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     await screen.findByRole("option", { name: "1.21.11" });
     fireEvent.change(screen.getByLabelText(labels.versionLabel), { target: { value: "1.21.11" } });
     fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "fabric" } });
@@ -181,7 +238,7 @@ describe("InstancesPage", () => {
       { version: "65.1.0", stable: true },
     ]);
     client.createInstance.mockResolvedValue({ ...instance, id: "forge", name: "Forge" });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     await screen.findByRole("option", { name: "1.21.11" });
     expect(screen.getByRole("option", { name: labels.loaders.neoforge })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "forge" } });
@@ -199,7 +256,7 @@ describe("InstancesPage", () => {
   it("asks to support Forge, since its installer is downloaded automatically", async () => {
     client.listLoaderVersions.mockResolvedValue([{ version: "65.1.0", stable: true }]);
     client.openExternal.mockResolvedValue(undefined);
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     await screen.findByRole("option", { name: "1.21.11" });
     expect(screen.queryByRole("link", { name: labels.supportForge })).not.toBeInTheDocument();
 
@@ -214,11 +271,14 @@ describe("InstancesPage", () => {
 
   it("explains a loader that does not support the chosen version", async () => {
     client.listLoaderVersions.mockRejectedValue(new IpcError("loader_unavailable", "400"));
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
     await screen.findByRole("option", { name: "1.21.11" });
     fireEvent.change(screen.getByLabelText(labels.loaderLabel), { target: { value: "quilt" } });
     fireEvent.change(screen.getByLabelText(labels.nameLabel), { target: { value: "Q" } });
-    expect(await screen.findByText(esCommon.errors.loader_unavailable)).toBeInTheDocument();
+    // The app's query client retries a failed lookup twice before it gives up.
+    expect(
+      await screen.findByText(esCommon.errors.loader_unavailable, {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.create })).toBeDisabled();
   });
 
@@ -232,7 +292,7 @@ describe("InstancesPage", () => {
         return { operationId: "op", done: done.promise, cancel };
       },
     );
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.install }));
     act(() => onProgress({ done: 43_515_908, total: 126_583_468, stage: "assets", unit: "bytes" }));
 
@@ -253,7 +313,7 @@ describe("InstancesPage", () => {
       return exit.promise;
     });
     client.killInstance.mockResolvedValue(true);
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     act(() =>
       onLog({
@@ -286,7 +346,7 @@ describe("InstancesPage", () => {
       }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     await waitFor(() => expect(client.launchInstance).toHaveBeenCalledTimes(2));
     expect(client.installInstance).toHaveBeenCalledOnce();
@@ -304,7 +364,7 @@ describe("InstancesPage", () => {
         [CINEPOL_SESSION]: { activity: { kind: "running" }, logs: [], error: null, lastExit: null },
       },
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances");
 
     const row = (await screen.findByRole("heading", { name: "CINEPOL" })).closest("li");
     if (!row) throw new Error("no CINEPOL row");
@@ -343,17 +403,18 @@ describe("InstancesPage", () => {
       }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<InstancesPage />);
-    const row = (await screen.findByRole("heading", { name: "Fabulously Optimized" })).closest(
-      "li",
+    const router = renderAt("/instances/survival");
+    await screen.findByRole("heading", { level: 1, name: "Survival" });
+    expect(screen.getByRole("button", { name: labels.export })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.update })).not.toBeInTheDocument();
+
+    await act(() =>
+      router.navigate({ to: "/instances/$instanceId", params: { instanceId: "fo" } }),
     );
-    const other = screen.getByRole("heading", { name: "Survival" }).closest("li");
-    if (!row || !other) throw new Error("rows not found");
-    expect(within(other).queryByRole("button", { name: labels.update })).not.toBeInTheDocument();
-    fireEvent.click(within(row).getByRole("button", { name: labels.update }));
+    fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(client.updateModpack).toHaveBeenCalledWith("fo", expect.any(Function));
     expect(
-      await within(row).findByText(labels.keptChanges_other.replace("{{count}}", "2")),
+      await screen.findByText(labels.keptChanges_other.replace("{{count}}", "2")),
     ).toBeInTheDocument();
   });
 
@@ -366,7 +427,7 @@ describe("InstancesPage", () => {
       done: Promise.resolve({ upToDate: true, instance: null, files: null }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(await screen.findByText(labels.upToDate)).toBeInTheDocument();
   });
@@ -377,7 +438,7 @@ describe("InstancesPage", () => {
       indexed: 10,
       overrides: 2,
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.export }));
     expect(client.exportMrpack).toHaveBeenCalledWith("survival");
     expect(
@@ -387,7 +448,7 @@ describe("InstancesPage", () => {
 
   it("shows why an export failed", async () => {
     client.exportMrpack.mockRejectedValue(new IpcError("network", "offline"));
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.export }));
     expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
@@ -395,7 +456,7 @@ describe("InstancesPage", () => {
   it("keeps the row busy while an export runs", async () => {
     const exported = deferred<{ path: string; indexed: number; overrides: number } | null>();
     client.exportMrpack.mockReturnValue(exported.promise);
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.export }));
     expect(await screen.findByText(labels.exporting)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.export })).toBeDisabled();
@@ -413,15 +474,15 @@ describe("InstancesPage", () => {
       done: Promise.reject(new IpcError("network", "offline")),
       cancel: vi.fn(),
     }));
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.update })).toBeEnabled();
   });
 
   async function openSettings() {
-    renderWithQuery(<InstancesPage />);
-    fireEvent.click(await screen.findByRole("button", { name: settingsLabels.open }));
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("tab", { name: labels.tabs.settings }));
     return screen.findByRole("region", { name: settingsLabels.title });
   }
 
@@ -580,7 +641,7 @@ describe("InstancesPage", () => {
       }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/gto");
     fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(client.updatePackwiz).toHaveBeenCalledWith("gto", expect.any(Function));
     expect(client.updateModpack).not.toHaveBeenCalled();
@@ -600,7 +661,7 @@ describe("InstancesPage", () => {
       done: Promise.resolve({ upToDate: true, instance: null, files: null, pending: [] }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/fo");
     const panel = await screen.findByRole("region", { name: manual.title });
     expect(within(panel).getByText(jei.name)).toBeInTheDocument();
     expect(client.checkManualDownloads).toHaveBeenCalledWith("fo");
@@ -614,7 +675,7 @@ describe("InstancesPage", () => {
     client.checkManualDownloads
       .mockResolvedValueOnce({ resolved: [], remaining: [jei] })
       .mockResolvedValue({ resolved: [jei], remaining: [] });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/gto");
     const panel = await screen.findByRole("region", { name: manual.title });
     expect(within(panel).getByText(jei.name)).toBeInTheDocument();
     expect(within(panel).getByText(jei.filename)).toBeInTheDocument();
@@ -640,7 +701,7 @@ describe("InstancesPage", () => {
       cancel: vi.fn(),
     });
     client.launchInstance.mockResolvedValue({ ...outcome, instanceId: "gto" });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/gto");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     await waitFor(() => expect(client.launchInstance).toHaveBeenCalled());
     expect(client.updatePackwiz).toHaveBeenCalledWith("gto", expect.any(Function));
@@ -655,8 +716,8 @@ describe("InstancesPage", () => {
     client.updateInstanceSettings.mockImplementation((_id: string, settings: unknown) =>
       Promise.resolve(settings),
     );
-    renderWithQuery(<InstancesPage />);
-    fireEvent.click(await screen.findByRole("button", { name: settingsLabels.open }));
+    renderAt("/instances/gto");
+    fireEvent.click(await screen.findByRole("tab", { name: labels.tabs.settings }));
     const panel = await screen.findByRole("region", { name: settingsLabels.title });
     fireEvent.click(await within(panel).findByLabelText(settingsLabels.updateOnLaunch));
     fireEvent.click(within(panel).getByRole("button", { name: settingsLabels.save }));
@@ -669,8 +730,8 @@ describe("InstancesPage", () => {
   });
 
   it("does not show the update-on-launch option for other instances", async () => {
-    renderWithQuery(<InstancesPage />);
-    fireEvent.click(await screen.findByRole("button", { name: settingsLabels.open }));
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("tab", { name: labels.tabs.settings }));
     const panel = await screen.findByRole("region", { name: settingsLabels.title });
     await within(panel).findByLabelText(labels.nameLabel);
     expect(within(panel).queryByLabelText(settingsLabels.updateOnLaunch)).not.toBeInTheDocument();
@@ -691,7 +752,7 @@ describe("InstancesPage", () => {
       cancel: vi.fn(),
     });
     client.launchInstance.mockResolvedValue({ ...outcome, instanceId: "gto" });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/gto");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     await waitFor(() => expect(client.updatePackwiz).toHaveBeenCalled());
     expect(await screen.findByRole("region", { name: manual.title })).toBeInTheDocument();
@@ -712,7 +773,7 @@ describe("InstancesPage", () => {
       }),
       cancel: vi.fn(),
     });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/gto");
     fireEvent.click(await screen.findByRole("button", { name: labels.update }));
     expect(await screen.findByRole("region", { name: manual.title })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: labels.play })).toBeDisabled();
@@ -729,8 +790,7 @@ describe("InstancesPage", () => {
     const hypixel = { ...cinepol, name: "Hypixel", address: "mc.hypixel.net" };
 
     async function openServers() {
-      renderWithQuery(<InstancesPage />);
-      fireEvent.click(await screen.findByRole("button", { name: serverLabels.open }));
+      renderAt("/instances/survival");
       return screen.findByRole("region", { name: serverLabels.title });
     }
 
@@ -844,7 +904,7 @@ describe("InstancesPage", () => {
     const report = "crash-2026-10-19_12.00.00-client.txt";
     client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, crashReport: report });
     client.openCrashReport.mockResolvedValue(undefined);
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     expect(await screen.findByText(labels.crashed)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: labels.openCrashReport }));
@@ -853,7 +913,7 @@ describe("InstancesPage", () => {
 
   it("keeps the plain exit message when the game failed without a report", async () => {
     client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1 });
-    renderWithQuery(<InstancesPage />);
+    renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     expect(await screen.findByText(labels.exited.replace("{{code}}", "1"))).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: labels.openCrashReport })).not.toBeInTheDocument();
