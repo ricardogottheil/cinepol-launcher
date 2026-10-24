@@ -208,7 +208,7 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
-          dmgs=("target/${{ matrix.target }}/release/bundle/dmg/"*.dmg)
+          dmgs=("target/${{ matrix.target }}/release/bundle/dmg/"*"_${{ needs.preflight.outputs.version }}_"*.dmg)
           if [ "${#dmgs[@]}" -ne 1 ]; then
             echo "::error::expected one DMG, found ${#dmgs[@]}"
             exit 1
@@ -236,6 +236,7 @@ jobs:
               break
             fi
             if [ "${attempt}" -eq 3 ]; then
+              echo "::error::stapling the DMG failed after 3 attempts"
               exit 1
             fi
             sleep 30
