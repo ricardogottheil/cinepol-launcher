@@ -145,6 +145,23 @@ pub struct ModDependency {
     pub kind: DependencyKind,
 }
 
+/// The version to update an installed `current` version to: the one
+/// [`newest_compatible`] picks, when it comes before `current` in the
+/// newest-first list or `current` no longer fits `target`. A newer beta the
+/// player installed is never "updated" to an older release.
+pub fn available_update<'a>(
+    versions: &'a [ModVersion],
+    target: &ModTarget,
+    current: &str,
+) -> Option<&'a ModVersion> {
+    let newest = newest_compatible(versions, target)?;
+    let position = |id: &str| versions.iter().position(|version| version.id == id);
+    match position(current) {
+        None => Some(newest),
+        Some(current) => (position(&newest.id)? < current).then_some(newest),
+    }
+}
+
 /// The version to install for `target` from a newest-first list: the newest
 /// release that fits and has a file, else the newest beta or alpha that does.
 pub fn newest_compatible<'a>(
@@ -255,5 +272,47 @@ mod tests {
         let chosen = newest_compatible(&versions, &target("1.21.1", Fabric)).unwrap();
         assert_eq!(chosen.id, "alpha");
         assert!(newest_compatible(&versions, &target("1.20.1", Fabric)).is_none());
+    }
+
+    #[test]
+    fn offers_an_update_only_when_it_is_newer_than_the_installed_version() {
+        let target = ModTarget {
+            game_version: GameVersion::parse("1.21.1").unwrap(),
+            loader: LoaderKind::Fabric,
+        };
+        let version = |id: &str, channel: ReleaseChannel| ModVersion {
+            id: id.into(),
+            project: "p".into(),
+            name: id.into(),
+            version_number: id.into(),
+            channel,
+            game_versions: vec![GameVersion::parse("1.21.1").unwrap()],
+            loaders: vec![LoaderKind::Fabric],
+            published: None,
+            file: Some(ModFile {
+                url: format!("https://cdn.modrinth.com/{id}.jar"),
+                filename: format!("{id}.jar"),
+                size: 1,
+                sha512: Checksum::parse(
+                    crate::domain::integrity::HashAlgorithm::Sha512,
+                    &"a".repeat(128),
+                )
+                .unwrap(),
+                sha1: None,
+            }),
+            dependencies: Vec::new(),
+        };
+        let versions = [
+            version("4-beta", ReleaseChannel::Beta),
+            version("3", ReleaseChannel::Release),
+            version("2", ReleaseChannel::Release),
+        ];
+        let update =
+            |current: &str| available_update(&versions, &target, current).map(|v| v.id.as_str());
+        assert_eq!(update("2"), Some("3"));
+        assert_eq!(update("3"), None);
+        assert_eq!(update("4-beta"), None);
+        // A version for another game version is replaced by one that fits.
+        assert_eq!(update("for-1.20"), Some("3"));
     }
 }

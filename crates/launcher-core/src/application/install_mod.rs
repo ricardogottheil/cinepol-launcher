@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
-use crate::application::mod_inventory::{read_mod_inventory, set_jar_enabled};
+use crate::application::mod_inventory::{ModInventory, read_mod_inventory, set_jar_enabled};
 use crate::application::modpack_files::{release_dir, scratch_dir};
 use crate::application::plan_mod_install::plan_mod_install;
 use crate::domain::instance::{InstanceId, InstanceRepository, InstanceRepositoryError};
@@ -27,8 +27,8 @@ use crate::domain::integrity::HashAlgorithm;
 use crate::domain::launch::LauncherPaths;
 use crate::domain::modpack::{PackFileError, PackFiles};
 use crate::domain::mods::{
-    InstalledMod, ModEntry, ModFile, ModPlanError, ModRegistry, ModRegistryStore, ModSource,
-    ModTarget, PlannedMod,
+    DISABLED_SUFFIX, InstalledMod, ModEntry, ModFile, ModPlanError, ModRegistry, ModRegistryStore,
+    ModSource, ModTarget, PlannedMod, available_update,
 };
 use crate::domain::ports::{
     DownloadError, DownloadRequest, Downloader, FileSystem, FileSystemError, ProgressReporter,
@@ -52,6 +52,10 @@ pub enum InstallModError {
     Scratch(#[from] FileSystemError),
     #[error("mods/{filename} already exists and is another file")]
     FileTaken { filename: String },
+    #[error("mod {project} is not installed")]
+    NotInstalled { project: String },
+    #[error("{title} is already the newest compatible version")]
+    UpToDate { title: String },
     #[error("the mod installation was cancelled")]
     Cancelled,
 }
@@ -95,6 +99,30 @@ where
     M: ModRegistryStore,
     R: ProgressReporter,
 {
+    write_mod(deps, id, project, false, reporter, cancel).await
+}
+
+/// Installs `project`, or with `update` replaces its installed jar with its
+/// newest compatible version. An update keeps whether the player asked for
+/// the mod, which mods need it and whether it is disabled; the old jar is
+/// set aside until the registry is saved, and put back when anything fails.
+pub(crate) async fn write_mod<I, S, D, F, P, M, R>(
+    deps: &InstallModDeps<'_, I, S, D, F, P, M>,
+    id: &InstanceId,
+    project: &str,
+    update: bool,
+    reporter: &R,
+    cancel: &CancellationToken,
+) -> Result<Vec<InstalledMod>, InstallModError>
+where
+    I: InstanceRepository,
+    S: ModSource,
+    D: Downloader,
+    F: FileSystem,
+    P: PackFiles,
+    M: ModRegistryStore,
+    R: ProgressReporter,
+{
     if cancel.is_cancelled() {
         return Err(InstallModError::Cancelled);
     }
@@ -106,48 +134,155 @@ where
     let mods_dir = deps.paths.game_dir(id).join(MODS_DIR);
     let saved = deps.registry.load(id).await?;
     let inventory = read_mod_inventory(deps.source, deps.files, &mods_dir, &saved).await?;
-    let mut registry = inventory.registry;
-    let plan = plan_mod_install(deps.source, &target, &registry, project).await?;
+    let mut registry = inventory.registry.clone();
+    let old = match update {
+        false => None,
+        true => Some(updatable(deps.source, &target, &inventory, &mods_dir, project).await?),
+    };
+    let mut planning = registry.clone();
+    if update {
+        planning.remove(project);
+    }
+    let plan = plan_mod_install(deps.source, &target, &planning, project).await?;
     let jars = jars(&plan.mods)?;
-    let adopted = adoptable(deps.files, &mods_dir, &jars).await?;
+    let destinations: Vec<PathBuf> = jars
+        .iter()
+        .enumerate()
+        .map(|(index, (_, file))| {
+            // A single safe file name: checked when the catalog answer was read.
+            let disabled = index == 0 && old.as_ref().is_some_and(|old| old.disabled);
+            match disabled {
+                true => mods_dir.join(format!("{}{DISABLED_SUFFIX}", file.filename)),
+                false => mods_dir.join(&file.filename),
+            }
+        })
+        .collect();
+    let replaced = old.as_ref().map(|old| old.path.as_path());
+    let adopted = adoptable(deps.files, &jars, &destinations, replaced).await?;
     if cancel.is_cancelled() {
         return Err(InstallModError::Cancelled);
     }
 
     let staging = scratch_dir(deps.paths, "mods");
-    let placed = write_jars(deps, &mods_dir, &jars, &adopted, &staging, reporter, cancel).await;
-    release_dir(deps.fs, &staging).await;
-    let placed = placed?;
-    let mut enabled = Vec::new();
-    for (dependency, _) in &plan.present {
-        let Some(filename) = disabled_copy(&inventory.entries, &registry, dependency) else {
-            continue;
+    let backup = staging.join("previous.jar");
+    let restore = old
+        .as_ref()
+        .map(|old| (backup.as_path(), old.path.as_path()));
+    let result: Result<Vec<InstalledMod>, InstallModError> = async {
+        deps.fs.create_dir_all(&staging).await?;
+        if let Some(old) = &old {
+            deps.files.place(&old.path, &backup).await?;
+        }
+        let jars_written = write_jars(
+            deps,
+            &jars,
+            &destinations,
+            &adopted,
+            &staging,
+            reporter,
+            cancel,
+        )
+        .await;
+        let placed = match jars_written {
+            Ok(placed) => placed,
+            Err(error) => {
+                undo(deps.files, &mods_dir, &[], &[], restore).await;
+                return Err(error);
+            }
         };
-        if let Err(error) = set_jar_enabled(deps.files, &mods_dir, filename, true).await {
-            undo(deps.files, &mods_dir, &placed, &enabled).await;
+        // The old jar goes once the new one is in, unless the new one took its name.
+        if let Some(old) = &old
+            && old.path != destinations[0]
+            && let Err(error) = deps.files.remove_file(&old.path).await
+        {
+            undo(deps.files, &mods_dir, &placed, &[], restore).await;
             return Err(error.into());
         }
-        enabled.push(filename);
-    }
-
-    for (dependency, needer) in &plan.present {
-        if let Some(existing) = registry.get_mut(dependency) {
-            existing.required_by.insert(needer.clone());
+        let mut enabled = Vec::new();
+        for (dependency, _) in &plan.present {
+            let Some(filename) = disabled_copy(&inventory.entries, &registry, dependency) else {
+                continue;
+            };
+            if let Err(error) = set_jar_enabled(deps.files, &mods_dir, filename, true).await {
+                undo(deps.files, &mods_dir, &placed, &enabled, restore).await;
+                return Err(error.into());
+            }
+            enabled.push(filename);
         }
+
+        for (dependency, needer) in &plan.present {
+            if let Some(existing) = registry.get_mut(dependency) {
+                existing.required_by.insert(needer.clone());
+            }
+        }
+        let mut written: Vec<InstalledMod> = jars
+            .iter()
+            .map(|(planned, file)| record(planned, file))
+            .collect();
+        if let (Some(old), Some(updated)) = (&old, written.first_mut()) {
+            updated.requested = old.record.requested;
+            updated.required_by = old.record.required_by.clone();
+        }
+        for installed in &written {
+            registry.insert(installed.clone());
+        }
+        if let Err(error) = deps.registry.save(id, &registry).await {
+            // Jars the registry does not know about would load unseen.
+            undo(deps.files, &mods_dir, &placed, &enabled, restore).await;
+            return Err(error.into());
+        }
+        Ok(written)
     }
-    let written: Vec<InstalledMod> = jars
+    .await;
+    release_dir(deps.fs, &staging).await;
+    result
+}
+
+/// The installed copy of a mod being updated.
+struct Updated {
+    record: InstalledMod,
+    /// Its jar on disk, `.disabled` included.
+    path: PathBuf,
+    disabled: bool,
+}
+
+/// The installed `project`, when a newer compatible version exists.
+async fn updatable<S: ModSource>(
+    source: &S,
+    target: &ModTarget,
+    inventory: &ModInventory,
+    mods_dir: &Path,
+    project: &str,
+) -> Result<Updated, InstallModError> {
+    let not_installed = || InstallModError::NotInstalled {
+        project: project.to_owned(),
+    };
+    let record = inventory.registry.get(project).ok_or_else(not_installed)?;
+    let entry = inventory
+        .entries
         .iter()
-        .map(|(planned, file)| record(planned, file))
-        .collect();
-    for installed in &written {
-        registry.insert(installed.clone());
+        .find(|entry| {
+            entry.filename == record.filename
+                && entry
+                    .record
+                    .as_ref()
+                    .is_some_and(|kept| kept.project == project)
+        })
+        .ok_or_else(not_installed)?;
+    let versions = source
+        .versions(project, target)
+        .await
+        .map_err(ModPlanError::from)?;
+    if available_update(&versions, target, &record.version).is_none() {
+        return Err(InstallModError::UpToDate {
+            title: record.title.clone(),
+        });
     }
-    if let Err(error) = deps.registry.save(id, &registry).await {
-        // Jars the registry does not know about would load unseen.
-        undo(deps.files, &mods_dir, &placed, &enabled).await;
-        return Err(error.into());
-    }
-    Ok(written)
+    Ok(Updated {
+        record: record.clone(),
+        path: mods_dir.join(entry.file_on_disk()),
+        disabled: !entry.enabled,
+    })
 }
 
 /// The jar to enable for an installed `project` the new mod needs: the
@@ -191,18 +326,20 @@ fn jars(planned: &[PlannedMod]) -> Result<Vec<(&PlannedMod, &ModFile)>, InstallM
 
 /// The jars already in `mods/` byte for byte (put there by hand or by a
 /// pack), which are kept and recorded instead of downloaded again. A
-/// different file under a planned jar's name is never overwritten.
+/// different file under a planned jar's name is never overwritten, except
+/// the jar being `replaced` by an update, which was set aside first.
 async fn adoptable<P: PackFiles>(
     files: &P,
-    mods_dir: &Path,
     jars: &[(&PlannedMod, &ModFile)],
+    destinations: &[PathBuf],
+    replaced: Option<&Path>,
 ) -> Result<HashSet<usize>, InstallModError> {
     let mut adopted = HashSet::new();
-    for (index, (_, file)) in jars.iter().enumerate() {
-        match files
-            .digest(&mods_dir.join(&file.filename), HashAlgorithm::Sha512)
-            .await?
-        {
+    for (index, ((_, file), destination)) in jars.iter().zip(destinations).enumerate() {
+        if Some(destination.as_path()) == replaced {
+            continue;
+        }
+        match files.digest(destination, HashAlgorithm::Sha512).await? {
             None => {}
             Some(hash) if hash.eq_ignore_ascii_case(file.sha512.value()) => {
                 adopted.insert(index);
@@ -218,13 +355,13 @@ async fn adoptable<P: PackFiles>(
 }
 
 /// Downloads every jar not `adopted` into `staging`, verified, then moves
-/// them into `mods_dir` and returns the paths written. When a move fails,
-/// the jars already moved are removed again.
+/// each to its destination and returns the paths written. When a move
+/// fails, the jars already moved are removed again.
 #[allow(clippy::too_many_arguments)]
 async fn write_jars<I, S, D, F, P, M, R>(
     deps: &InstallModDeps<'_, I, S, D, F, P, M>,
-    mods_dir: &Path,
     jars: &[(&PlannedMod, &ModFile)],
+    destinations: &[PathBuf],
     adopted: &HashSet<usize>,
     staging: &Path,
     reporter: &R,
@@ -266,26 +403,37 @@ where
     }
 
     let mut placed = Vec::with_capacity(fresh.len());
-    for (index, file) in fresh {
-        // A single safe file name: checked when the catalog answer was read.
-        let destination = mods_dir.join(&file.filename);
-        if let Err(error) = deps.files.place(&scratch(index), &destination).await {
+    for (index, _) in fresh {
+        let destination = &destinations[index];
+        if let Err(error) = deps.files.place(&scratch(index), destination).await {
             remove_all(deps.files, &placed).await;
             return Err(error.into());
         }
-        placed.push(destination);
+        placed.push(destination.clone());
     }
     Ok(placed)
 }
 
-/// Best-effort undo of a failed install: the jars it wrote are removed and
-/// the dependencies it enabled are disabled again.
-async fn undo<P: PackFiles>(files: &P, mods_dir: &Path, placed: &[PathBuf], enabled: &[&str]) {
+/// Best-effort undo of a failed install: the jars it wrote are removed, the
+/// dependencies it enabled are disabled again, and the jar an update set
+/// aside is put back (`(backup, original)`).
+async fn undo<P: PackFiles>(
+    files: &P,
+    mods_dir: &Path,
+    placed: &[PathBuf],
+    enabled: &[&str],
+    restore: Option<(&Path, &Path)>,
+) {
     remove_all(files, placed).await;
     for filename in enabled {
         if let Err(error) = set_jar_enabled(files, mods_dir, filename, false).await {
             tracing::warn!(%filename, %error, "could not disable a mod again after a failed install");
         }
+    }
+    if let Some((backup, original)) = restore
+        && let Err(error) = files.place(backup, original).await
+    {
+        tracing::warn!(path = %original.display(), %error, "could not put a mod back after a failed update");
     }
 }
 
