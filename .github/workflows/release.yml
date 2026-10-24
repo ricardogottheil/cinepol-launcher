@@ -214,18 +214,32 @@ jobs:
             exit 1
           fi
           credentials=(--apple-id "${APPLE_ID}" --password "${APPLE_PASSWORD}" --team-id "${APPLE_TEAM_ID}")
+          # A failed submit must still reach the error branch below, which
+          # prints Apple's log. Notarization usually takes minutes; 30 minutes
+          # fails a stuck queue long before the job timeout.
           result="$(xcrun notarytool submit "${dmgs[0]}" "${credentials[@]}" \
             --wait --timeout 30m --output-format json)" || true
-          status="$(jq -r '.status // empty' <<< "${result}")"
+          status="$(jq -r '.status // empty' <<< "${result}" 2>/dev/null)" || status=""
           if [ "${status}" != "Accepted" ]; then
             echo "::error::DMG notarization did not succeed (status: ${status:-unknown})"
-            id="$(jq -r '.id // empty' <<< "${result}")"
+            echo "${result}"
+            id="$(jq -r '.id // empty' <<< "${result}" 2>/dev/null)" || id=""
             if [ -n "${id}" ]; then
-              xcrun notarytool log "${id}" "${credentials[@]}"
+              xcrun notarytool log "${id}" "${credentials[@]}" || true
             fi
             exit 1
           fi
-          xcrun stapler staple "${dmgs[0]}"
+          # The ticket can take a moment to reach Apple's servers after
+          # acceptance, so stapling is retried before the job fails.
+          for attempt in 1 2 3; do
+            if xcrun stapler staple "${dmgs[0]}"; then
+              break
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 30
+          done
           # Assess the stapled DMG the way Gatekeeper assesses a downloaded
           # file; a rejection fails the job.
           spctl -a -vvv -t open --context context:primary-signature "${dmgs[0]}"
