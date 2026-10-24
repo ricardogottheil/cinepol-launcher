@@ -107,11 +107,18 @@ pub struct FakePackFiles {
     removed: Mutex<Vec<PathBuf>>,
     /// When set, `place` succeeds this many more times and then fails.
     places_before_failure: Mutex<Option<usize>>,
+    /// When set, `remove_file` succeeds this many more times and then fails.
+    removes_before_failure: Mutex<Option<usize>>,
 }
 
 impl FakePackFiles {
     pub fn removed(&self) -> Vec<PathBuf> {
         self.removed.lock().unwrap().clone()
+    }
+
+    /// Lets `successful_removes` deletions through, then fails every later one.
+    pub fn fail_removes_after(&self, successful_removes: usize) {
+        *self.removes_before_failure.lock().unwrap() = Some(successful_removes);
     }
 
     /// Lets `successful_places` moves through, then fails every later one.
@@ -175,6 +182,12 @@ impl PackFiles for FakePackFiles {
     }
 
     async fn remove_file(&self, path: &Path) -> Result<(), PackFileError> {
+        if let Some(remaining) = self.removes_before_failure.lock().unwrap().as_mut() {
+            if *remaining == 0 {
+                return Err(io(path, std::io::Error::other("the file is in use")));
+            }
+            *remaining -= 1;
+        }
         self.removed.lock().unwrap().push(path.to_path_buf());
         match std::fs::remove_file(path) {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(io(path, error)),

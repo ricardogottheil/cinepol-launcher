@@ -123,6 +123,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn refuses_to_replace_another_copy_under_the_target_name() {
+        let world = world().await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(mods_dir(&world).join("sodium.jar"), b"new").unwrap();
+        std::fs::write(mods_dir(&world).join("sodium.jar.disabled"), b"old").unwrap();
+        assert!(matches!(
+            set(&world, "sodium.jar", false).await,
+            Err(SetModEnabledError::Files(_))
+        ));
+        assert_eq!(
+            std::fs::read(mods_dir(&world).join("sodium.jar.disabled")).unwrap(),
+            b"old"
+        );
+    }
+
+    #[tokio::test]
     async fn refuses_names_that_are_not_mod_jars_and_missing_jars() {
         let world = world().await;
         for name in [

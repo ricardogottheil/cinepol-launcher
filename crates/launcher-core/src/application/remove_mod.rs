@@ -3,6 +3,8 @@
 //!
 //! The jars are deleted first and the registry saved after; should saving
 //! fail, the next read of `mods/` drops the records of the deleted jars.
+//! Orphans go before the requested jar, so when a deletion fails, asking
+//! again for the same jar finds it and finishes the job.
 
 use thiserror::Error;
 
@@ -63,7 +65,7 @@ where
         return Err(RemoveModError::NotFound(filename.to_owned()));
     };
 
-    let mut doomed = vec![entry];
+    let mut doomed = Vec::new();
     if remove_orphans {
         doomed.extend(
             entry
@@ -72,12 +74,15 @@ where
                 .filter_map(|orphan| kept_copy(&inventory.entries, &registry, orphan)),
         );
     }
+    doomed.push(entry);
     let mut removed = Vec::with_capacity(doomed.len());
     for jar in &doomed {
         let name = jar.file_on_disk();
         deps.files.remove_file(&mods_dir.join(&name)).await?;
         removed.push(name);
     }
+    // The requested one first.
+    removed.rotate_right(1);
     let mut changed = false;
     for jar in &doomed {
         if let Some(record) = &jar.record
@@ -259,6 +264,42 @@ mod tests {
         );
         let registry = world.registry.load(&id()).await.unwrap();
         assert!(registry.get("sodium").is_none());
+    }
+
+    #[tokio::test]
+    async fn asking_again_after_a_failed_deletion_finishes_the_removal() {
+        let world = world().await;
+        // Indium goes; Sodium (an orphan too) and Iris stay.
+        world.files.fail_removes_after(1);
+        assert!(matches!(
+            remove(&world, "iris.jar", true).await,
+            Err(RemoveModError::Files(_))
+        ));
+        assert!(jars_in(&world).contains(&"iris.jar".to_owned()));
+
+        world.files.fail_removes_after(usize::MAX);
+        let removed = remove(&world, "iris.jar", true).await.unwrap();
+        assert_eq!(removed, ["iris.jar", "sodium.jar.disabled"]);
+        assert_eq!(jars_in(&world), ["lithium.jar"]);
+        let registry = world.registry.load(&id()).await.unwrap();
+        assert_eq!(registry.mods().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_failed_registry_save_is_healed_by_the_next_read() {
+        let world = world().await;
+        world.registry.fail_saves();
+        assert!(matches!(
+            remove(&world, "lithium.jar", false).await,
+            Err(RemoveModError::Files(_))
+        ));
+        assert!(!jars_in(&world).contains(&"lithium.jar".to_owned()));
+        let saved = world.registry.load(&id()).await.unwrap();
+        let inventory = read_mod_inventory(&world.source, &world.files, &mods_dir(&world), &saved)
+            .await
+            .unwrap();
+        assert!(inventory.registry.get("lithium").is_none());
+        assert!(inventory.registry.get("iris").is_some());
     }
 
     #[tokio::test]

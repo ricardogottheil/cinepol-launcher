@@ -139,8 +139,9 @@ pub async fn read_mod_inventory<S: ModSource, P: PackFiles>(
 }
 
 /// Turns `mods_dir/<filename>` on or off by renaming it to or from
-/// `<filename>.disabled`. Doing what is already done is not an error; a
-/// different file already under the target name is.
+/// `<filename>.disabled`. Doing what is already done is not an error, and
+/// an interrupted rename is finished; a different file already under the
+/// target name is an error.
 pub async fn set_jar_enabled<P: PackFiles>(
     files: &P,
     mods_dir: &Path,
@@ -150,17 +151,22 @@ pub async fn set_jar_enabled<P: PackFiles>(
     let on = mods_dir.join(filename);
     let off = mods_dir.join(format!("{filename}{DISABLED_SUFFIX}"));
     let (from, to) = if enabled { (off, on) } else { (on, off) };
-    if files.digest(&from, HashAlgorithm::Sha512).await?.is_none() {
+    let Some(source) = files.digest(&from, HashAlgorithm::Sha512).await? else {
         return Ok(());
+    };
+    match files.digest(&to, HashAlgorithm::Sha512).await? {
+        // A rename interrupted after the copy (a locked jar on Windows):
+        // only the old name is left to remove.
+        Some(target) if target == source => {}
+        // Another jar under the target name is never replaced.
+        Some(_) => {
+            return Err(PackFileError::Io {
+                path: to.display().to_string(),
+                reason: "a file with this name already exists".into(),
+            });
+        }
+        None => files.place(&from, &to).await?,
     }
-    // Another jar under the target name is never replaced.
-    if files.digest(&to, HashAlgorithm::Sha512).await?.is_some() {
-        return Err(PackFileError::Io {
-            path: to.display().to_string(),
-            reason: "a file with this name already exists".into(),
-        });
-    }
-    files.place(&from, &to).await?;
     files.remove_file(&from).await
 }
 
@@ -262,5 +268,21 @@ mod tests {
             b"another a"
         );
         assert!(dir.path().join("a.jar.disabled").exists());
+    }
+
+    #[tokio::test]
+    async fn finishes_a_rename_that_stopped_after_the_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = FakePackFiles::default();
+        std::fs::write(dir.path().join("a.jar"), b"a").unwrap();
+        std::fs::write(dir.path().join("a.jar.disabled"), b"a").unwrap();
+        set_jar_enabled(&files, dir.path(), "a.jar", false)
+            .await
+            .unwrap();
+        assert!(!dir.path().join("a.jar").exists());
+        assert_eq!(
+            std::fs::read(dir.path().join("a.jar.disabled")).unwrap(),
+            b"a"
+        );
     }
 }
