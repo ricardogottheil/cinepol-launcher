@@ -181,6 +181,32 @@ pub fn open_crash_report(
         .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))
 }
 
+/// Opens the instance's game folder (mods, saves, resource packs) in the
+/// system's file manager, creating it when the instance was never installed.
+/// Only folders of instances that exist are opened.
+#[tauri::command]
+pub fn open_instance_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<(), AppError> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let id = parse_instance_id(&instance_id)?;
+    if !state.paths.instance_dir(&id).is_dir() {
+        return Err(AppError::new(
+            ErrorCode::NotFound,
+            format!("instance {instance_id} was not found"),
+        ));
+    }
+    let game_dir = state.paths.game_dir(&id);
+    std::fs::create_dir_all(&game_dir)
+        .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))?;
+    app.opener()
+        .open_path(game_dir.to_string_lossy(), None::<&str>)
+        .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))
+}
+
 /// A plain file name: no separators, drive letters, NUL or dot segments.
 fn is_report_name(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\', ':', '\0']) && name != "." && name != ".."

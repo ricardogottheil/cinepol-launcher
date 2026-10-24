@@ -399,6 +399,11 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             "null".to_owned(),
         ),
         command(
+            "open_instance_folder",
+            vec![("instanceId", string())],
+            "null".to_owned(),
+        ),
+        command(
             "list_servers",
             vec![("instanceId", string())],
             ServerListDto::name(cfg),
@@ -545,6 +550,7 @@ mod tests {
             "update_modpack",
             "export_mrpack",
             "open_crash_report",
+            "open_instance_folder",
             "list_servers",
             "edit_server_list",
             "list_saved_servers",

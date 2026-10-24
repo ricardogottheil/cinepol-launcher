@@ -406,6 +406,11 @@ export async function openCrashReport(instanceId: string, fileName: string): Pro
   await call("open_crash_report", { instanceId, fileName });
 }
 
+/** Opens the instance's game folder (mods, saves) in the system's file manager. */
+export async function openInstanceFolder(instanceId: string): Promise<void> {
+  await call("open_instance_folder", { instanceId });
+}
+
 /** Deletes an instance and its whole folder, worlds included. */
 export async function deleteInstance(instanceId: string): Promise<void> {
   await call("delete_instance", { instanceId });

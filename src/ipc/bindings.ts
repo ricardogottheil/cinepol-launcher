@@ -254,6 +254,7 @@ export interface Commands {
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
   open_crash_report: { args: { instanceId: string; fileName: string }; result: null };
+  open_instance_folder: { args: { instanceId: string }; result: null };
   list_servers: { args: { instanceId: string }; result: ServerListDto };
   list_saved_servers: { args: Record<string, never>; result: SavedServerDto[] };
   save_server: { args: { form: SavedServerFormDto }; result: SavedServerDto };
