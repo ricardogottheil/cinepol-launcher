@@ -103,6 +103,16 @@ pub struct ModVersion {
     pub dependencies: Vec<ModDependency>,
 }
 
+impl ModVersion {
+    /// The projects this version declares it cannot run with.
+    pub fn incompatible_projects(&self) -> impl Iterator<Item = &str> {
+        self.dependencies
+            .iter()
+            .filter(|dependency| dependency.kind == DependencyKind::Incompatible)
+            .filter_map(|dependency| dependency.project.as_deref())
+    }
+}
+
 /// A downloadable mod jar and the hashes it is verified against.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFile {

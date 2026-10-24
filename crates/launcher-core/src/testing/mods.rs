@@ -16,12 +16,14 @@ use super::sha512_hex;
 
 /// A mod catalog in memory. `versions` answers like the real catalog: only
 /// the versions that fit the target, in the order they were added (add them
-/// newest first). Records every project whose versions were asked for.
+/// newest first). Records every project whose versions were asked for;
+/// `projects_fail` makes the title lookup fail.
 #[derive(Debug, Default)]
 pub struct FakeModSource {
     pub titles: HashMap<String, String>,
     pub versions: Vec<ModVersion>,
     pub asked: Mutex<Vec<String>>,
+    pub projects_fail: bool,
 }
 
 impl FakeModSource {
@@ -68,6 +70,11 @@ impl ModSource for FakeModSource {
     }
 
     async fn projects(&self, ids: &[String]) -> Result<Vec<ModSummary>, ModpackSourceError> {
+        if self.projects_fail {
+            return Err(ModpackSourceError::RateLimited {
+                retry_after_secs: 60,
+            });
+        }
         Ok(ids
             .iter()
             .filter_map(|id| {

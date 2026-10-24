@@ -282,8 +282,7 @@ fn safe_path(raw: &str) -> Result<RelativePath, PackwizError> {
 }
 
 fn safe_file_name(raw: &str) -> Result<&str, PackwizError> {
-    let single = RelativePath::parse(raw).is_ok() && !raw.contains('/');
-    if single {
+    if RelativePath::is_file_name(raw) {
         Ok(raw)
     } else {
         Err(PackwizError::UnsafeFileName(raw.to_owned()))

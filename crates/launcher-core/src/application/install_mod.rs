@@ -21,8 +21,7 @@ use crate::domain::integrity::HashAlgorithm;
 use crate::domain::launch::LauncherPaths;
 use crate::domain::modpack::{PackFileError, PackFiles};
 use crate::domain::mods::{
-    DependencyKind, InstalledMod, ModFile, ModPlanError, ModRegistryStore, ModSource, ModTarget,
-    PlannedMod,
+    InstalledMod, ModFile, ModPlanError, ModRegistryStore, ModSource, ModTarget, PlannedMod,
 };
 use crate::domain::ports::{
     DownloadError, DownloadRequest, Downloader, FileSystem, FileSystemError, ProgressReporter,
@@ -253,14 +252,9 @@ fn record(planned: &PlannedMod, file: &ModFile) -> InstalledMod {
         version_number: version.version_number.clone(),
         filename: file.filename.clone(),
         sha512: file.sha512.value().to_owned(),
-        requested: planned.required_by.is_none(),
-        required_by: planned.required_by.iter().cloned().collect(),
-        incompatible: version
-            .dependencies
-            .iter()
-            .filter(|dependency| dependency.kind == DependencyKind::Incompatible)
-            .filter_map(|dependency| dependency.project.clone())
-            .collect(),
+        requested: planned.requested,
+        required_by: planned.required_by.clone(),
+        incompatible: version.incompatible_projects().map(str::to_owned).collect(),
     }
 }
 

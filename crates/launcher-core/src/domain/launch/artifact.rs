@@ -37,6 +37,12 @@ impl RelativePath {
         }
     }
 
+    /// Whether `raw` is a single safe file name: a relative path with one
+    /// segment, so joining it under a folder stays in that folder.
+    pub fn is_file_name(raw: &str) -> bool {
+        Self::parse(raw).is_ok() && !raw.contains('/')
+    }
+
     /// For paths built only from fixed segments and validated hex digests.
     pub(super) fn from_hex_digest_path(path: String) -> Self {
         Self(path)

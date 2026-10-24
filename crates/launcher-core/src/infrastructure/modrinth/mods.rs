@@ -200,8 +200,7 @@ fn mod_file(files: &[wire::VersionFile]) -> Option<ModFile> {
         .hashes
         .get("sha1")
         .and_then(|hash| Checksum::parse(HashAlgorithm::Sha1, hash).ok());
-    let safe_name = RelativePath::parse(&file.filename).is_ok() && !file.filename.contains('/');
-    if !safe_name || !is_allowed_download(&file.url) {
+    if !RelativePath::is_file_name(&file.filename) || !is_allowed_download(&file.url) {
         return None;
     }
     Some(ModFile {

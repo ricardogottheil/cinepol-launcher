@@ -1,9 +1,11 @@
 //! What installing one mod takes: the mod, the dependencies it pulls in,
 //! and the reasons it cannot be installed.
 
+use std::collections::BTreeSet;
+
 use thiserror::Error;
 
-use super::{DependencyKind, ModRegistry, ModVersion};
+use super::{ModRegistry, ModVersion};
 use crate::domain::modpack::ModpackSourceError;
 
 /// The most mods one install may bring in, the requested one included. A
@@ -15,8 +17,10 @@ pub const MAX_PLANNED_MODS: usize = 64;
 pub struct PlannedMod {
     pub title: String,
     pub version: ModVersion,
-    /// The mod that needs it; `None` for the one the player asked for.
-    pub required_by: Option<String>,
+    /// Whether it is the mod the player asked for.
+    pub requested: bool,
+    /// The planned mods that need it.
+    pub required_by: BTreeSet<String>,
 }
 
 /// The mods an install writes, the requested one first, and the required
@@ -48,23 +52,15 @@ pub enum ModPlanError {
 /// `mod` is planned and `other` is planned or installed. Either side may be
 /// the one declaring the incompatibility.
 pub fn find_conflict(plan: &[PlannedMod], installed: &ModRegistry) -> Option<(String, String)> {
-    let declared = |version: &ModVersion| -> Vec<String> {
-        version
-            .dependencies
-            .iter()
-            .filter(|dependency| dependency.kind == DependencyKind::Incompatible)
-            .filter_map(|dependency| dependency.project.clone())
-            .collect()
-    };
     for planned in plan {
         let project = &planned.version.project;
-        for other in declared(&planned.version) {
+        for other in planned.version.incompatible_projects() {
             let present = plan
                 .iter()
                 .any(|candidate| candidate.version.project == other)
-                || installed.get(&other).is_some();
-            if present && &other != project {
-                return Some((project.clone(), other));
+                || installed.get(other).is_some();
+            if present && other != project {
+                return Some((project.clone(), other.to_owned()));
             }
         }
         for existing in installed.mods() {
@@ -80,10 +76,8 @@ pub fn find_conflict(plan: &[PlannedMod], installed: &ModRegistry) -> Option<(St
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use std::collections::BTreeSet;
-
     use super::*;
-    use crate::domain::mods::{InstalledMod, ModDependency, ReleaseChannel};
+    use crate::domain::mods::{DependencyKind, InstalledMod, ModDependency, ReleaseChannel};
 
     fn planned(project: &str, incompatible: &[&str]) -> PlannedMod {
         PlannedMod {
@@ -107,7 +101,8 @@ mod tests {
                     })
                     .collect(),
             },
-            required_by: None,
+            requested: true,
+            required_by: BTreeSet::new(),
         }
     }
 

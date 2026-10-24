@@ -2,8 +2,9 @@
 //! install, the required dependencies it pulls in, and whether anything
 //! installed stands in the way. Nothing is written.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
+use crate::domain::modpack::ModpackSourceError;
 use crate::domain::mods::{
     DependencyKind, MAX_PLANNED_MODS, ModDependency, ModInstallPlan, ModPlanError, ModRegistry,
     ModSource, ModTarget, ModVersion, PlannedMod, find_conflict, newest_compatible,
@@ -30,7 +31,9 @@ pub async fn plan_mod_install<S: ModSource>(
         });
     }
     let root = newest(source, target, project).await?;
-    let mut planned: Vec<(ModVersion, Option<String>)> = vec![(root, None)];
+    // Each planned version with the planned mods that need it; the first is
+    // the one the player asked for.
+    let mut planned: Vec<(ModVersion, BTreeSet<String>)> = vec![(root, BTreeSet::new())];
     let mut present = Vec::new();
 
     let mut next = 0;
@@ -44,32 +47,39 @@ pub async fn plan_mod_install<S: ModSource>(
             .collect();
         next += 1;
         for dependency in required {
-            let known = |project: &str, planned: &[(ModVersion, Option<String>)]| {
+            let already = |project: &str| {
                 installed.get(project).is_some()
                     || planned
                         .iter()
                         .any(|(version, _)| version.project == project)
             };
-            if let Some(project) = &dependency.project
-                && known(project, &planned)
-            {
-                if installed.get(project).is_some() {
-                    present.push((project.clone(), needer.clone()));
-                }
-                continue;
-            }
-            let version = resolve(source, target, &dependency).await?;
             // A dependency named only by version is known once it is fetched.
-            if dependency.project.is_none() && known(&version.project, &planned) {
-                if installed.get(&version.project).is_some() {
-                    present.push((version.project.clone(), needer.clone()));
-                }
+            let fetched = match &dependency.project {
+                Some(project) if already(project) => None,
+                _ => Some(resolve(source, target, &dependency).await?),
+            };
+            let Some(project) = fetched
+                .as_ref()
+                .map(|version| version.project.clone())
+                .or_else(|| dependency.project.clone())
+            else {
                 continue;
+            };
+            if installed.get(&project).is_some() {
+                present.push((project, needer.clone()));
+            } else if let Some((_, needers)) = planned
+                .iter_mut()
+                .find(|(version, _)| version.project == project)
+            {
+                if project != needer {
+                    needers.insert(needer.clone());
+                }
+            } else if let Some(version) = fetched {
+                if planned.len() == MAX_PLANNED_MODS {
+                    return Err(ModPlanError::TooManyDependencies);
+                }
+                planned.push((version, BTreeSet::from([needer.clone()])));
             }
-            if planned.len() == MAX_PLANNED_MODS {
-                return Err(ModPlanError::TooManyDependencies);
-            }
-            planned.push((version, Some(needer.clone())));
         }
     }
 
@@ -77,7 +87,7 @@ pub async fn plan_mod_install<S: ModSource>(
         .iter()
         .map(|(version, _)| version.project.clone())
         .collect();
-    let titles = titles(source, &ids).await?;
+    let titles = titles(source, &ids).await;
     let title_of = |project: &str| {
         titles
             .get(project)
@@ -91,9 +101,11 @@ pub async fn plan_mod_install<S: ModSource>(
     };
     let mods: Vec<PlannedMod> = planned
         .into_iter()
-        .map(|(version, required_by)| PlannedMod {
+        .enumerate()
+        .map(|(index, (version, required_by))| PlannedMod {
             title: title_of(&version.project),
             version,
+            requested: index == 0,
             required_by,
         })
         .collect();
@@ -114,11 +126,17 @@ async fn resolve<S: ModSource>(
 ) -> Result<ModVersion, ModPlanError> {
     let mut project = dependency.project.clone();
     if let Some(id) = &dependency.version {
-        let pinned = source.version(id).await?;
-        if pinned.file.is_some() && target.accepts(&pinned) {
-            return Ok(pinned);
+        match source.version(id).await {
+            Ok(pinned) => {
+                if pinned.file.is_some() && target.accepts(&pinned) {
+                    return Ok(pinned);
+                }
+                project.get_or_insert(pinned.project);
+            }
+            // The author removed the pinned version; the project may still fit.
+            Err(ModpackSourceError::NotFound(_)) if project.is_some() => {}
+            Err(error) => return Err(error.into()),
         }
-        project.get_or_insert(pinned.project);
     }
     match project {
         Some(project) => newest(source, target, &project).await,
@@ -140,7 +158,7 @@ async fn newest<S: ModSource>(
         Some(version) => Ok(version.clone()),
         None => {
             let title = titles(source, &[project.to_owned()])
-                .await?
+                .await
                 .remove(project)
                 .unwrap_or_else(|| project.to_owned());
             Err(ModPlanError::NoCompatibleVersion { title })
@@ -148,16 +166,19 @@ async fn newest<S: ModSource>(
     }
 }
 
-async fn titles<S: ModSource>(
-    source: &S,
-    projects: &[String],
-) -> Result<HashMap<String, String>, ModPlanError> {
-    Ok(source
-        .projects(projects)
-        .await?
-        .into_iter()
-        .map(|summary| (summary.project, summary.title))
-        .collect())
+/// Display names only: when the catalog cannot answer, callers fall back to
+/// installed titles or project ids rather than refusing the install.
+async fn titles<S: ModSource>(source: &S, projects: &[String]) -> HashMap<String, String> {
+    match source.projects(projects).await {
+        Ok(summaries) => summaries
+            .into_iter()
+            .map(|summary| (summary.project, summary.title))
+            .collect(),
+        Err(error) => {
+            tracing::warn!(%error, "could not read mod titles; using project ids");
+            HashMap::new()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -200,7 +221,7 @@ mod tests {
                 (
                     planned.version.project.as_str(),
                     planned.version.id.as_str(),
-                    planned.required_by.as_deref(),
+                    planned.required_by.iter().next().map(String::as_str),
                 )
             })
             .collect()
@@ -453,6 +474,111 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_dependency_shared_by_two_planned_mods_records_both() {
+        // Iris needs Sodium and Indium; Indium needs Sodium too.
+        let source = FakeModSource::default()
+            .with(
+                "iris",
+                "Iris",
+                vec![depends(
+                    depends(
+                        mod_version("iris", "iris-2", "1.21.1", &[Fabric]),
+                        Required,
+                        Some("indium"),
+                        None,
+                    ),
+                    Required,
+                    Some("sodium"),
+                    None,
+                )],
+            )
+            .with(
+                "indium",
+                "Indium",
+                vec![depends(
+                    mod_version("indium", "indium-1", "1.21.1", &[Fabric]),
+                    Required,
+                    Some("sodium"),
+                    None,
+                )],
+            )
+            .with(
+                "sodium",
+                "Sodium",
+                vec![mod_version("sodium", "sodium-2", "1.21.1", &[Fabric])],
+            );
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "iris")
+            .await
+            .unwrap();
+        let sodium = plan
+            .mods
+            .iter()
+            .find(|planned| planned.version.project == "sodium")
+            .unwrap();
+        assert_eq!(
+            sodium.required_by,
+            BTreeSet::from(["iris".to_owned(), "indium".to_owned()])
+        );
+        assert_eq!(plan.mods.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn a_removed_pinned_version_falls_back_to_the_newest_of_its_project() {
+        let source = FakeModSource::default()
+            .with(
+                "iris",
+                "Iris",
+                vec![depends(
+                    mod_version("iris", "iris-2", "1.21.1", &[Fabric]),
+                    Required,
+                    Some("sodium"),
+                    Some("sodium-deleted"),
+                )],
+            )
+            .with(
+                "sodium",
+                "Sodium",
+                vec![mod_version("sodium", "sodium-2", "1.21.1", &[Fabric])],
+            );
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "iris")
+            .await
+            .unwrap();
+        assert_eq!(
+            projects(&plan),
+            [
+                ("iris", "iris-2", None),
+                ("sodium", "sodium-2", Some("iris"))
+            ]
+        );
+
+        // Named only by the removed version, the dependency cannot be found.
+        let orphan = FakeModSource::default().with(
+            "iris",
+            "Iris",
+            vec![depends(
+                mod_version("iris", "iris-2", "1.21.1", &[Fabric]),
+                Required,
+                None,
+                Some("sodium-deleted"),
+            )],
+        );
+        assert!(matches!(
+            plan_mod_install(&orphan, &target(Fabric), &ModRegistry::default(), "iris").await,
+            Err(ModPlanError::Source(ModpackSourceError::NotFound(_)))
+        ));
+    }
+
+    #[tokio::test]
+    async fn titles_fall_back_to_project_ids_when_the_catalog_cannot_name_them() {
+        let mut source = catalog();
+        source.projects_fail = true;
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "iris")
+            .await
+            .unwrap();
+        assert_eq!(plan.mods[0].title, "iris");
+    }
+
+    #[tokio::test]
     async fn dependency_cycles_end_once_every_mod_is_planned() {
         let source = FakeModSource::default()
             .with(
@@ -478,9 +604,12 @@ mod tests {
         let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "a")
             .await
             .unwrap();
+        // Each needs the other; only A was asked for.
         assert_eq!(
             projects(&plan),
-            [("a", "a-1", None), ("b", "b-1", Some("a"))]
+            [("a", "a-1", Some("b")), ("b", "b-1", Some("a"))]
         );
+        assert!(plan.mods[0].requested);
+        assert!(!plan.mods[1].requested);
     }
 }

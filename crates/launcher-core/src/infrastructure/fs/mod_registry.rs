@@ -60,9 +60,7 @@ impl ModRecord {
     /// Refuses records whose file name could leave `mods/`, or whose hash is
     /// not a sha512: a hand-edited file must not point the launcher elsewhere.
     fn into_installed(self, registry: &Path) -> Result<InstalledMod, PackFileError> {
-        let single_segment =
-            RelativePath::parse(&self.filename).is_ok() && !self.filename.contains('/');
-        if !single_segment {
+        if !RelativePath::is_file_name(&self.filename) {
             return Err(io_error(
                 registry,
                 format!("unsafe mod file name {:?}", self.filename),
