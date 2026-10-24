@@ -30,6 +30,7 @@ const fakes = vi.hoisted(() => {
         if (control.failSetup) throw new Error("setup failed");
       }),
     };
+    readonly camera = { add: vi.fn() };
     readonly globalLight = { intensity: 3 };
     readonly cameraLight = { intensity: 0.6 };
     readonly playerObject = {
@@ -66,7 +67,20 @@ const fakes = vi.hoisted(() => {
     readonly position = { set: vi.fn() };
   }
 
-  return { viewers, control, FakeViewer, FakeFunctionAnimation, FakeLight };
+  /** Cape images, loaded only when a test says so. */
+  const images: FakeImage[] = [];
+
+  class FakeImage {
+    src = "";
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+
+    constructor() {
+      images.push(this);
+    }
+  }
+
+  return { viewers, control, images, FakeViewer, FakeFunctionAnimation, FakeLight, FakeImage };
 });
 
 vi.mock("skinview3d", () => ({
@@ -96,6 +110,14 @@ function mockReducedMotion(reduced: boolean) {
   );
 }
 
+/** Finishes loading the cape image for `src`. */
+function loadImage(src: string) {
+  const image = fakes.images.findLast((candidate) => candidate.src === src);
+  if (!image) throw new Error(`no image was requested for ${src}`);
+  image.onload?.();
+  return image;
+}
+
 function lastViewer() {
   const viewer = fakes.viewers.at(-1);
   if (!viewer) throw new Error("no viewer was created");
@@ -104,6 +126,8 @@ function lastViewer() {
 
 beforeEach(() => {
   fakes.viewers.length = 0;
+  fakes.images.length = 0;
+  vi.stubGlobal("Image", fakes.FakeImage);
   mockReducedMotion(false);
 });
 
@@ -153,10 +177,39 @@ describe("SkinViewer", () => {
     expect(viewer.options.cape).toBe(CAPE);
 
     rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
-    await waitFor(() => expect(viewer.loadCape).toHaveBeenLastCalledWith(OTHER_CAPE));
+    const image = loadImage(OTHER_CAPE);
+    await waitFor(() => expect(viewer.loadCape).toHaveBeenLastCalledWith(image));
     rerender(<SkinViewer texture={TEXTURE} slim={false} cape={null} label="Skin" />);
     await waitFor(() => expect(viewer.loadCape).toHaveBeenLastCalledWith(null));
     expect(fakes.viewers).toHaveLength(1);
+  });
+
+  it("never puts a cape on a viewer that is gone, or an older cape over a newer one", async () => {
+    const { rerender, unmount } = render(
+      <SkinViewer texture={TEXTURE} slim={false} cape={CAPE} label="Skin" />,
+    );
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    const viewer = lastViewer();
+
+    rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
+    rerender(<SkinViewer texture={TEXTURE} slim={false} cape={CAPE} label="Skin" />);
+    const newer = loadImage(CAPE);
+    loadImage(OTHER_CAPE);
+    await waitFor(() => expect(viewer.loadCape).toHaveBeenCalledOnce());
+    expect(viewer.loadCape).toHaveBeenCalledWith(newer);
+
+    rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
+    unmount();
+    loadImage(OTHER_CAPE);
+    await Promise.resolve();
+    expect(viewer.loadCape).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the key light on the camera, so the side facing the player stays lit", async () => {
+    render(<SkinViewer texture={TEXTURE} slim={false} label="Skin" />);
+
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    expect(lastViewer().camera.add).toHaveBeenCalledWith(expect.any(fakes.FakeLight));
   });
 
   it("uses the slim model when the skin is slim", async () => {

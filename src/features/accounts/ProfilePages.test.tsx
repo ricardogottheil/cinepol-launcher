@@ -446,6 +446,34 @@ describe("skin and capes", () => {
     expect(client.setAccountCape).toHaveBeenCalledOnce();
   });
 
+  it("reads the capes again after a refusal and drops a choice the account no longer owns", async () => {
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+      { id: "c2", alias: "Pan", active: false, dataUrl: "data:image/png;base64,C2" },
+    ]);
+    client.setAccountCape.mockRejectedValue(new IpcError("cape_not_owned", "400"));
+    renderAt("/profile");
+    const capes = await screen.findByRole("group", { name: labels.capesTitle });
+    const viewer = screen.getByRole("img", { name: labels.skinLabel });
+
+    fireEvent.click(within(capes).getByRole("button", { name: /Pan/ }));
+    client.listAccountCapes.mockResolvedValue([
+      { id: "c1", alias: "Migrator", active: true, dataUrl: "data:image/png;base64,C1" },
+    ]);
+    fireEvent.click(await screen.findByRole("button", { name: labels.applyCape }));
+
+    await waitFor(() =>
+      expect(within(capes).queryByRole("button", { name: /Pan/ })).not.toBeInTheDocument(),
+    );
+    expect(viewer).toHaveAttribute("data-cape", "data:image/png;base64,C1");
+    expect(within(capes).getByRole("button", { name: /Migrator/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.queryByRole("button", { name: labels.applyCape })).not.toBeInTheDocument();
+    expect(client.setAccountCape).toHaveBeenCalledOnce();
+  });
+
   it("refuses an image that is not a skin without uploading it", async () => {
     renderAt("/profile");
     await choosePng(128, 128);

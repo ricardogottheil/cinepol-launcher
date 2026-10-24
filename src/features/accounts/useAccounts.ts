@@ -86,14 +86,15 @@ export function useChangeSkin(accountId: string) {
 
 /**
  * Wears a cape (or none). It settles only after the capes are read again, so
- * "worn" never shows a cape Mojang has not confirmed.
+ * "worn" never shows a cape Mojang has not confirmed. A refusal reads them
+ * again too: the cape may no longer be the account's.
  */
 export function useSetCape(accountId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (capeId: string | null) => setAccountCape(accountId, capeId),
     retry: false,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["account-capes", accountId] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["account-capes", accountId] }),
   });
 }
 

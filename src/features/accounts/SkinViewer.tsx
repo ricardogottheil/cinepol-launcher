@@ -15,12 +15,20 @@ export interface SkinViewerProps {
   className?: string;
 }
 
-// The lighting of the website's hero figure (cinepol-web src/scripts/hero-model.ts):
-// a high flat fill plus one weak key.
+// The website's hero figure (cinepol-web src/scripts/hero-model.ts) is lit by a
+// high fill plus one key. Its numbers come out muddy here: skinview3d turns off
+// three's color management and draws through an FXAA pass with no sRGB output,
+// so nothing brightens the midtones. These are set so the side facing the
+// player shows the skin's own colors, the top a little brighter and the
+// underside half as bright. The figure turns, so the key rides on the camera.
 const FOV_DEG = 28;
-const HEMISPHERE_INTENSITY = 2.1;
-const KEY_INTENSITY = 0.85;
+const HEMISPHERE_INTENSITY = 2.4;
+const KEY_INTENSITY = 1.6;
+/** Above and to the left of the camera, in camera space; it aims at the figure. */
+const KEY_OFFSET = [-30, 40, 0] as const;
 const WHITE_LIGHT = 0xffffff;
+/** Half the sky light, so the underside still reads. */
+const GROUND_LIGHT = 0x808080;
 /** Front three-quarter view: the face reads, and so does the cape behind it. */
 const THREE_QUARTER = -Math.PI / 5;
 /** One press of a turn button. */
@@ -42,6 +50,15 @@ function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === "function"
     ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
     : false;
+}
+
+function loadCapeImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("the cape image did not load"));
+    image.src = src;
+  });
 }
 
 /** Arms and cape at a point of the breathing loop; `seconds` is animation time. */
@@ -113,13 +130,12 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
         // Replace skinview3d's ambient and camera lights with the website's rig.
         viewer.globalLight.intensity = 0;
         viewer.cameraLight.intensity = 0;
-        const panel = getComputedStyle(host).getPropertyValue("--color-panel").trim();
         viewer.scene.add(
-          new THREE.HemisphereLight(WHITE_LIGHT, panel || WHITE_LIGHT, HEMISPHERE_INTENSITY),
+          new THREE.HemisphereLight(WHITE_LIGHT, GROUND_LIGHT, HEMISPHERE_INTENSITY),
         );
         const key = new THREE.DirectionalLight(WHITE_LIGHT, KEY_INTENSITY);
-        key.position.set(-4, 6, 5);
-        viewer.scene.add(key);
+        key.position.set(...KEY_OFFSET);
+        viewer.camera.add(key);
 
         // Drag to turn; no zoom or pan, so the figure never leaves the frame.
         viewer.controls.enableZoom = false;
@@ -205,15 +221,29 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
     };
   }, [texture, slim]);
 
-  // A new cape goes onto the figure already on screen, keeping its angle.
+  // A new cape goes onto the figure already on screen, keeping its angle. The
+  // image loads here, not in skinview3d, so a cape that arrives after the
+  // viewer is gone or after a newer cape is dropped.
   useEffect(() => {
     const viewer = turnableRef.current?.viewer;
     if (!viewer) return;
-    if (cape) {
-      void Promise.resolve(viewer.loadCape(cape)).catch(() => viewer.loadCape(null));
-    } else {
+    if (!cape) {
       viewer.loadCape(null);
+      return;
     }
+    let current = true;
+    const stillWanted = () => current && turnableRef.current?.viewer === viewer;
+    loadCapeImage(cape).then(
+      (image) => {
+        if (stillWanted()) viewer.loadCape(image);
+      },
+      () => {
+        if (stillWanted()) viewer.loadCape(null);
+      },
+    );
+    return () => {
+      current = false;
+    };
   }, [cape]);
 
   const turn = (radians: number) => turnableRef.current?.turn(radians);

@@ -53,7 +53,12 @@ function Profile({ account }: { account: AccountDto }) {
   const capes = useAccountCapes(premium ? account.id : null);
   // A picked skin or cape shows on the figure before it is applied.
   const [draft, setDraft] = useState<SkinDraft | null>(null);
-  const [capeChoice, setCapeChoice] = useState<CapeChoice | null>(null);
+  const [pickedCape, setCapeChoice] = useState<CapeChoice | null>(null);
+  // A picked cape the account no longer owns is no choice at all.
+  const capeChoice =
+    pickedCape?.id === null || capes.data?.some((owned) => owned.id === pickedCape?.id)
+      ? pickedCape
+      : null;
   const shownCape = capeChoice
     ? capes.data?.find((owned) => owned.id === capeChoice.id)
     : capes.data?.find((owned) => owned.active);
