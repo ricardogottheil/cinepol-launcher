@@ -105,11 +105,18 @@ impl MrpackArchive for FakeMrpackArchive {
 #[derive(Debug, Default)]
 pub struct FakePackFiles {
     removed: Mutex<Vec<PathBuf>>,
+    /// When set, `place` succeeds this many more times and then fails.
+    places_before_failure: Mutex<Option<usize>>,
 }
 
 impl FakePackFiles {
     pub fn removed(&self) -> Vec<PathBuf> {
         self.removed.lock().unwrap().clone()
+    }
+
+    /// Lets `successful_places` moves through, then fails every later one.
+    pub fn fail_places_after(&self, successful_places: usize) {
+        *self.places_before_failure.lock().unwrap() = Some(successful_places);
     }
 }
 
@@ -154,6 +161,12 @@ impl PackFiles for FakePackFiles {
     }
 
     async fn place(&self, from: &Path, to: &Path) -> Result<(), PackFileError> {
+        if let Some(remaining) = self.places_before_failure.lock().unwrap().as_mut() {
+            if *remaining == 0 {
+                return Err(io(to, std::io::Error::other("no space left on device")));
+            }
+            *remaining -= 1;
+        }
         if let Some(parent) = to.parent() {
             std::fs::create_dir_all(parent).map_err(|e| io(parent, e))?;
         }

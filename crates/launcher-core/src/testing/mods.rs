@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::domain::instance::InstanceId;
 use crate::domain::integrity::{Checksum, HashAlgorithm};
@@ -132,10 +133,17 @@ pub fn depends(
     version
 }
 
-/// Keeps registries in memory.
+/// Keeps registries in memory; `fail_saves` makes every save fail.
 #[derive(Debug, Default)]
 pub struct InMemoryModRegistryStore {
     pub registries: Mutex<HashMap<InstanceId, ModRegistry>>,
+    fail_saves: AtomicBool,
+}
+
+impl InMemoryModRegistryStore {
+    pub fn fail_saves(&self) {
+        self.fail_saves.store(true, Ordering::SeqCst);
+    }
 }
 
 impl ModRegistryStore for InMemoryModRegistryStore {
@@ -150,6 +158,12 @@ impl ModRegistryStore for InMemoryModRegistryStore {
     }
 
     async fn save(&self, id: &InstanceId, registry: &ModRegistry) -> Result<(), PackFileError> {
+        if self.fail_saves.load(Ordering::SeqCst) {
+            return Err(PackFileError::Io {
+                path: "mods.json".into(),
+                reason: "disk full".into(),
+            });
+        }
         self.registries
             .lock()
             .unwrap()

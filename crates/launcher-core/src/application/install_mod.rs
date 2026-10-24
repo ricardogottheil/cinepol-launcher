@@ -2,10 +2,14 @@
 //! pulls in, and records why each one is there.
 //!
 //! Every jar is downloaded into a scratch folder and verified against its
-//! sha512 there; only once all of them arrived are they moved into `mods/`,
-//! so a failed or cancelled install leaves the instance untouched.
+//! sha512 there; only once all of them arrived are they moved into `mods/`.
+//! A jar already in `mods/` with the same bytes is kept, and a different
+//! file under the same name is never overwritten. When moving a jar or
+//! saving the registry fails, the jars this install moved are removed again,
+//! so a failed or cancelled install leaves `mods/` as it was.
 
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
@@ -13,10 +17,12 @@ use tokio_util::sync::CancellationToken;
 use crate::application::modpack_files::{release_dir, scratch_dir};
 use crate::application::plan_mod_install::plan_mod_install;
 use crate::domain::instance::{InstanceId, InstanceRepository, InstanceRepositoryError};
+use crate::domain::integrity::HashAlgorithm;
 use crate::domain::launch::LauncherPaths;
 use crate::domain::modpack::{PackFileError, PackFiles};
 use crate::domain::mods::{
-    InstalledMod, ModFile, ModPlanError, ModRegistryStore, ModSource, ModTarget, PlannedMod,
+    DependencyKind, InstalledMod, ModFile, ModPlanError, ModRegistryStore, ModSource, ModTarget,
+    PlannedMod,
 };
 use crate::domain::ports::{
     DownloadError, DownloadRequest, Downloader, FileSystem, FileSystemError, ProgressReporter,
@@ -38,6 +44,8 @@ pub enum InstallModError {
     Files(#[from] PackFileError),
     #[error(transparent)]
     Scratch(#[from] FileSystemError),
+    #[error("mods/{filename} already exists and is another file")]
+    FileTaken { filename: String },
     #[error("the mod installation was cancelled")]
     Cancelled,
 }
@@ -81,6 +89,9 @@ where
     M: ModRegistryStore,
     R: ProgressReporter,
 {
+    if cancel.is_cancelled() {
+        return Err(InstallModError::Cancelled);
+    }
     let instance = deps.instances.get(id).await?;
     let target = ModTarget {
         game_version: instance.game_version.clone(),
@@ -88,37 +99,94 @@ where
     };
     let mut registry = deps.registry.load(id).await?;
     let plan = plan_mod_install(deps.source, &target, &registry, project).await?;
+    let jars = jars(&plan.mods)?;
+    let mods_dir = deps.paths.game_dir(id).join(MODS_DIR);
+    let adopted = adoptable(deps.files, &mods_dir, &jars).await?;
     if cancel.is_cancelled() {
         return Err(InstallModError::Cancelled);
     }
 
     let staging = scratch_dir(deps.paths, "mods");
-    let written = write_jars(deps, id, &plan.mods, &staging, reporter, cancel).await;
+    let placed = write_jars(deps, &mods_dir, &jars, &adopted, &staging, reporter, cancel).await;
     release_dir(deps.fs, &staging).await;
-    let written = written?;
+    let placed = placed?;
 
     for (dependency, needer) in &plan.present {
         if let Some(existing) = registry.get_mut(dependency) {
             existing.required_by.insert(needer.clone());
         }
     }
+    let written: Vec<InstalledMod> = jars
+        .iter()
+        .map(|(planned, file)| record(planned, file))
+        .collect();
     for installed in &written {
         registry.insert(installed.clone());
     }
-    deps.registry.save(id, &registry).await?;
+    if let Err(error) = deps.registry.save(id, &registry).await {
+        // Jars the registry does not know about would load unseen.
+        remove_all(deps.files, &placed).await;
+        return Err(error.into());
+    }
     Ok(written)
 }
 
-/// Downloads every planned jar into `staging`, verified, then moves them all
-/// into the instance's `mods/` folder.
+/// Each planned mod with the jar it installs. The plan only picks versions
+/// that have one; a version without one is reported as not installable.
+fn jars(planned: &[PlannedMod]) -> Result<Vec<(&PlannedMod, &ModFile)>, InstallModError> {
+    planned
+        .iter()
+        .map(|planned| match &planned.version.file {
+            Some(file) => Ok((planned, file)),
+            None => Err(ModPlanError::NoCompatibleVersion {
+                title: planned.title.clone(),
+            }
+            .into()),
+        })
+        .collect()
+}
+
+/// The jars already in `mods/` byte for byte (put there by hand or by a
+/// pack), which are kept and recorded instead of downloaded again. A
+/// different file under a planned jar's name is never overwritten.
+async fn adoptable<P: PackFiles>(
+    files: &P,
+    mods_dir: &Path,
+    jars: &[(&PlannedMod, &ModFile)],
+) -> Result<HashSet<usize>, InstallModError> {
+    let mut adopted = HashSet::new();
+    for (index, (_, file)) in jars.iter().enumerate() {
+        match files
+            .digest(&mods_dir.join(&file.filename), HashAlgorithm::Sha512)
+            .await?
+        {
+            None => {}
+            Some(hash) if hash.eq_ignore_ascii_case(file.sha512.value()) => {
+                adopted.insert(index);
+            }
+            Some(_) => {
+                return Err(InstallModError::FileTaken {
+                    filename: file.filename.clone(),
+                });
+            }
+        }
+    }
+    Ok(adopted)
+}
+
+/// Downloads every jar not `adopted` into `staging`, verified, then moves
+/// them into `mods_dir` and returns the paths written. When a move fails,
+/// the jars already moved are removed again.
+#[allow(clippy::too_many_arguments)]
 async fn write_jars<I, S, D, F, P, M, R>(
     deps: &InstallModDeps<'_, I, S, D, F, P, M>,
-    id: &InstanceId,
-    planned: &[PlannedMod],
+    mods_dir: &Path,
+    jars: &[(&PlannedMod, &ModFile)],
+    adopted: &HashSet<usize>,
     staging: &Path,
     reporter: &R,
     cancel: &CancellationToken,
-) -> Result<Vec<InstalledMod>, InstallModError>
+) -> Result<Vec<PathBuf>, InstallModError>
 where
     D: Downloader,
     F: FileSystem,
@@ -126,18 +194,19 @@ where
     R: ProgressReporter,
 {
     deps.fs.create_dir_all(staging).await?;
-    // Planned versions always have a file: the plan only picks installable ones.
-    let jars: Vec<(&PlannedMod, &ModFile)> = planned
-        .iter()
-        .filter_map(|planned| planned.version.file.as_ref().map(|file| (planned, file)))
-        .collect();
-    let requests = jars
+    // The catalog's file name is not trusted as a scratch path.
+    let scratch = |index: usize| staging.join(format!("{index}.jar"));
+    let fresh: Vec<(usize, &ModFile)> = jars
         .iter()
         .enumerate()
-        .map(|(index, (_, file))| DownloadRequest {
+        .filter(|(index, _)| !adopted.contains(index))
+        .map(|(index, (_, file))| (index, *file))
+        .collect();
+    let requests = fresh
+        .iter()
+        .map(|(index, file)| DownloadRequest {
             url: file.url.clone(),
-            // The catalog's file name is not trusted as a scratch path.
-            destination: staging.join(format!("{index}.jar")),
+            destination: scratch(*index),
             checksum: Some(file.sha512.clone()),
             size: Some(file.size),
         })
@@ -153,37 +222,46 @@ where
         return Err(InstallModError::Cancelled);
     }
 
-    let mods_dir = deps.paths.game_dir(id).join(MODS_DIR);
-    let mut written = Vec::with_capacity(jars.len());
-    for (index, (planned, file)) in jars.into_iter().enumerate() {
+    let mut placed = Vec::with_capacity(fresh.len());
+    for (index, file) in fresh {
         // A single safe file name: checked when the catalog answer was read.
-        deps.files
-            .place(
-                &staging.join(format!("{index}.jar")),
-                &mods_dir.join(&file.filename),
-            )
-            .await?;
-        let version = &planned.version;
-        written.push(InstalledMod {
-            project: version.project.clone(),
-            title: planned.title.clone(),
-            version: version.id.clone(),
-            version_number: version.version_number.clone(),
-            filename: file.filename.clone(),
-            sha512: file.sha512.value().to_owned(),
-            requested: planned.required_by.is_none(),
-            required_by: planned.required_by.iter().cloned().collect(),
-            incompatible: version
-                .dependencies
-                .iter()
-                .filter(|dependency| {
-                    dependency.kind == crate::domain::mods::DependencyKind::Incompatible
-                })
-                .filter_map(|dependency| dependency.project.clone())
-                .collect(),
-        });
+        let destination = mods_dir.join(&file.filename);
+        if let Err(error) = deps.files.place(&scratch(index), &destination).await {
+            remove_all(deps.files, &placed).await;
+            return Err(error.into());
+        }
+        placed.push(destination);
     }
-    Ok(written)
+    Ok(placed)
+}
+
+/// Best-effort removal of jars this install wrote; nothing else was there.
+async fn remove_all<P: PackFiles>(files: &P, paths: &[PathBuf]) {
+    for path in paths {
+        if let Err(error) = files.remove_file(path).await {
+            tracing::warn!(path = %path.display(), %error, "could not remove a mod jar after a failed install");
+        }
+    }
+}
+
+fn record(planned: &PlannedMod, file: &ModFile) -> InstalledMod {
+    let version = &planned.version;
+    InstalledMod {
+        project: version.project.clone(),
+        title: planned.title.clone(),
+        version: version.id.clone(),
+        version_number: version.version_number.clone(),
+        filename: file.filename.clone(),
+        sha512: file.sha512.value().to_owned(),
+        requested: planned.required_by.is_none(),
+        required_by: planned.required_by.iter().cloned().collect(),
+        incompatible: version
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.kind == DependencyKind::Incompatible)
+            .filter_map(|dependency| dependency.project.clone())
+            .collect(),
+    }
 }
 
 #[cfg(test)]
@@ -196,6 +274,7 @@ mod tests {
     use crate::domain::instance::{GameVersion, Instance, InstanceName, InstanceOrigin};
     use crate::domain::loader::{LoaderKind, LoaderSpec, LoaderVersion};
     use crate::domain::mods::{DependencyKind::*, ModRegistry};
+    use crate::testing::sha512_hex;
     use crate::testing::{
         FakeDownloader, FakeFileSystem, FakeModSource, FakePackFiles, InMemoryInstanceRepository,
         InMemoryModRegistryStore, RecordingReporter, depends, mod_jar, mod_version,
@@ -303,6 +382,131 @@ mod tests {
 
     fn mods_dir(world: &World) -> std::path::PathBuf {
         world.paths.game_dir(&id()).join(MODS_DIR)
+    }
+
+    async fn install(
+        world: &World,
+        downloader: &FakeDownloader,
+    ) -> Result<Vec<InstalledMod>, InstallModError> {
+        install_mod(
+            &deps(world, downloader),
+            &id(),
+            "iris",
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+    }
+
+    fn jars_in(world: &World) -> Vec<String> {
+        let Ok(entries) = std::fs::read_dir(mods_dir(world)) else {
+            return Vec::new();
+        };
+        let mut names: Vec<String> = entries
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[tokio::test]
+    async fn a_failed_move_removes_the_jars_already_moved() {
+        let world = world(LoaderKind::Fabric).await;
+        world.files.fail_places_after(1);
+        let downloader = downloader();
+        let result = install(&world, &downloader).await;
+        assert!(
+            matches!(result, Err(InstallModError::Files(_))),
+            "{result:?}"
+        );
+        assert!(jars_in(&world).is_empty(), "{:?}", jars_in(&world));
+        assert_eq!(world.files.removed().len(), 1);
+        assert_eq!(
+            world.registry.load(&id()).await.unwrap(),
+            ModRegistry::default()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_registry_save_removes_the_jars_it_wrote() {
+        let world = world(LoaderKind::Fabric).await;
+        world.registry.fail_saves();
+        let downloader = downloader();
+        let result = install(&world, &downloader).await;
+        assert!(
+            matches!(result, Err(InstallModError::Files(_))),
+            "{result:?}"
+        );
+        assert!(jars_in(&world).is_empty(), "{:?}", jars_in(&world));
+    }
+
+    #[tokio::test]
+    async fn never_overwrites_another_file_under_a_planned_name() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(mods_dir(&world).join("sodium-2.jar"), b"hand-made").unwrap();
+        let downloader = downloader();
+        let result = install(&world, &downloader).await;
+        assert_eq!(
+            result,
+            Err(InstallModError::FileTaken {
+                filename: "sodium-2.jar".into()
+            })
+        );
+        assert!(downloader.requests().is_empty());
+        assert_eq!(
+            std::fs::read(mods_dir(&world).join("sodium-2.jar")).unwrap(),
+            b"hand-made"
+        );
+        assert_eq!(jars_in(&world), ["sodium-2.jar"]);
+    }
+
+    #[tokio::test]
+    async fn keeps_and_records_an_identical_jar_already_in_mods() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(mods_dir(&world).join("sodium-2.jar"), mod_jar("sodium-2")).unwrap();
+        let downloader = downloader();
+        install(&world, &downloader).await.unwrap();
+        // Only Iris was downloaded; Sodium's jar was already the right one.
+        let requests = downloader.requests();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].url.ends_with("iris-2.jar"));
+        let registry = world.registry.load(&id()).await.unwrap();
+        let sodium = registry.get("sodium").unwrap();
+        assert_eq!(sodium.sha512, sha512_hex(&mod_jar("sodium-2")));
+        assert_eq!(sodium.required_by, BTreeSet::from(["iris".to_owned()]));
+    }
+
+    #[tokio::test]
+    async fn a_rollback_never_removes_a_jar_it_did_not_write() {
+        let world = world(LoaderKind::Fabric).await;
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(mods_dir(&world).join("sodium-2.jar"), mod_jar("sodium-2")).unwrap();
+        world.registry.fail_saves();
+        let downloader = downloader();
+        assert!(install(&world, &downloader).await.is_err());
+        assert_eq!(jars_in(&world), ["sodium-2.jar"]);
+    }
+
+    #[tokio::test]
+    async fn a_planned_version_without_a_jar_is_refused() {
+        let mut world = world(LoaderKind::Fabric).await;
+        let mut bare = mod_version("lithium", "lithium-2", "1.21.1", &[LoaderKind::Fabric]);
+        bare.file = None;
+        world.source = FakeModSource::default().with("lithium", "Lithium", vec![bare]);
+        let downloader = downloader();
+        let result = install_mod(
+            &deps(&world, &downloader),
+            &id(),
+            "lithium",
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(downloader.requests().is_empty());
     }
 
     #[tokio::test]
