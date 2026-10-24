@@ -93,7 +93,8 @@ export function SkinChanger({
   accountId: string;
   /** The model on the figure: the draft's, the one chosen, or the current skin's. */
   slim: boolean;
-  onModel: (slim: boolean) => void;
+  /** A model to preview, or null to follow the current skin's again. */
+  onModel: (slim: boolean | null) => void;
   draft: SkinDraft | null;
   onDraft: (draft: SkinDraft | null) => void;
 }) {
@@ -119,10 +120,12 @@ export function SkinChanger({
 
   function apply() {
     if (!draft) return;
-    change.mutate(
-      { pngBase64: draft.file.base64, slim: draft.slim },
-      { onSuccess: () => onDraft(null) },
-    );
+    change.mutate({ pngBase64: draft.file.base64, slim: draft.slim }, { onSuccess: discard });
+  }
+
+  function discard() {
+    onDraft(null);
+    onModel(null);
   }
 
   const error = invalid
@@ -165,7 +168,7 @@ export function SkinChanger({
             <Button onClick={apply} disabled={change.isPending}>
               {change.isPending ? t("accounts.applyingSkin") : t("accounts.applySkin")}
             </Button>
-            <Button onClick={() => onDraft(null)} disabled={change.isPending}>
+            <Button onClick={discard} disabled={change.isPending}>
               {t("accounts.discardSkin")}
             </Button>
           </div>

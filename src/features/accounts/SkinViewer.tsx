@@ -78,6 +78,32 @@ interface Turnable {
 }
 
 /**
+ * Puts `wanted` on `viewer`. The image loads here, not in skinview3d, so a cape
+ * that arrives after the viewer is gone, or after a newer request, is dropped.
+ */
+function wearCape(
+  viewer: Viewer,
+  wanted: string | null,
+  requests: { current: number },
+  turnable: { current: Turnable | null },
+) {
+  const request = ++requests.current;
+  if (!wanted) {
+    viewer.loadCape(null);
+    return;
+  }
+  const stillWanted = () => requests.current === request && turnable.current?.viewer === viewer;
+  loadCapeImage(wanted).then(
+    (image) => {
+      if (stillWanted()) viewer.loadCape(image);
+    },
+    () => {
+      if (stillWanted()) viewer.loadCape(null);
+    },
+  );
+}
+
+/**
  * A 3D preview of a Minecraft skin and cape, lit like the website's hero
  * figure. It can be dragged around or turned with the buttons below it.
  */
@@ -87,9 +113,11 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
   const turnableRef = useRef<Turnable | null>(null);
   // Where the pointer was at the last move of a drag; null when not dragging.
   const dragXRef = useRef<number | null>(null);
-  // Read when a viewer is built; later changes go through loadCape.
+  // Read when a viewer is built; later changes go through wearCape.
   const capeRef = useRef(cape);
   capeRef.current = cape;
+  // Counts cape requests, so only the latest one ever lands on the figure.
+  const capeRequestRef = useRef(0);
   const hint = useId();
 
   useEffect(() => {
@@ -104,13 +132,11 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
       .then(([skinview3d, THREE]) => {
         if (cancelled) return;
 
-        const initialCape = capeRef.current;
         const viewer = new skinview3d.SkinViewer({
           width: Math.max(1, host.clientWidth),
           height: Math.max(1, host.clientHeight),
           skin: texture,
           model: slim ? "slim" : "default",
-          ...(initialCape ? { cape: initialCape } : {}),
           // The camera never moves; dragging turns the figure (see onPointerMove).
           enableControls: false,
           pixelRatio: "match-device",
@@ -176,6 +202,7 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
             }
           },
         };
+        if (capeRef.current) wearCape(viewer, capeRef.current, capeRequestRef, turnableRef);
 
         const sizing =
           typeof ResizeObserver === "function"
@@ -217,29 +244,10 @@ export function SkinViewer({ texture, slim, cape = null, label, className }: Ski
     };
   }, [texture, slim]);
 
-  // A new cape goes onto the figure already on screen, keeping its angle. The
-  // image loads here, not in skinview3d, so a cape that arrives after the
-  // viewer is gone or after a newer cape is dropped.
+  // A new cape goes onto the figure already on screen, keeping its angle.
   useEffect(() => {
     const viewer = turnableRef.current?.viewer;
-    if (!viewer) return;
-    if (!cape) {
-      viewer.loadCape(null);
-      return;
-    }
-    let current = true;
-    const stillWanted = () => current && turnableRef.current?.viewer === viewer;
-    loadCapeImage(cape).then(
-      (image) => {
-        if (stillWanted()) viewer.loadCape(image);
-      },
-      () => {
-        if (stillWanted()) viewer.loadCape(null);
-      },
-    );
-    return () => {
-      current = false;
-    };
+    if (viewer) wearCape(viewer, cape, capeRequestRef, turnableRef);
   }, [cape]);
 
   const turn = (radians: number) => turnableRef.current?.turn(radians);

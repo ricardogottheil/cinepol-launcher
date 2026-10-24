@@ -187,7 +187,8 @@ describe("SkinViewer", () => {
     );
     await waitFor(() => expect(fakes.viewers).toHaveLength(1));
     const viewer = lastViewer();
-    expect(viewer.options.cape).toBe(CAPE);
+    const first = loadImage(CAPE);
+    await waitFor(() => expect(viewer.loadCape).toHaveBeenLastCalledWith(first));
 
     rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
     const image = loadImage(OTHER_CAPE);
@@ -214,6 +215,22 @@ describe("SkinViewer", () => {
     rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
     unmount();
     loadImage(OTHER_CAPE);
+    await Promise.resolve();
+    expect(viewer.loadCape).toHaveBeenCalledOnce();
+  });
+
+  it("never lets the first cape of a new viewer land over a cape picked after it", async () => {
+    const { rerender } = render(
+      <SkinViewer texture={TEXTURE} slim={false} cape={CAPE} label="Skin" />,
+    );
+    await waitFor(() => expect(fakes.viewers).toHaveLength(1));
+    const viewer = lastViewer();
+    expect(viewer.options.cape).toBeUndefined();
+
+    rerender(<SkinViewer texture={TEXTURE} slim={false} cape={OTHER_CAPE} label="Skin" />);
+    const picked = loadImage(OTHER_CAPE);
+    fakes.images.find((candidate) => candidate.src === CAPE)?.onload?.();
+    await waitFor(() => expect(viewer.loadCape).toHaveBeenCalledWith(picked));
     await Promise.resolve();
     expect(viewer.loadCape).toHaveBeenCalledOnce();
   });

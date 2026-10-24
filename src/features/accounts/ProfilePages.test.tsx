@@ -509,6 +509,32 @@ describe("skin and capes", () => {
     expect(client.changeAccountSkin).not.toHaveBeenCalled();
   });
 
+  it("goes back to the current skin's model when a preview is discarded", async () => {
+    renderAt("/profile");
+    await choosePng(64, 64);
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    fireEvent.click(screen.getByRole("radio", { name: labels.slim }));
+    await waitFor(() => expect(viewer).toHaveAttribute("data-slim", "true"));
+
+    fireEvent.click(screen.getByRole("button", { name: labels.discardSkin }));
+    await waitFor(() => expect(viewer).toHaveAttribute("data-slim", "false"));
+    expect(screen.getByRole("radio", { name: labels.classic })).toBeChecked();
+  });
+
+  it("follows the account's skin again once a skin is applied", async () => {
+    renderAt("/profile");
+    await choosePng(64, 64);
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    fireEvent.click(screen.getByRole("radio", { name: labels.slim }));
+    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,NEW", slim: false });
+
+    fireEvent.click(screen.getByRole("button", { name: labels.applySkin }));
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,NEW"),
+    );
+    expect(viewer).toHaveAttribute("data-slim", "false");
+  });
+
   it("explains a refused upload and never sends it again by itself", async () => {
     client.changeAccountSkin.mockRejectedValue(new IpcError("too_many_changes", "429"));
     renderAt("/profile");
