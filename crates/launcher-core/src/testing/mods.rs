@@ -98,7 +98,7 @@ impl ModSource for FakeModSource {
             .versions
             .iter()
             .filter_map(|version| {
-                let hash = version.file.as_ref()?.sha512.value().to_owned();
+                let hash = version.file.as_ref()?.checksum.value().to_owned();
                 sha512.contains(&hash).then(|| (hash, version.clone()))
             })
             .collect())
@@ -175,12 +175,11 @@ pub fn mod_version(
         game_versions: GameVersion::parse(game).into_iter().collect(),
         loaders: loaders.to_vec(),
         published: None,
-        file: checksum(HashAlgorithm::Sha512, sha512_hex(&mod_jar(id))).map(|sha512| ModFile {
+        file: checksum(HashAlgorithm::Sha512, sha512_hex(&mod_jar(id))).map(|checksum| ModFile {
             url: format!("https://cdn.modrinth.com/data/{project}/versions/{id}/{id}.jar"),
             filename: format!("{id}.jar"),
             size: mod_jar(id).len() as u64,
-            sha512,
-            sha1: None,
+            checksum,
         }),
         dependencies: Vec::new(),
     }

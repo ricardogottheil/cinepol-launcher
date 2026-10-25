@@ -236,10 +236,19 @@ where
                 existing.required_by.insert(needer.clone());
             }
         }
-        let mut written: Vec<InstalledMod> = jars
-            .iter()
-            .map(|(planned, file)| record(planned, file))
-            .collect();
+        let mut written = Vec::with_capacity(jars.len());
+        for ((planned, file), destination) in jars.iter().zip(&destinations) {
+            let sha512 = match jar_sha512(deps.files, file, destination).await {
+                Ok(sha512) => sha512,
+                Err(error) => {
+                    if !undo(deps.files, &mods_dir, &placed, &enabled, restore).await {
+                        keep_backup.store(true, Ordering::Relaxed);
+                    }
+                    return Err(error);
+                }
+            };
+            written.push(record(planned, file, sha512));
+        }
         if let (Some(old), Some(updated)) = (&old, written.first_mut()) {
             updated.requested = old.record.requested;
             updated.required_by = old.record.required_by.clone();
@@ -376,9 +385,9 @@ async fn adoptable<P: PackFiles>(
         if Some(destination.as_path()) == replaced {
             continue;
         }
-        match files.digest(destination, HashAlgorithm::Sha512).await? {
+        match files.digest(destination, file.checksum.algorithm()).await? {
             None => {}
-            Some(hash) if hash.eq_ignore_ascii_case(file.sha512.value()) => {
+            Some(hash) if hash.eq_ignore_ascii_case(file.checksum.value()) => {
                 adopted.insert(index);
             }
             Some(_) => {
@@ -424,7 +433,7 @@ where
         .map(|(index, file)| DownloadRequest {
             url: file.url.clone(),
             destination: scratch(*index),
-            checksum: Some(file.sha512.clone()),
+            checksum: Some(file.checksum.clone()),
             size: Some(file.size),
         })
         .collect();
@@ -486,7 +495,29 @@ async fn remove_all<P: PackFiles>(files: &P, paths: &[PathBuf]) {
     }
 }
 
-fn record(planned: &PlannedMod, file: &ModFile) -> InstalledMod {
+/// The sha512 the registry keeps for a jar now in `mods/`: the catalog's
+/// own when it gives one, else the jar's, computed here.
+async fn jar_sha512<P: PackFiles>(
+    files: &P,
+    file: &ModFile,
+    jar: &Path,
+) -> Result<String, InstallModError> {
+    if file.checksum.algorithm() == HashAlgorithm::Sha512 {
+        return Ok(file.checksum.value().to_ascii_lowercase());
+    }
+    let sha512 = files
+        .digest(jar, HashAlgorithm::Sha512)
+        .await?
+        .ok_or_else(|| {
+            InstallModError::Files(PackFileError::Io {
+                path: jar.display().to_string(),
+                reason: "the installed jar is missing".into(),
+            })
+        })?;
+    Ok(sha512.to_ascii_lowercase())
+}
+
+fn record(planned: &PlannedMod, file: &ModFile, sha512: String) -> InstalledMod {
     let version = &planned.version;
     InstalledMod {
         project: version.project.clone(),
@@ -494,7 +525,7 @@ fn record(planned: &PlannedMod, file: &ModFile) -> InstalledMod {
         version: version.id.clone(),
         version_number: version.version_number.clone(),
         filename: file.filename.clone(),
-        sha512: file.sha512.value().to_owned(),
+        sha512,
         requested: planned.requested,
         required_by: planned.required_by.clone(),
         incompatible: version.incompatible_projects().map(str::to_owned).collect(),
@@ -733,6 +764,37 @@ mod tests {
         let sodium = registry.get("sodium").unwrap();
         assert_eq!(sodium.sha512, sha512_hex(&mod_jar("sodium-2")));
         assert_eq!(sodium.required_by, BTreeSet::from(["iris".to_owned()]));
+    }
+
+    #[tokio::test]
+    async fn a_catalog_that_only_gives_sha1_verifies_with_it_and_records_the_sha512() {
+        let mut world = world(LoaderKind::Fabric).await;
+        // CurseForge files carry a sha1, never a sha512.
+        for version in &mut world.source.versions {
+            let file = version.file.as_mut().unwrap();
+            let sha1 = crate::testing::sha1_hex(&mod_jar(&version.id));
+            file.checksum =
+                crate::domain::integrity::Checksum::parse(HashAlgorithm::Sha1, &sha1).unwrap();
+        }
+        std::fs::create_dir_all(mods_dir(&world)).unwrap();
+        std::fs::write(mods_dir(&world).join("sodium-2.jar"), mod_jar("sodium-2")).unwrap();
+        let downloader = downloader();
+        install(&world, &downloader).await.unwrap();
+
+        // The identical Sodium jar is recognised by its sha1 and kept.
+        let requests = downloader.requests();
+        assert_eq!(requests.len(), 1);
+        let checksum = requests[0].checksum.as_ref().unwrap();
+        assert_eq!(checksum.algorithm(), HashAlgorithm::Sha1);
+        assert_eq!(
+            checksum.value(),
+            crate::testing::sha1_hex(&mod_jar("iris-2"))
+        );
+        let registry = world.registry.load(&id()).await.unwrap();
+        for project in ["iris", "sodium"] {
+            let installed = registry.get(project).unwrap();
+            assert_eq!(installed.sha512, sha512_hex(&mod_jar(&installed.version)));
+        }
     }
 
     #[tokio::test]

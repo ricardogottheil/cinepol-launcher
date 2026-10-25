@@ -214,11 +214,7 @@ fn mod_file(files: &[wire::VersionFile]) -> Option<ModFile> {
         .filter(is_jar)
         .find(|file| file.primary)
         .or_else(|| files.iter().find(is_jar))?;
-    let sha512 = Checksum::parse(HashAlgorithm::Sha512, file.hashes.get("sha512")?).ok()?;
-    let sha1 = file
-        .hashes
-        .get("sha1")
-        .and_then(|hash| Checksum::parse(HashAlgorithm::Sha1, hash).ok());
+    let checksum = Checksum::parse(HashAlgorithm::Sha512, file.hashes.get("sha512")?).ok()?;
     if !RelativePath::is_file_name(&file.filename) || !is_allowed_download(&file.url) {
         return None;
     }
@@ -226,8 +222,7 @@ fn mod_file(files: &[wire::VersionFile]) -> Option<ModFile> {
         url: file.url.clone(),
         filename: file.filename.clone(),
         size: file.size,
-        sha512,
-        sha1,
+        checksum,
     })
 }
 

@@ -3,6 +3,7 @@
 use serde_json::Value;
 
 use crate::domain::instance::GameVersion;
+use crate::domain::integrity::HashAlgorithm;
 use crate::domain::loader::LoaderKind;
 use crate::domain::mods::{DependencyKind, ModQuery, ModSource, ModTarget, ReleaseChannel};
 use crate::infrastructure::modrinth::ModrinthSource;
@@ -121,7 +122,7 @@ async fn versions_are_filtered_by_target_newest_first_with_dependencies() {
     let file = newest.file.as_ref().unwrap();
     assert_eq!(file.filename, "iris-fabric-1.8.14-beta.1+mc1.21.1.jar");
     assert_eq!(file.size, 2_791_343);
-    assert!(file.sha1.is_some());
+    assert_eq!(file.checksum.algorithm(), HashAlgorithm::Sha512);
     // Iris needs Sodium; this beta pins one Sodium version.
     assert_eq!(newest.dependencies.len(), 1);
     let sodium = &newest.dependencies[0];

@@ -118,14 +118,14 @@ impl ModVersion {
     }
 }
 
-/// A downloadable mod jar and the hashes it is verified against.
+/// A downloadable mod jar and the hash it is verified against: a sha512 on
+/// Modrinth, a sha1 on CurseForge.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFile {
     pub url: String,
     pub filename: String,
     pub size: u64,
-    pub sha512: Checksum,
-    pub sha1: Option<Checksum>,
+    pub checksum: Checksum,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,8 +217,7 @@ mod tests {
                 url: format!("https://cdn.modrinth.com/{id}.jar"),
                 filename: format!("{id}.jar"),
                 size: 1,
-                sha512: Checksum::parse(HashAlgorithm::Sha512, &"a".repeat(128)).unwrap(),
-                sha1: None,
+                checksum: Checksum::parse(HashAlgorithm::Sha512, &"a".repeat(128)).unwrap(),
             }),
             dependencies: Vec::new(),
         }
@@ -296,12 +295,11 @@ mod tests {
                 url: format!("https://cdn.modrinth.com/{id}.jar"),
                 filename: format!("{id}.jar"),
                 size: 1,
-                sha512: Checksum::parse(
+                checksum: Checksum::parse(
                     crate::domain::integrity::HashAlgorithm::Sha512,
                     &"a".repeat(128),
                 )
                 .unwrap(),
-                sha1: None,
             }),
             dependencies: Vec::new(),
         };
