@@ -124,6 +124,21 @@ describe("UpdatePage", () => {
     expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
 
+  it("forgets a refused install once the player leaves the page", async () => {
+    client.checkAppUpdate.mockResolvedValue(available);
+    client.installAppUpdate.mockImplementation(() =>
+      running(Promise.reject(new IpcError("already_running", "a game is running"))),
+    );
+    const first = renderWithQuery(<UpdatePage />);
+    fireEvent.click(await installButton());
+    expect(await screen.findByRole("alert")).toHaveTextContent(labels.closeTheGame);
+    first.unmount();
+
+    renderWithQuery(<UpdatePage />);
+    await installButton();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("explains a refused install and checks again when the release changed", async () => {
     client.checkAppUpdate.mockResolvedValue(available);
     client.installAppUpdate

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
@@ -59,7 +59,9 @@ export function UpdatePage() {
   const { t } = useTranslation();
   const status = useAppUpdate();
   const appInfo = useAppInfo();
-  const { installing, progress, error: code, install: start } = useAppUpdateInstall();
+  const { installing, progress, error: code, install: start, clearError } = useAppUpdateInstall();
+  // A refusal answers the press that caused it; leaving the page drops it.
+  useEffect(() => clearError, [clearError]);
   const error = code
     ? code === "already_running"
       ? t("updates.closeTheGame")

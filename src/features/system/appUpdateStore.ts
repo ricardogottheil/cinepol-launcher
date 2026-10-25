@@ -15,6 +15,8 @@ interface AppUpdateInstall {
    * when the release changed under it, so the caller checks again.
    */
   install: (version: string) => Promise<boolean>;
+  /** Forgets a refused install, so it does not greet the next visit. */
+  clearError: () => void;
 }
 
 /**
@@ -25,6 +27,7 @@ export const useAppUpdateInstall = create<AppUpdateInstall>((set, get) => ({
   installing: false,
   progress: null,
   error: null,
+  clearError: () => set({ error: null }),
   install: async (version) => {
     if (get().installing) return false;
     set({ installing: true, progress: null, error: null });
