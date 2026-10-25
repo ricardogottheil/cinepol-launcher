@@ -36,7 +36,7 @@ describe("App shell", () => {
         [esCommon.nav.home, esCommon.nav.instances, esCommon.nav.servers, esCommon.nav.modpacks],
       ],
       [esCommon.navGroups.player, [esCommon.nav.profile]],
-      [esCommon.navGroups.launcher, [esCommon.nav.settings]],
+      [esCommon.navGroups.launcher, [esCommon.nav.about]],
     ];
     for (const [group, items] of groups) {
       const list = within(nav).getByRole("list", { name: group });
@@ -53,9 +53,9 @@ describe("App shell", () => {
     expect(current).toHaveTextContent(esCommon.nav.profile);
   });
 
-  it("shows the legal disclaimer in the settings' about section", async () => {
-    renderAt("/settings");
-    const about = await screen.findByRole("region", { name: esCommon.settings.aboutTitle });
+  it("shows the legal disclaimer on the about page", async () => {
+    renderAt("/about");
+    const about = await screen.findByRole("region", { name: esCommon.about.legalTitle });
     expect(within(about).getByText(esCommon.legal.disclaimer)).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe("App shell", () => {
 
   it("shows the app version from the backend", async () => {
     getAppInfo.mockResolvedValue({ name: "Cinepol Launcher", version: "0.1.0" });
-    renderAt("/settings");
+    renderAt("/about");
     expect(await screen.findByText("0.1.0")).toBeInTheDocument();
   });
 

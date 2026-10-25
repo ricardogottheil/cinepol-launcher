@@ -19,7 +19,7 @@
     "servers": "Servidores",
     "modpacks": "Modpacks",
     "profile": "Perfil",
-    "settings": "Ajustes",
+    "about": "Acerca de",
     "designKit": "Kit de diseño"
   },
   "navGroups": {
@@ -346,9 +346,14 @@
     "crashed": "El juego se cerró por un error.",
     "openCrashReport": "Abrir reporte del error"
   },
-  "settings": {
-    "title": "Ajustes",
-    "aboutTitle": "Acerca de"
+  "about": {
+    "title": "Acerca de",
+    "launcherTitle": "Cinepol Launcher",
+    "updates": "Actualizaciones",
+    "upToDate": "Al día",
+    "updateAvailable": "Versión {{version}} disponible",
+    "openUpdates": "Ver actualizaciones",
+    "legalTitle": "Aviso legal"
   },
   "units": {
     "megabytes": "MB"
@@ -441,10 +446,20 @@
   },
   "updates": {
     "title": "Actualización del launcher",
-    "available": "Cinepol Launcher {{version}} está disponible",
+    "badge": "Nueva versión {{version}}",
+    "seeWhatsNew": "Ver novedades",
+    "currentVersion": "Versión actual",
+    "newVersion": "Versión nueva",
+    "product": "Cinepol Launcher {{version}}",
+    "whatsNew": "Novedades",
     "install": "Instalar y reiniciar",
+    "installing": "Instalando la actualización",
     "downloading": "Descargando la actualización",
-    "closeTheGame": "Cierra el juego primero: instalar reinicia el launcher."
+    "closeTheGame": "Cierra el juego primero: instalar reinicia el launcher.",
+    "checking": "Buscando actualizaciones",
+    "upToDate": "Estás al día",
+    "upToDateDetail": "Cinepol Launcher {{version}} es la última versión.",
+    "notConfigured": "Esta versión no se actualiza sola."
   },
   "mods": {
     "title": "Mods",

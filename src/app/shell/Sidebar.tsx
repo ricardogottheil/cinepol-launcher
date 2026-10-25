@@ -4,17 +4,18 @@ import { useTranslation } from "react-i18next";
 import { BrandGlyph, type BrandGlyphName } from "../../components/ui/BrandGlyph";
 import { ProfileSwitcher } from "../../features/accounts/ProfileSwitcher";
 import { bundledConfigDto, useServerConfig } from "../../features/server/useServer";
+import { UpdateBadge } from "../../features/system/UpdateBadge";
 import { openExternal } from "../../ipc/client";
 
 type NavItem = {
-  to: "/" | "/instances" | "/servers" | "/modpacks" | "/profile" | "/settings" | "/design";
+  to: "/" | "/instances" | "/servers" | "/modpacks" | "/profile" | "/about" | "/design";
   key:
     | "nav.home"
     | "nav.instances"
     | "nav.servers"
     | "nav.modpacks"
     | "nav.profile"
-    | "nav.settings"
+    | "nav.about"
     | "nav.designKit";
 };
 
@@ -34,7 +35,7 @@ const GROUPS: { key: NavGroupKey; items: NavItem[] }[] = [
   {
     key: "navGroups.launcher",
     items: [
-      { to: "/settings", key: "nav.settings" },
+      { to: "/about", key: "nav.about" },
       ...(import.meta.env.DEV ? [{ to: "/design", key: "nav.designKit" } as const] : []),
     ],
   },
@@ -77,7 +78,7 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
 /**
  * Section rail grouped by what the player is doing: playing, their profile,
  * the launcher itself. Text only, like the website's section strip; the
- * active profile sits at the foot.
+ * active profile sits at the foot, with a newer launcher announced above it.
  */
 export function Sidebar() {
   const { t } = useTranslation();
@@ -113,6 +114,7 @@ export function Sidebar() {
           {linkFailed ? t("links.openFailed") : null}
         </p>
       </div>
+      <UpdateBadge />
       <ProfileSwitcher />
     </aside>
   );

@@ -210,10 +210,13 @@ App shell (`src/app/shell/`):
   `src-tauri/tauri.macos.conf.json`) and the wordmark clears them.
 - **Sidebar**: text-only section rail, like the website's section strip (no
   decorative icons, D:239-268), grouped by what the player is doing: Game
-  (Home, Instances, Servers, Modpacks), Player (Profile), Launcher (Settings). Group
+  (Home, Instances, Servers, Modpacks), Player (Profile), Launcher (About). Group
   names are `plate` in `engrave`; current item: `silk` on `panel` with a 3px
   `signal` bar on its left edge. Community
-  links (Twitch, Discord) sit above the profile switcher at the foot.
+  links (Twitch, Discord) sit above the profile switcher at the foot. When a
+  newer launcher is out, an update badge sits between them and the switcher:
+  "New version x.y.z" as a `signal` plate over "See what's new", with the same
+  3px `signal` bar; it opens the update page and is absent otherwise.
 - **Profile switcher**: the active profile (head, name, kind plate) at the
   foot of the sidebar. It opens a menu on `panel` with a `hairline-lit` edge
   that lists online (Microsoft) and offline profiles in separate groups, plus
@@ -273,8 +276,14 @@ App shell (`src/app/shell/`):
   (name, address readout, status lamp, players, version, latency, the
   instance select, then Play, Edit and Remove as plate buttons); then the add
   form. Play without an instance focuses the select and says why.
-- **Settings**: only About, the version and the legal disclaimer. The server
-  configuration URL is not offered to players.
+- **About** (formerly Settings; nothing on it is a setting): a spec sheet with
+  the version and the update state, a plate link to the update page, then the
+  legal disclaimer. The server configuration URL is not offered to players.
+- **Update page** (`/updates`, reached from the badge or About): current and
+  new version as a spec sheet, the signal control "Install and restart"
+  (replaced by a progress meter while it installs), then "What's new": the
+  release notes block in the player's language, each `- ` line a row with a
+  small `signal` square. Up to date, it says so with the version.
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (main server, recommended version, supported range,
   active account as a spec sheet; the signal control "Play", which joins the
