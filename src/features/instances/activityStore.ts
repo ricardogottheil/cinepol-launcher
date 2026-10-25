@@ -77,7 +77,8 @@ interface ActivityState {
   updatePack: (instanceId: string, source?: PackSource) => Promise<{ pending: number } | null>;
   /** Asks where to save and exports the instance as a `.mrpack`. */
   exportPack: (instanceId: string) => Promise<void>;
-  playCinepol: () => Promise<LaunchOutcomeDto | null>;
+  /** Joins `server` (a community server's address), or the main one. */
+  playCinepol: (server?: string) => Promise<LaunchOutcomeDto | null>;
 }
 
 const IDLE: InstanceActivity = {
@@ -253,9 +254,10 @@ export const useActivityStore = create<ActivityState>((set) => {
     await killInstance(instanceId).catch(() => false);
   };
 
-  const playCinepol = async (): Promise<LaunchOutcomeDto | null> => {
+  const playCinepol = async (server?: string): Promise<LaunchOutcomeDto | null> => {
     const key = CINEPOL_SESSION;
     const operation = playOnCinepol({
+      ...(server === undefined ? {} : { server }),
       onProgress: (event) =>
         update(key, {
           activity:

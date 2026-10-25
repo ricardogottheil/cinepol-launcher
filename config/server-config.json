@@ -1,10 +1,13 @@
 {
-  "schemaVersion": 1,
-  "server": {
-    "name": "CINEPOL",
-    "address": "mc.policarpiers.com",
-    "port": 25565
-  },
+  "schemaVersion": 2,
+  "name": "CINEPOL",
+  "servers": [
+    {
+      "name": "CINEPOL",
+      "address": "mc.policarpiers.com",
+      "port": 25565
+    }
+  ],
   "versions": {
     "min": "1.21.11",
     "max": "26.2",

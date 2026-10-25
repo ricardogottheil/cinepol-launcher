@@ -45,7 +45,7 @@ pub async fn create_instance(
         game_version: &game_version,
         loader,
         origin: InstanceOrigin::Custom,
-        seed_server: Some(cinepol_server_entry(&state.current_config())),
+        seed_server: cinepol_server_entry(&state.current_config()),
     };
     Ok(InstanceDto::from(
         &create(request, &state.instances, &state.servers).await?,

@@ -274,7 +274,7 @@ async fn install_new(
     let request = InstallModpackRequest {
         pack,
         name: None,
-        seed_server: Some(cinepol_server_entry(&state.current_config())),
+        seed_server: cinepol_server_entry(&state.current_config()),
         claim: Some(&claim),
     };
     let deps = InstallModpackDeps {
@@ -313,7 +313,7 @@ async fn install_new_curseforge(
     let request = InstallCurseForgeRequest {
         pack,
         name: None,
-        seed_server: Some(cinepol_server_entry(&state.current_config())),
+        seed_server: cinepol_server_entry(&state.current_config()),
         claim: Some(&claim),
     };
     let deps = CurseForgeDeps {

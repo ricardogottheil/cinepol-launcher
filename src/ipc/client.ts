@@ -692,25 +692,25 @@ export function getServerConfig(): Promise<ServerConfigDto> {
   return call("get_server_config");
 }
 
-export function getServerStatus(): Promise<ServerStatusDto> {
-  return call("get_server_status");
-}
-
 export interface PlayOnCinepolOptions {
   onProgress: (event: ProgressEvent) => void;
   onLog: (line: LogLineDto) => void;
+  /** A community server's address; the main server when left out. */
+  server?: string;
 }
 
 /** Prepares, installs and launches the CINEPOL instance; `cancel` stops either phase. */
 export function playOnCinepol({
   onProgress,
   onLog,
+  server,
 }: PlayOnCinepolOptions): RunningOperation<LaunchOutcomeDto> {
   return startOperation("play_on_cinepol", (operationId) =>
     call("play_on_cinepol", {
       operationId,
       onProgress: channel(onProgress),
       onLog: channel(onLog),
+      server: server ?? null,
     }),
   );
 }

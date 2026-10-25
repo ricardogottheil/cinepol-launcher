@@ -1,18 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { getServerConfig, getServerStatus, IpcError, type ServerConfigDto } from "../../ipc/client";
+import { getServerConfig, IpcError, type ServerConfigDto } from "../../ipc/client";
 import { bundledServerConfig, displayAddress } from "./serverConfig";
 
 export const serverConfigKey = ["server-config"] as const;
 
-/** Refresh period of the live status on the home screen. */
+/** Refresh period of every server's live status. */
 export const STATUS_REFRESH_MS = 30_000;
 
 /** The bundled config as the backend would report it, for previews and tests. */
 export function bundledConfigDto(): ServerConfigDto {
   const config = bundledServerConfig;
   return {
-    name: config.server.name,
-    address: displayAddress(config),
+    name: config.name,
+    servers: config.servers.map((server) => ({
+      name: server.name,
+      address: displayAddress(server),
+    })),
     minVersion: config.versions.min,
     maxVersion: config.versions.max,
     recommendedVersion: config.versions.recommended,
@@ -36,14 +39,5 @@ export function useServerConfig() {
     },
     placeholderData: bundledConfigDto,
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useServerStatus() {
-  return useQuery({
-    queryKey: ["server-status"],
-    queryFn: getServerStatus,
-    refetchInterval: STATUS_REFRESH_MS,
-    retry: false,
   });
 }

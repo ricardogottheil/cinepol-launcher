@@ -19,7 +19,8 @@ import { LogPanel } from "../instances/LogPanel";
 import { ProgressMeter } from "../instances/ProgressMeter";
 import { useInstanceSession } from "../instances/useInstanceSession";
 import { instancesKey, useInstances } from "../instances/useInstances";
-import { bundledConfigDto, useServerConfig, useServerStatus } from "../server/useServer";
+import { bundledConfigDto, useServerConfig } from "../server/useServer";
+import { useServerPing } from "../servers/useSavedServers";
 
 const plateLink = plateLinkClass;
 
@@ -160,7 +161,8 @@ export function HomePage() {
     accounts.data?.accounts.find((account) => account.id === accounts.data?.activeId)?.username ??
     null;
   const config = useServerConfig().data ?? bundledConfigDto();
-  const statusQuery = useServerStatus();
+  const main = config.servers[0];
+  const statusQuery = useServerPing(main?.address);
   const status: ServerStatus = statusQuery.isPending
     ? "checking"
     : statusQuery.isError
@@ -185,7 +187,7 @@ export function HomePage() {
           <div className="mt-8 flex flex-wrap items-start gap-x-12 gap-y-6">
             <SpecSheet
               rows={[
-                { label: t("home.spec.server"), value: config.address },
+                { label: t("home.spec.server"), value: main?.address ?? "–" },
                 {
                   label: t("home.spec.version"),
                   value: t("home.recommended", { version: config.recommendedVersion }),

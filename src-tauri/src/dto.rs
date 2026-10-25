@@ -847,13 +847,23 @@ pub enum ConfigOriginDto {
     Bundled,
 }
 
-/// The CINEPOL server configuration the UI shows and acts on.
+/// One community server.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub struct ServerConfigDto {
+pub struct CommunityServerDto {
     pub name: String,
     /// `host[:port]` as players type it.
     pub address: String,
+}
+
+/// The CINEPOL configuration the UI shows and acts on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConfigDto {
+    /// The community's name.
+    pub name: String,
+    /// Possibly empty; the first is the main server, where Play goes.
+    pub servers: Vec<CommunityServerDto>,
     pub min_version: String,
     pub max_version: String,
     pub recommended_version: String,
@@ -869,7 +879,14 @@ impl ServerConfigDto {
         let config = &loaded.config;
         Self {
             name: config.name.clone(),
-            address: config.address.to_string(),
+            servers: config
+                .servers
+                .iter()
+                .map(|server| CommunityServerDto {
+                    name: server.name.clone(),
+                    address: server.address.to_string(),
+                })
+                .collect(),
             min_version: config.versions.min().as_str().to_owned(),
             max_version: config.versions.max().as_str().to_owned(),
             recommended_version: config.versions.recommended().as_str().to_owned(),

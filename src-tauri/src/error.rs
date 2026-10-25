@@ -399,6 +399,9 @@ impl From<launcher_core::application::play_on_cinepol::PlayOnCinepolError> for A
             PlayOnCinepolError::AlreadyRunning(_) => {
                 Self::new(ErrorCode::AlreadyRunning, error.to_string())
             }
+            PlayOnCinepolError::UnknownServer(_) => {
+                Self::new(ErrorCode::InvalidInput, error.to_string())
+            }
         }
     }
 }

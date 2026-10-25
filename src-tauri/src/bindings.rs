@@ -10,16 +10,16 @@ use ts_rs::{Config, TS};
 
 use crate::dto::{
     AccountDto, AccountKindDto, AccountPolicyDto, AccountsDto, AppInfo, AppUpdateStatusDto,
-    CapeDto, CommunityLinksDto, ConfigOriginDto, DeviceCodeDto, GameVersionDto, GameVersionsDto,
-    InstallSummaryDto, InstalledModDto, InstanceDto, InstanceOriginDto, InstanceSettingsDto,
-    JavaChoiceDto, JavaKindDto, LaunchOutcomeDto, LoaderReleaseDto, LogLevelDto, LogLineDto,
-    LogStreamDto, ManualDownloadsDto, ManualFileDto, ModEntryDto, ModInstallPreviewDto,
-    ModOriginDto, ModPageDto, ModSummaryDto, ModUpdateDto, ModUpdatesDto, ModpackCatalogsDto,
-    ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto, ModpackSummaryDto,
-    ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto, PackwizUpdateDto,
-    PlannedModDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
-    SavedServerDto, SavedServerFormDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto,
-    ServerListDto, ServerStatusDto, SkinDto, SuggestedModDto, WindowSizeDto,
+    CapeDto, CommunityLinksDto, CommunityServerDto, ConfigOriginDto, DeviceCodeDto, GameVersionDto,
+    GameVersionsDto, InstallSummaryDto, InstalledModDto, InstanceDto, InstanceOriginDto,
+    InstanceSettingsDto, JavaChoiceDto, JavaKindDto, LaunchOutcomeDto, LoaderReleaseDto,
+    LogLevelDto, LogLineDto, LogStreamDto, ManualDownloadsDto, ManualFileDto, ModEntryDto,
+    ModInstallPreviewDto, ModOriginDto, ModPageDto, ModSummaryDto, ModUpdateDto, ModUpdatesDto,
+    ModpackCatalogsDto, ModpackDetailsDto, ModpackExportDto, ModpackInstallDto, ModpackPageDto,
+    ModpackSummaryDto, ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto,
+    PackwizUpdateDto, PlannedModDto, PremiumNameDto, ProgressEvent, ProgressStageDto,
+    ProgressUnitDto, SavedServerDto, SavedServerFormDto, ServerConfigDto, ServerDto, ServerEditDto,
+    ServerFormDto, ServerListDto, ServerStatusDto, SkinDto, SuggestedModDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -67,6 +67,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         LaunchOutcomeDto::decl(cfg),
         CommunityLinksDto::decl(cfg),
         ConfigOriginDto::decl(cfg),
+        CommunityServerDto::decl(cfg),
         ServerConfigDto::decl(cfg),
         ServerStatusDto::decl(cfg),
         ModpackSummaryDto::decl(cfg),
@@ -253,7 +254,6 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             bool::name(cfg),
         ),
         command("get_server_config", vec![], ServerConfigDto::name(cfg)),
-        command("get_server_status", vec![], ServerStatusDto::name(cfg)),
         command(
             "play_on_cinepol",
             vec![
@@ -263,6 +263,7 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
                     format!("Channel<{}>", ProgressEvent::name(cfg)),
                 ),
                 ("onLog", format!("Channel<{}>", LogLineDto::name(cfg))),
+                ("server", format!("{} | null", string())),
             ],
             LaunchOutcomeDto::name(cfg),
         ),
@@ -643,7 +644,6 @@ mod tests {
             "update_packwiz",
             "check_manual_downloads",
             "get_server_config",
-            "get_server_status",
             "play_on_cinepol",
         ] {
             assert!(

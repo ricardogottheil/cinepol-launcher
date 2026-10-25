@@ -98,11 +98,21 @@ export type CommunityLinksDto = { website: string, twitch: string, discord: stri
 
 export type ConfigOriginDto = "remote" | "bundled";
 
-export type ServerConfigDto = { name: string, 
+export type CommunityServerDto = { name: string, 
 /**
  * `host[:port]` as players type it.
  */
-address: string, minVersion: string, maxVersion: string, recommendedVersion: string, links: CommunityLinksDto, origin: ConfigOriginDto, };
+address: string, };
+
+export type ServerConfigDto = { 
+/**
+ * The community's name.
+ */
+name: string, 
+/**
+ * Possibly empty; the first is the main server, where Play goes.
+ */
+servers: Array<CommunityServerDto>, minVersion: string, maxVersion: string, recommendedVersion: string, links: CommunityLinksDto, origin: ConfigOriginDto, };
 
 export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versionName: string, motd: string, latencyMs: number | null, };
 
@@ -304,8 +314,7 @@ export interface Commands {
   launch_instance: { args: { instanceId: string; joinServer: string | null; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
   kill_instance: { args: { instanceId: string }; result: boolean };
   get_server_config: { args: Record<string, never>; result: ServerConfigDto };
-  get_server_status: { args: Record<string, never>; result: ServerStatusDto };
-  play_on_cinepol: { args: { operationId: string; onProgress: Channel<ProgressEvent>; onLog: Channel<LogLineDto> }; result: LaunchOutcomeDto };
+  play_on_cinepol: { args: { operationId: string; onProgress: Channel<ProgressEvent>; onLog: Channel<LogLineDto>; server: string | null }; result: LaunchOutcomeDto };
   delete_instance: { args: { instanceId: string }; result: null };
   duplicate_instance: { args: { instanceId: string; name: string }; result: InstanceDto };
   get_instance_settings: { args: { instanceId: string }; result: InstanceSettingsDto };

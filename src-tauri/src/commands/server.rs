@@ -1,12 +1,12 @@
-use launcher_core::application::check_server_status::check_server_status;
 use launcher_core::application::install_instance::InstallDeps;
 use launcher_core::application::launch_instance::LaunchDeps;
 use launcher_core::application::load_server_config::load_server_config;
 use launcher_core::application::play_on_cinepol::play_on_cinepol as play;
+use launcher_core::domain::server_list::ServerAddress;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::dto::{LaunchOutcomeDto, LogLineDto, ProgressEvent, ServerConfigDto, ServerStatusDto};
+use crate::dto::{LaunchOutcomeDto, LogLineDto, ProgressEvent, ServerConfigDto};
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
 use crate::logs::ChannelLogSink;
@@ -21,14 +21,9 @@ pub async fn get_server_config(state: State<'_, AppState>) -> Result<ServerConfi
     Ok(ServerConfigDto::new(&loaded))
 }
 
-/// Pings the CINEPOL server (Server List Ping).
-#[tauri::command]
-pub async fn get_server_status(state: State<'_, AppState>) -> Result<ServerStatusDto, AppError> {
-    let status = check_server_status(&state.pinger, &state.current_config()).await?;
-    Ok(ServerStatusDto::from(&status))
-}
-
-/// Prepares the managed instance, installs it and joins the server. Install
+/// Prepares the managed instance, installs it and joins `server` (a community
+/// server from the config; the main one when `None`, none when the config
+/// lists no server). Install
 /// progress, then a `launching` step, arrive through `on_progress`; the game
 /// output through `on_log`. `cancel_operation(operation_id)` stops either.
 #[tauri::command]
@@ -38,7 +33,13 @@ pub async fn play_on_cinepol(
     operation_id: String,
     on_progress: Channel<ProgressEvent>,
     on_log: Channel<LogLineDto>,
+    server: Option<String>,
 ) -> Result<LaunchOutcomeDto, AppError> {
+    let server = server
+        .as_deref()
+        .map(ServerAddress::parse)
+        .transpose()
+        .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))?;
     let _session = state.cinepol_session.try_enter().ok_or_else(|| {
         AppError::new(
             ErrorCode::AlreadyRunning,
@@ -75,6 +76,7 @@ pub async fn play_on_cinepol(
     // see this session.
     let result = play(
         &config,
+        server.as_ref(),
         &state.servers,
         &state.games,
         &install,

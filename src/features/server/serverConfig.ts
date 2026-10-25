@@ -1,9 +1,17 @@
 import bundled from "../../../config/server-config.json";
 
-/** CINEPOL server configuration. Milestone 6 adds the remote copy; this is the bundled fallback. */
+/** One community server as `server-config.json` (schema 2) lists it. */
+export interface CommunityServerEntry {
+  name: string;
+  address: string;
+  port?: number;
+}
+
+/** The CINEPOL configuration bundled with the launcher; the remote copy wins when it loads. */
 export interface ServerConfig {
   schemaVersion: number;
-  server: { name: string; address: string; port: number };
+  name: string;
+  servers: CommunityServerEntry[];
   versions: { min: string; max: string; recommended: string };
   links: { website: string; twitch: string; discord: string };
 }
@@ -11,7 +19,6 @@ export interface ServerConfig {
 export const bundledServerConfig: ServerConfig = bundled;
 
 /** The address players type, omitting the default port. */
-export function displayAddress(config: ServerConfig): string {
-  const { address, port } = config.server;
-  return port === 25565 ? address : `${address}:${port}`;
+export function displayAddress({ address, port }: CommunityServerEntry): string {
+  return port === undefined || port === 25565 ? address : `${address}:${port}`;
 }

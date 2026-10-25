@@ -14,11 +14,12 @@ export function useSavedServers() {
   return useQuery({ queryKey: savedServersKey, queryFn: listSavedServers });
 }
 
-/** A saved server's live status, refreshed like CINEPOL's. */
-export function useServerPing(address: string) {
+/** A server's live status, refreshed every STATUS_REFRESH_MS; idle without an address. */
+export function useServerPing(address: string | undefined) {
   return useQuery({
     queryKey: ["server-status", address],
-    queryFn: () => pingServer(address),
+    queryFn: () => pingServer(address ?? ""),
+    enabled: address !== undefined,
     refetchInterval: STATUS_REFRESH_MS,
     retry: false,
   });

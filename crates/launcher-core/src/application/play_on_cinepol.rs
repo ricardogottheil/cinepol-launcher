@@ -1,5 +1,6 @@
 //! "Play on CINEPOL": prepare the managed instance, install what is missing
-//! and launch straight into the server.
+//! and launch straight into a community server (the main one unless the
+//! player picked another), or into the game when the config lists none.
 
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
@@ -24,7 +25,7 @@ use crate::domain::ports::{
     Clock, Downloader, FileSystem, ProgressReporter, ProgressStage, ProgressUpdate,
 };
 use crate::domain::server::ServerConfig;
-use crate::domain::server_list::ServerListStore;
+use crate::domain::server_list::{ServerAddress, ServerListStore};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PlayOnCinepolError {
@@ -36,6 +37,8 @@ pub enum PlayOnCinepolError {
     Launch(#[from] LaunchError),
     #[error("{0} is already running")]
     AlreadyRunning(InstanceId),
+    #[error("{0} is not a CINEPOL server")]
+    UnknownServer(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +56,7 @@ pub struct CinepolSession {
 #[allow(clippy::too_many_arguments)]
 pub async fn play_on_cinepol<I, A, V, D, J, O, N, P, C, F, Q, S, G, R, L>(
     config: &ServerConfig,
+    server: Option<&ServerAddress>,
     servers: &S,
     games: &G,
     install: &InstallDeps<'_, I, V, D, J, O>,
@@ -79,6 +83,15 @@ where
     R: ProgressReporter,
     L: LogSink,
 {
+    let join = match server {
+        Some(address) => Some(
+            config
+                .server(address)
+                .ok_or_else(|| PlayOnCinepolError::UnknownServer(address.to_string()))?,
+        ),
+        None => config.main_server(),
+    }
+    .map(|server| server.address.to_string());
     let id = match find_cinepol_instance(install.instances)
         .await
         .map_err(CreateInstanceError::from)?
@@ -104,7 +117,7 @@ where
         let request = LaunchRequest {
             instance: instance.id.clone(),
             account: None,
-            join_server: Some(config.address.to_string()),
+            join_server: join,
         };
         let outcome = launch_instance(&request, launch, logs, kill).await?;
         Ok(CinepolSession { instance, outcome })
@@ -138,6 +151,7 @@ mod tests {
     use crate::domain::java::{JavaRuntime, JavaSource, JavaVersion};
     use crate::domain::launch::{Arch, LauncherPaths, OsName, Platform, VersionManifest};
     use crate::domain::loader::LoaderSpec;
+    use crate::domain::server::CommunityServer;
     use crate::testing::{
         FakeDownloader, FakeFileSystem, FakeGameProcess, FakeJavaRuntimes, FakeVersionSource,
         FixedClock, InMemoryAccountRepository, InMemoryInstanceRepository, InMemoryRunningGames,
@@ -222,6 +236,15 @@ mod tests {
             &self,
             kill: CancellationToken,
         ) -> Result<CinepolSession, PlayOnCinepolError> {
+            self.play_on(&cinepol("26.2"), None, kill).await
+        }
+
+        async fn play_on(
+            &self,
+            config: &ServerConfig,
+            server: Option<&ServerAddress>,
+            kill: CancellationToken,
+        ) -> Result<CinepolSession, PlayOnCinepolError> {
             let install = InstallDeps {
                 instances: &self.instances,
                 versions: &self.versions,
@@ -247,7 +270,8 @@ mod tests {
                 launcher_version: "0.1.0",
             };
             play_on_cinepol(
-                &cinepol("26.2"),
+                config,
+                server,
                 &self.servers,
                 &self.games,
                 &install,
@@ -295,6 +319,74 @@ mod tests {
         assert!(
             !world.games.is_busy(&session.instance.id),
             "released after the game exits"
+        );
+    }
+
+    fn with_creative(mut config: ServerConfig) -> ServerConfig {
+        config.servers.push(CommunityServer {
+            name: "Creative".into(),
+            address: ServerAddress::parse("creative.policarpiers.com").unwrap(),
+        });
+        config
+    }
+
+    fn joined(world: &World) -> Option<String> {
+        let args = world.runner.specs()[0].command.args().to_vec();
+        args.iter()
+            .position(|arg| arg == "--quickPlayMultiplayer")
+            .map(|index| args[index + 1].clone())
+    }
+
+    #[tokio::test]
+    async fn joins_the_community_server_the_player_picked() {
+        let world = World::new().await;
+        let creative = ServerAddress::parse("creative.policarpiers.com").unwrap();
+        world
+            .play_on(
+                &with_creative(cinepol("26.2")),
+                Some(&creative),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(joined(&world).as_deref(), Some("creative.policarpiers.com"));
+    }
+
+    #[tokio::test]
+    async fn refuses_a_server_the_config_does_not_list_before_installing() {
+        let world = World::new().await;
+        let elsewhere = ServerAddress::parse("mc.hypixel.net").unwrap();
+        let result = world
+            .play_on(&cinepol("26.2"), Some(&elsewhere), CancellationToken::new())
+            .await;
+        assert_eq!(
+            result,
+            Err(PlayOnCinepolError::UnknownServer("mc.hypixel.net".into()))
+        );
+        assert!(world.downloader.requests().is_empty(), "nothing installed");
+        assert!(world.runner.specs().is_empty(), "no game started");
+    }
+
+    #[tokio::test]
+    async fn starts_the_game_without_joining_when_the_config_lists_no_server() {
+        let world = World::new().await;
+        let mut config = cinepol("26.2");
+        config.servers.clear();
+        let session = world
+            .play_on(&config, None, CancellationToken::new())
+            .await
+            .unwrap();
+        assert_eq!(joined(&world), None);
+        assert_eq!(session.instance.name.as_str(), "CINEPOL");
+        assert!(
+            world
+                .servers
+                .load(&session.instance.id)
+                .await
+                .unwrap()
+                .entries()
+                .is_empty(),
+            "no server to seed"
         );
     }
 

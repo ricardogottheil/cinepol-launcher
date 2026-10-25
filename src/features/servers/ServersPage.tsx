@@ -10,16 +10,17 @@ import { TextField } from "../../components/ui/TextField";
 import { toIpcError } from "../../ipc/client";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../instances/activityStore";
 import { useInstances } from "../instances/useInstances";
-import { bundledConfigDto, useServerConfig, useServerStatus } from "../server/useServer";
+import { bundledConfigDto, useServerConfig } from "../server/useServer";
 import { SavedServerRow, serverFormError } from "./SavedServerRow";
 import { serverLamp } from "./serverLamp";
-import { useSavedServers, useSaveServer } from "./useSavedServers";
+import { useSavedServers, useSaveServer, useServerPing } from "./useSavedServers";
 
 /** CINEPOL, pinned: the same status and Play as on Home. */
 function CinepolServer() {
   const { t } = useTranslation();
   const config = useServerConfig().data ?? bundledConfigDto();
-  const status = useServerStatus();
+  const main = config.servers[0];
+  const status = useServerPing(main?.address);
   const lamp = serverLamp(status);
   const live = status.isError ? undefined : status.data;
   const session = useInstanceActivity(CINEPOL_SESSION);
@@ -36,7 +37,7 @@ function CinepolServer() {
           {config.name}
         </h2>
         <span data-readout className="readout-sm text-silk-dim">
-          {config.address}
+          {main?.address}
         </span>
       </div>
       <div className="flex flex-wrap items-start gap-x-10 gap-y-4">

@@ -18,7 +18,7 @@ const client = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listInstances: vi.fn(),
   getServerConfig: vi.fn(),
-  getServerStatus: vi.fn(),
+  pingServer: vi.fn(),
   playOnCinepol: vi.fn(),
 }));
 
@@ -31,9 +31,11 @@ beforeEach(() => {
   client.listAccounts.mockResolvedValue({ accounts: [], activeId: null });
   client.listInstances.mockResolvedValue([]);
   client.getServerConfig.mockRejectedValue(new IpcError("internal", "no backend"));
-  client.getServerStatus.mockRejectedValue(new IpcError("internal", "no backend"));
+  client.pingServer.mockRejectedValue(new IpcError("internal", "no backend"));
   useActivityStore.setState({ byInstance: {} });
 });
+
+const mainAddress = serverConfig.servers[0]?.address ?? "";
 
 const liveStatus = {
   onlinePlayers: 8,
@@ -77,7 +79,7 @@ describe("HomePage", () => {
   it("shows the server address and the supported range from config", async () => {
     renderHome();
     const { min, max } = serverConfig.versions;
-    expect(await screen.findByText(serverConfig.server.address)).toBeInTheDocument();
+    expect(await screen.findByText(mainAddress)).toBeInTheDocument();
     expect(screen.getByText(`${min} – ${max}`)).toBeInTheDocument();
   });
 
@@ -174,14 +176,14 @@ describe("HomePage", () => {
   });
 
   it("says the server does not answer when the ping is unreachable", async () => {
-    client.getServerStatus.mockRejectedValue(new IpcError("server_unreachable", "timed out"));
+    client.pingServer.mockRejectedValue(new IpcError("server_unreachable", "timed out"));
     const { container } = renderHome();
     expect(await screen.findByText(esCommon.home.status.offline)).toBeInTheDocument();
     expect(container.querySelector("[data-status-dot]")).toBeNull();
   });
 
   it("lights the lamp and shows the live readings when the server answers", async () => {
-    client.getServerStatus.mockResolvedValue({
+    client.pingServer.mockResolvedValue({
       onlinePlayers: 8,
       maxPlayers: 100,
       versionName: "Velocity",
@@ -199,7 +201,7 @@ describe("HomePage", () => {
   it("uses the remote config when the backend provides one", async () => {
     client.getServerConfig.mockResolvedValue({
       name: "CINEPOL",
-      address: "play.example.test",
+      servers: [{ name: "CINEPOL", address: "play.example.test" }],
       minVersion: "1.21.11",
       maxVersion: "26.2",
       recommendedVersion: "26.2",
@@ -217,11 +219,11 @@ describe("HomePage", () => {
   });
 
   it("hides the last readings once the server stops answering", async () => {
-    client.getServerStatus.mockResolvedValue(liveStatus);
+    client.pingServer.mockResolvedValue(liveStatus);
     const { client: queries } = renderHome();
     expect(await screen.findByText("8 / 100")).toBeInTheDocument();
 
-    client.getServerStatus.mockRejectedValue(new IpcError("server_unreachable", "timed out"));
+    client.pingServer.mockRejectedValue(new IpcError("server_unreachable", "timed out"));
     await act(() => queries.refetchQueries());
 
     expect(await screen.findByText(esCommon.home.status.offline)).toBeInTheDocument();
@@ -255,7 +257,7 @@ describe("HomePage", () => {
     });
     renderHome();
     const account = await screen.findByText("CinepolTest7319");
-    expect(account.closest("dl")).toBe(screen.getByText(serverConfig.server.address).closest("dl"));
+    expect(account.closest("dl")).toBe(screen.getByText(mainAddress).closest("dl"));
   });
 
   it("asks to sign in again when the Microsoft session expired", async () => {

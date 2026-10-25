@@ -5,8 +5,8 @@ use serde::Deserialize;
 use crate::domain::instance::GameVersion;
 use crate::domain::ports::HttpClient;
 use crate::domain::server::{
-    CommunityLinks, HttpsUrl, SERVER_CONFIG_SCHEMA, ServerConfig, ServerConfigError,
-    ServerConfigInvalid, ServerConfigSource, SupportedVersions,
+    CommunityLinks, CommunityServer, HttpsUrl, MAX_COMMUNITY_SERVERS, ServerConfig,
+    ServerConfigError, ServerConfigInvalid, ServerConfigSource, SupportedVersions,
 };
 use crate::domain::server_list::ServerAddress;
 
@@ -14,7 +14,15 @@ use crate::domain::server_list::ServerAddress;
 #[serde(rename_all = "camelCase")]
 struct ConfigFile {
     schema_version: u32,
-    server: ServerSection,
+    /// Schema 2: the community's name.
+    #[serde(default)]
+    name: Option<String>,
+    /// Schema 1: the single server.
+    #[serde(default)]
+    server: Option<ServerSection>,
+    /// Schema 2: every community server, possibly none.
+    #[serde(default)]
+    servers: Option<Vec<ServerSection>>,
     versions: VersionsSection,
     links: LinksSection,
 }
@@ -45,23 +53,63 @@ fn invalid(error: impl std::fmt::Display) -> ServerConfigError {
     ServerConfigError::Invalid(error.to_string())
 }
 
-/// Parses and validates a `server-config.json` document.
-pub fn parse_server_config(bytes: &[u8]) -> Result<ServerConfig, ServerConfigError> {
-    let file: ConfigFile = serde_json::from_slice(bytes).map_err(invalid)?;
-    if file.schema_version != SERVER_CONFIG_SCHEMA {
-        return Err(invalid(ServerConfigInvalid::UnsupportedSchema(
-            file.schema_version,
+/// A display name: 1-64 printable characters.
+fn display_name(raw: &str, what: &str) -> Result<String, ServerConfigError> {
+    let name = raw.trim();
+    if name.is_empty() || name.chars().count() > 64 || name.chars().any(char::is_control) {
+        return Err(invalid(format!(
+            "the {what} must be 1-64 printable characters"
         )));
     }
-    let name = file.server.name.trim();
-    if name.is_empty() || name.chars().count() > 64 || name.chars().any(char::is_control) {
-        return Err(invalid("the server name must be 1-64 printable characters"));
-    }
-    let raw_address = match file.server.port {
-        Some(port) if port != 25565 => format!("{}:{port}", file.server.address),
-        _ => file.server.address.clone(),
+    Ok(name.to_owned())
+}
+
+fn community_server(section: &ServerSection) -> Result<CommunityServer, ServerConfigError> {
+    let raw_address = match section.port {
+        Some(port) if port != 25565 => format!("{}:{port}", section.address),
+        _ => section.address.clone(),
     };
-    let address = ServerAddress::parse(&raw_address).map_err(invalid)?;
+    Ok(CommunityServer {
+        name: display_name(&section.name, "server name")?,
+        address: ServerAddress::parse(&raw_address).map_err(invalid)?,
+    })
+}
+
+/// Parses and validates a `server-config.json` document (schema 1 or 2).
+pub fn parse_server_config(bytes: &[u8]) -> Result<ServerConfig, ServerConfigError> {
+    let file: ConfigFile = serde_json::from_slice(bytes).map_err(invalid)?;
+    let (name, sections) = match file.schema_version {
+        1 => {
+            let server = file
+                .server
+                .ok_or_else(|| invalid("a schema 1 config needs its server"))?;
+            (server.name.clone(), vec![server])
+        }
+        2 => (
+            file.name
+                .ok_or_else(|| invalid("a schema 2 config needs the community name"))?,
+            file.servers
+                .ok_or_else(|| invalid("a schema 2 config needs its servers, even if none"))?,
+        ),
+        other => return Err(invalid(ServerConfigInvalid::UnsupportedSchema(other))),
+    };
+    let name = display_name(&name, "community name")?;
+    if sections.len() > MAX_COMMUNITY_SERVERS {
+        return Err(invalid(format!(
+            "a config lists at most {MAX_COMMUNITY_SERVERS} servers"
+        )));
+    }
+    let mut servers: Vec<CommunityServer> = Vec::with_capacity(sections.len());
+    for section in &sections {
+        let server = community_server(section)?;
+        if servers
+            .iter()
+            .any(|known| known.address.same_server(&server.address))
+        {
+            return Err(invalid(format!("{} is listed twice", server.address)));
+        }
+        servers.push(server);
+    }
     let version = |raw: &str| GameVersion::parse(raw).map_err(invalid);
     let versions = SupportedVersions::new(
         version(&file.versions.min)?,
@@ -75,8 +123,8 @@ pub fn parse_server_config(bytes: &[u8]) -> Result<ServerConfig, ServerConfigErr
         discord: HttpsUrl::parse(&file.links.discord).map_err(invalid)?,
     };
     Ok(ServerConfig {
-        name: name.to_owned(),
-        address,
+        name,
+        servers,
         versions,
         links,
     })
@@ -122,11 +170,36 @@ mod tests {
         serde_json::to_vec(&value).unwrap()
     }
 
+    /// A schema 1 document, as the website served before schema 2.
+    fn schema_one() -> serde_json::Value {
+        serde_json::json!({
+            "schemaVersion": 1,
+            "server": { "name": "CINEPOL", "address": "mc.policarpiers.com", "port": 25565 },
+            "versions": { "min": "1.21.11", "max": "26.2", "recommended": "26.2" },
+            "links": {
+                "website": "https://cinepol.policarpiers.com/",
+                "twitch": "https://twitch.tv/polispol1",
+                "discord": "https://discord.gg/cinepol"
+            }
+        })
+    }
+
+    fn servers(config: &ServerConfig) -> Vec<(String, String)> {
+        config
+            .servers
+            .iter()
+            .map(|server| (server.name.clone(), server.address.to_string()))
+            .collect()
+    }
+
     #[test]
     fn parses_the_bundled_config() {
         let config = parse_server_config(BUNDLED).unwrap();
         assert_eq!(config.name, "CINEPOL");
-        assert_eq!(config.address.to_string(), "mc.policarpiers.com");
+        assert_eq!(
+            servers(&config),
+            [("CINEPOL".to_owned(), "mc.policarpiers.com".to_owned())]
+        );
         assert_eq!(config.versions.min().as_str(), "1.21.11");
         assert_eq!(config.versions.max().as_str(), "26.2");
         assert_eq!(config.versions.recommended().as_str(), "26.2");
@@ -135,18 +208,67 @@ mod tests {
     }
 
     #[test]
-    fn keeps_a_non_default_port() {
-        let config = parse_server_config(&with(|v| v["server"]["port"] = 25570.into())).unwrap();
-        assert_eq!(config.address.to_string(), "mc.policarpiers.com:25570");
+    fn reads_a_schema_one_config_as_a_single_server() {
+        let bytes = serde_json::to_vec(&schema_one()).unwrap();
+        let config = parse_server_config(&bytes).unwrap();
+        assert_eq!(config.name, "CINEPOL");
+        assert_eq!(
+            servers(&config),
+            [("CINEPOL".to_owned(), "mc.policarpiers.com".to_owned())]
+        );
+    }
+
+    #[test]
+    fn lists_every_community_server_in_order_with_its_port() {
+        let config = parse_server_config(&with(|v| {
+            v["servers"] = serde_json::json!([
+                { "name": "CINEPOL", "address": "mc.policarpiers.com" },
+                { "name": "Creative", "address": "creative.policarpiers.com", "port": 25570 }
+            ]);
+        }))
+        .unwrap();
+        assert_eq!(
+            servers(&config),
+            [
+                ("CINEPOL".to_owned(), "mc.policarpiers.com".to_owned()),
+                (
+                    "Creative".to_owned(),
+                    "creative.policarpiers.com:25570".to_owned()
+                ),
+            ]
+        );
+        assert_eq!(config.main_server().unwrap().name, "CINEPOL");
+    }
+
+    #[test]
+    fn accepts_a_config_without_servers() {
+        let config = parse_server_config(&with(|v| v["servers"] = serde_json::json!([]))).unwrap();
+        assert!(config.servers.is_empty());
+        assert!(config.main_server().is_none());
+        assert_eq!(config.name, "CINEPOL");
     }
 
     #[test]
     fn rejects_unsafe_or_inconsistent_configs() {
         type Edit = Box<dyn FnOnce(&mut serde_json::Value)>;
+        let too_many: Vec<serde_json::Value> = (0..=MAX_COMMUNITY_SERVERS)
+            .map(|index| serde_json::json!({ "name": format!("S{index}"), "address": format!("s{index}.example.org") }))
+            .collect();
         let cases: Vec<Edit> = vec![
-            Box::new(|v| v["schemaVersion"] = 2.into()),
-            Box::new(|v| v["server"]["address"] = "bad host".into()),
-            Box::new(|v| v["server"]["name"] = "".into()),
+            Box::new(|v| v["schemaVersion"] = 3.into()),
+            Box::new(|v| v["servers"][0]["address"] = "bad host".into()),
+            Box::new(|v| v["servers"][0]["name"] = "".into()),
+            Box::new(|v| v["name"] = "".into()),
+            Box::new(|v| {
+                v.as_object_mut().unwrap().remove("servers");
+            }),
+            Box::new(|v| {
+                v["servers"] = serde_json::json!([
+                    { "name": "A", "address": "mc.policarpiers.com" },
+                    { "name": "B", "address": "MC.policarpiers.com:25565" }
+                ]);
+            }),
+            Box::new(move |v| v["servers"] = serde_json::Value::Array(too_many)),
             Box::new(|v| v["versions"]["recommended"] = "26.3".into()),
             Box::new(|v| v["versions"]["min"] = "../1.21".into()),
             Box::new(|v| v["links"]["twitch"] = "http://twitch.tv/polispol1".into()),
@@ -158,6 +280,12 @@ mod tests {
                 Err(ServerConfigError::Invalid(_))
             ));
         }
+        let mut no_server = schema_one();
+        no_server.as_object_mut().unwrap().remove("server");
+        assert!(matches!(
+            parse_server_config(&serde_json::to_vec(&no_server).unwrap()),
+            Err(ServerConfigError::Invalid(_))
+        ));
         assert!(matches!(
             parse_server_config(b"{"),
             Err(ServerConfigError::Invalid(_))

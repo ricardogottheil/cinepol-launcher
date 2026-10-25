@@ -1,5 +1,5 @@
-//! The CINEPOL server: its configuration (address, supported versions, links)
-//! and its live status.
+//! The CINEPOL servers: their configuration (servers, supported versions,
+//! links) and their live status.
 
 mod ports;
 
@@ -166,18 +166,41 @@ pub struct CommunityLinks {
     pub discord: HttpsUrl,
 }
 
-/// The CINEPOL server configuration, from the remote `server-config.json`
-/// or the copy bundled with the launcher.
+/// One server the community runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerConfig {
+pub struct CommunityServer {
     pub name: String,
     pub address: ServerAddress,
+}
+
+/// The CINEPOL configuration, from the remote `server-config.json` or the
+/// copy bundled with the launcher.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerConfig {
+    /// The community's name; also the name of its managed instance.
+    pub name: String,
+    /// Possibly none; the first is the main one, where Play goes.
+    pub servers: Vec<CommunityServer>,
     pub versions: SupportedVersions,
     pub links: CommunityLinks,
 }
 
-/// The only `server-config.json` schema this launcher reads.
-pub const SERVER_CONFIG_SCHEMA: u32 = 1;
+impl ServerConfig {
+    /// Where Play goes when no server is named.
+    pub fn main_server(&self) -> Option<&CommunityServer> {
+        self.servers.first()
+    }
+
+    /// The community server at this address, if the config lists it.
+    pub fn server(&self, address: &ServerAddress) -> Option<&CommunityServer> {
+        self.servers
+            .iter()
+            .find(|server| server.address.same_server(address))
+    }
+}
+
+/// At most this many community servers are read from a config.
+pub const MAX_COMMUNITY_SERVERS: usize = 16;
 
 /// What the server answers to a status ping.
 #[derive(Debug, Clone, PartialEq, Eq)]

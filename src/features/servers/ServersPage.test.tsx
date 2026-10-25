@@ -12,7 +12,6 @@ const client = vi.hoisted(() => ({
   saveServer: vi.fn(),
   removeSavedServer: vi.fn(),
   pingServer: vi.fn(),
-  getServerStatus: vi.fn(),
   listInstances: vi.fn(),
   launchInstance: vi.fn(),
   playOnCinepol: vi.fn(),
@@ -54,8 +53,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   useActivityStore.setState({ byInstance: {} });
   client.listSavedServers.mockResolvedValue([hypixel]);
-  client.pingServer.mockResolvedValue(status);
-  client.getServerStatus.mockResolvedValue({ ...status, onlinePlayers: 9, maxPlayers: 100 });
+  client.pingServer.mockImplementation((address: string) =>
+    Promise.resolve(
+      address === hypixel.address ? status : { ...status, onlinePlayers: 9, maxPlayers: 100 },
+    ),
+  );
   client.listInstances.mockResolvedValue([skyblock]);
   client.listAccounts.mockResolvedValue({ accounts: [], activeId: null });
   client.saveServer.mockImplementation((form: typeof hypixel) =>

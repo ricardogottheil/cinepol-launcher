@@ -48,14 +48,19 @@ pub async fn load_server_config<C: ServerConfigSource>(
 #[cfg(test)]
 pub(crate) mod fixtures {
     use crate::domain::instance::GameVersion;
-    use crate::domain::server::{CommunityLinks, HttpsUrl, ServerConfig, SupportedVersions};
+    use crate::domain::server::{
+        CommunityLinks, CommunityServer, HttpsUrl, ServerConfig, SupportedVersions,
+    };
     use crate::domain::server_list::ServerAddress;
 
     pub fn cinepol(recommended: &str) -> ServerConfig {
         let version = |raw: &str| GameVersion::parse(raw).unwrap();
         ServerConfig {
             name: "CINEPOL".into(),
-            address: ServerAddress::parse("mc.policarpiers.com").unwrap(),
+            servers: vec![CommunityServer {
+                name: "CINEPOL".into(),
+                address: ServerAddress::parse("mc.policarpiers.com").unwrap(),
+            }],
             versions: SupportedVersions::new(
                 version("1.21.11"),
                 version("26.3"),

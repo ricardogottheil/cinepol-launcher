@@ -9,7 +9,6 @@ pub mod change_skin;
 pub mod check_app_update;
 pub mod check_mod_updates;
 pub mod check_premium_name;
-pub mod check_server_status;
 pub mod create_instance;
 pub mod create_offline_profile;
 pub mod delete_instance;

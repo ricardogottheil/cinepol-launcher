@@ -139,7 +139,7 @@ async fn install_new(
     let request = InstallPackwizRequest {
         pack: location,
         name: None,
-        seed_server: Some(cinepol_server_entry(&state.current_config())),
+        seed_server: cinepol_server_entry(&state.current_config()),
         claim: Some(&claim),
     };
     let deps = InstallPackwizDeps {

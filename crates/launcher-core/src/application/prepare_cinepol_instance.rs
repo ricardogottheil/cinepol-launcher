@@ -9,9 +9,12 @@ use crate::domain::loader::LoaderSpec;
 use crate::domain::server::ServerConfig;
 use crate::domain::server_list::{ServerEntry, ServerListStore};
 
-/// The server entry new instances get first in their `servers.dat`.
-pub fn cinepol_server_entry(config: &ServerConfig) -> ServerEntry {
-    ServerEntry::new(config.name.clone(), config.address.clone())
+/// The server entry new instances get first in their `servers.dat`: the main
+/// community server, when the config lists one.
+pub fn cinepol_server_entry(config: &ServerConfig) -> Option<ServerEntry> {
+    config
+        .main_server()
+        .map(|server| ServerEntry::new(server.name.clone(), server.address.clone()))
 }
 
 /// The managed CINEPOL instance, when it already exists.
@@ -27,7 +30,7 @@ pub async fn find_cinepol_instance<R: InstanceRepository>(
 
 /// Reuses the instance whose origin is `CinepolServer` (moving it to the
 /// recommended version when the server changed it), or creates one named
-/// after the server and seeded with its address.
+/// after the community and seeded with its main server.
 pub async fn prepare_cinepol_instance<R: InstanceRepository, S: ServerListStore>(
     config: &ServerConfig,
     instances: &R,
@@ -51,7 +54,7 @@ pub async fn prepare_cinepol_instance<R: InstanceRepository, S: ServerListStore>
                 game_version: recommended.as_str(),
                 loader: LoaderSpec::vanilla(),
                 origin: InstanceOrigin::CinepolServer,
-                seed_server: Some(cinepol_server_entry(config)),
+                seed_server: cinepol_server_entry(config),
             };
             create_instance(request, instances, servers).await
         }
@@ -79,7 +82,7 @@ mod tests {
         assert_eq!(first.origin, InstanceOrigin::CinepolServer);
         assert_eq!(
             servers.load(&first.id).await.unwrap().entries(),
-            [cinepol_server_entry(&config)]
+            [cinepol_server_entry(&config).unwrap()]
         );
 
         let again = prepare_cinepol_instance(&config, &instances, &servers)
