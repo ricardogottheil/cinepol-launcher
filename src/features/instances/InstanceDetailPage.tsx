@@ -188,7 +188,7 @@ function InstanceTabs({
               className={cx(
                 "nav-label -mb-px h-11 cursor-pointer border-b-2 px-4 transition-colors duration-[160ms] ease-settle",
                 selected
-                  ? "border-silk text-silk"
+                  ? "border-signal text-silk"
                   : "border-transparent text-engrave hover:text-silk-dim",
               )}
             >

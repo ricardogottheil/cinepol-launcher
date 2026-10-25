@@ -50,9 +50,17 @@ desktop-app patterns.
 | `signal-lit` | `#68ca4a` | GC:27 |
 | `on-signal` | `#0e100e` (6.87:1; white would be 2.78:1) | GC:28 |
 
-**Palette law** (D:274-283): `signal` appears on exactly two things: the
-primary signal control and the live-status lamp. Never a heading, border,
+**Palette law** (D:274-283): on the website `signal` appears on exactly two
+things: the primary signal control and the live-status lamp. Never a heading,
 gradient or decoration. Text on signal is always `on-signal`, never white.
+
+**Launcher divergence** (2026-10-25, players found the app too grey): the
+launcher also uses `signal` for state, never decoration. It marks where the
+player is and what is moving: the current sidebar item (a 3px bar), the
+selected tab's underline, the keyboard focus ring (6.87:1 on `chassis`), the
+fill of progress meters and the lamp of a success toast. `signal` still fills
+only one control per screen, the primary one; headings, plain borders, text and
+backgrounds stay chassis.
 
 **Launcher translation:** the website's signal control is "Copy IP". In the
 launcher it is **"Play on CINEPOL"**, the primary action. "Copy IP" becomes a
@@ -179,7 +187,7 @@ All live in `src/components/ui/` and are previewed on the dev-only route
 | `SpecSheet` | World readings ("label -> value") | Instance details: version, loader, Java, memory |
 | `PlayerHead` | Launcher only | A profile's face from its skin (face + hat layer, pixelated); initial on a plate without a skin |
 | `CapeSwatch` | Launcher only | A cape's front (10x16 at 1,1 of its texture, pixelated); an empty plate without a texture |
-| `Meter` | (launcher only) | Progress as a reading: hairline track, silk fill (never signal), tabular count |
+| `Meter` | (launcher only) | Progress as a reading: hairline track, signal fill, tabular count |
 | `StepList` | How to join, HowToJoin.astro:43-58 | Numbered steps where order matters (Microsoft sign-in) |
 | `BrandGlyph` | src/icons/brandGlyphs.ts | Twitch and Discord only, simple-icons (CC0) |
 | `Toaster` | Launcher only | Passing notices bottom right, mounted once in the shell; see below |
@@ -203,7 +211,8 @@ App shell (`src/app/shell/`):
 - **Sidebar**: text-only section rail, like the website's section strip (no
   decorative icons, D:239-268), grouped by what the player is doing: Game
   (Home, Instances, Servers, Modpacks), Player (Profile), Launcher (Settings). Group
-  names are `plate` in `engrave`; current item: `silk` on `panel`. Community
+  names are `plate` in `engrave`; current item: `silk` on `panel` with a 3px
+  `signal` bar on its left edge. Community
   links (Twitch, Discord) sit above the profile switcher at the foot.
 - **Profile switcher**: the active profile (head, name, kind plate) at the
   foot of the sidebar. It opens a menu on `panel` with a `hairline-lit` edge
@@ -226,7 +235,7 @@ App shell (`src/app/shell/`):
   request. "Delete profile" reads in `hazard` and asks in the destructive
   `ConfirmDialog`, like deleting an instance.
 - **Modpacks**: tabs Explore / Installed / Import (`nav-label`, the current
-  tab underlined in `silk`). Explore puts the filters on top and the packs as
+  tab underlined in `signal`). Explore puts the filters on top and the packs as
   cards (icon, title as a stretched link, two-line description, loader
   plates, downloads readout) in an auto-fill grid; a card opens the pack's own
   page (`/modpacks/<catalog>/<project>`) with its versions. Installed reuses
@@ -302,7 +311,7 @@ because the launcher brief asks for it.
 
 Themed, never browser defaults (GC:144-190): selection `silk` on `hairline-lit`;
 caret `signal`; 10px scrollbar with `hairline-lit` thumb (`engrave` on hover);
-`::marker` in `engrave`; focus ring 2px `silk` with 2px offset; link underline
+`::marker` in `engrave`; focus ring 2px `signal` with 2px offset; link underline
 offset 0.2em, 1px thick. Window chrome is not text-selectable.
 
 ## 10. Copy
@@ -314,7 +323,8 @@ blames the player: an unreadable status says the address still works.
 
 ## 11. Do and don't
 
-Do: signal only on the primary control and the lamp; dark ink on green; every
+Do: signal fills only the primary control; otherwise it marks state (lamp,
+current item, focus, progress); dark ink on green; every
 figure as a readout with a unit; separate bands with rules; an em dash for
 unknown values; field-only colors only as fields.
 

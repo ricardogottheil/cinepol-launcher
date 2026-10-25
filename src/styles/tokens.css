@@ -20,7 +20,8 @@
   --color-hairline: #2a2e29;
   --color-hairline-lit: #454a44;
 
-  /* signal: legislated to the primary signal control and the live dot only (GC:25-28) */
+  /* signal: the primary control and the live dot (GC:25-28); the launcher also
+     marks where the player is and what is moving with it (design-system.md) */
   --color-signal: #2cb302;
   --color-signal-lit: #68ca4a;
   --color-on-signal: #0e100e; /* 6.87:1. White would be 2.78:1 and fail. */
@@ -151,7 +152,7 @@
 
   :focus-visible {
     outline: 2px solid;
-    outline-color: var(--color-silk);
+    outline-color: var(--color-signal);
     outline-offset: 2px;
   }
 

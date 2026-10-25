@@ -57,7 +57,7 @@ function ModelChoice({
               "flex min-w-[132px] cursor-pointer items-center gap-4 rounded-control border border-hairline-lit px-4 py-3 text-silk-dim",
               "transition-colors duration-[160ms] ease-settle hover:border-engrave hover:text-silk",
               "has-checked:border-silk-dim has-checked:bg-panel has-checked:text-silk",
-              "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-silk",
+              "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-signal",
               "has-disabled:cursor-wait",
             )}
           >
@@ -148,7 +148,7 @@ export function SkinChanger({
         <label
           className={cx(
             plateLinkClass,
-            "cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-silk",
+            "cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-signal",
           )}
         >
           {t("accounts.pickSkin")}

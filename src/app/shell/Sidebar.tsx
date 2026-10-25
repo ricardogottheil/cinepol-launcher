@@ -59,7 +59,9 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
               activeOptions={{ exact: item.to === "/" }}
               className={itemClass}
               activeProps={{
-                className: "bg-panel text-silk hover:text-silk",
+                // The signal bar marks where the player is (design-system.md, Signal).
+                className:
+                  "relative bg-panel text-silk hover:text-silk before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:bg-signal",
                 "aria-current": "page",
               }}
             >

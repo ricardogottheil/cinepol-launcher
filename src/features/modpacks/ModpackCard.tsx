@@ -12,7 +12,7 @@ export function ModpackCard({ modpack }: { modpack: ModpackSummaryDto }) {
   const numbers = new Intl.NumberFormat(i18n.language);
 
   return (
-    <article className="relative flex h-full flex-col gap-4 rounded-control border border-hairline bg-chassis p-5 transition-colors duration-[160ms] ease-settle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-silk hover:border-hairline-lit">
+    <article className="relative flex h-full flex-col gap-4 rounded-control border border-hairline bg-chassis p-5 transition-colors duration-[160ms] ease-settle focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-signal hover:border-hairline-lit">
       <div className="flex items-start gap-4">
         {modpack.iconUrl ? (
           <img

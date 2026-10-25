@@ -14,8 +14,8 @@ export interface MeterProps {
 }
 
 /**
- * Progress as an instrument reading: a hairline track filled in silk (never
- * signal) and the count as a tabular readout.
+ * Progress as an instrument reading: a hairline track filled in signal and
+ * the count as a tabular readout.
  */
 export function Meter({ label, value, max, format, unitLabel, className }: MeterProps) {
   const ratio = max ? Math.min(1, Math.max(0, value / max)) : 0;
@@ -31,7 +31,7 @@ export function Meter({ label, value, max, format, unitLabel, className }: Meter
         className="h-1 flex-1 bg-hairline"
       >
         <div
-          className="h-full bg-silk transition-[width] duration-[160ms] ease-settle"
+          className="h-full bg-signal transition-[width] duration-[160ms] ease-settle"
           style={{ width: `${ratio * 100}%` }}
         />
       </div>
