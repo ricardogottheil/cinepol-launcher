@@ -316,6 +316,34 @@ describe("ModsPanel", () => {
     expect(client.installMod).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "mod_incompatible",
+    "no_compatible_version",
+    "too_many_dependencies",
+    "already_exists",
+  ] as const)("marks a mod refused with %s as not compatible, with no retry", async (code) => {
+    client.searchMods.mockResolvedValue({
+      items: [
+        { project: "lithium", title: "Lithium", description: "", iconUrl: null, downloads: 1 },
+      ],
+      total: 1,
+    });
+    client.previewModInstall.mockRejectedValue(new IpcError(code, "refused"));
+    renderWithQuery(<Panel />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.add }));
+    const results = await screen.findByRole("region", { name: labels.results });
+    fireEvent.click(
+      await within(results).findByRole("button", { name: `${labels.install} Lithium` }),
+    );
+
+    expect(await within(results).findByText(esCommon.errors[code])).toBeInTheDocument();
+    expect(within(results).getByText(labels.notCompatible)).toBeInTheDocument();
+    expect(
+      within(results).queryByRole("button", { name: `${labels.install} Lithium` }),
+    ).not.toBeInTheDocument();
+    expect(client.previewModInstall).toHaveBeenCalledTimes(1);
+  });
+
   it("lets the player retry a mod whose check failed for a passing reason", async () => {
     client.searchMods.mockResolvedValue({
       items: [
