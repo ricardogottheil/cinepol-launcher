@@ -1,12 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  getServerConfig,
-  getServerStatus,
-  getSettings,
-  IpcError,
-  type ServerConfigDto,
-  setServerConfigUrl,
-} from "../../ipc/client";
+import { useQuery } from "@tanstack/react-query";
+import { getServerConfig, getServerStatus, IpcError, type ServerConfigDto } from "../../ipc/client";
 import { bundledServerConfig, displayAddress } from "./serverConfig";
 
 export const serverConfigKey = ["server-config"] as const;
@@ -52,22 +45,5 @@ export function useServerStatus() {
     queryFn: getServerStatus,
     refetchInterval: STATUS_REFRESH_MS,
     retry: false,
-  });
-}
-
-export const settingsKey = ["settings"] as const;
-
-export function useSettings() {
-  return useQuery({ queryKey: settingsKey, queryFn: getSettings });
-}
-
-export function useSetServerConfigUrl() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (url: string | null) => setServerConfigUrl(url),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: settingsKey });
-      await queryClient.invalidateQueries({ queryKey: serverConfigKey });
-    },
   });
 }

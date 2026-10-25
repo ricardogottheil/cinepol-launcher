@@ -717,15 +717,6 @@ export function playOnCinepol({
   );
 }
 
-export function getSettings(): Promise<SettingsDto> {
-  return call("get_settings");
-}
-
-/** `null` restores the default URL. */
-export function setServerConfigUrl(url: string | null): Promise<SettingsDto> {
-  return call("set_server_config_url", { url });
-}
-
 /** Opens a community link in the system browser (the capability limits the domains). */
 export async function openExternal(url: string): Promise<void> {
   if (!isTauri()) {

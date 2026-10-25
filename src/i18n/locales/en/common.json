@@ -343,16 +343,6 @@
   },
   "settings": {
     "title": "Settings",
-    "serverConfigTitle": "Server configuration",
-    "serverConfigHint": "The https address of server-config.json. When it cannot be read, the launcher uses its bundled copy.",
-    "urlLabel": "Configuration URL",
-    "save": "Save",
-    "reset": "Reset",
-    "origin": {
-      "remote": "In use: the remote configuration",
-      "bundled": "In use: the copy bundled with the launcher"
-    },
-    "saved": "Saved",
     "aboutTitle": "About"
   },
   "units": {

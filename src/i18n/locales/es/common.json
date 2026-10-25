@@ -343,16 +343,6 @@
   },
   "settings": {
     "title": "Ajustes",
-    "serverConfigTitle": "Configuración del servidor",
-    "serverConfigHint": "Dirección https del archivo server-config.json. Si no se puede leer, el launcher usa la copia incluida.",
-    "urlLabel": "URL de la configuración",
-    "save": "Guardar",
-    "reset": "Restablecer",
-    "origin": {
-      "remote": "En uso: la configuración remota",
-      "bundled": "En uso: la copia incluida en el launcher"
-    },
-    "saved": "Guardado",
     "aboutTitle": "Acerca de"
   },
   "units": {
