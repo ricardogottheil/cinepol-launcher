@@ -52,3 +52,5 @@ distribution of their files; the API then returns no download URL.
   only required files install.
 - Instances imported from a local zip cannot be updated from the catalog.
 - No CurseForge export: Modrinth's `.mrpack` stays the export format.
+- Project logos load from `https://media.forgecdn.net`, which the CSP
+  `img-src` allows next to `https://cdn.modrinth.com` (ADR 0006).
