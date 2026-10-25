@@ -4,7 +4,8 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { cx } from "../../components/ui/cx";
 import { Readout } from "../../components/ui/Readout";
-import type { ModEntryDto, ModUpdateDto } from "../../ipc/client";
+import { asCatalog, type ModEntryDto, type ModUpdateDto } from "../../ipc/client";
+import { CATALOG_NAMES } from "../modpacks/catalogNames";
 import { modErrorText } from "./modErrorText";
 import { useInstanceMods, useModUpdates, useRemoveMod, useSetModEnabled } from "./useMods";
 
@@ -185,6 +186,11 @@ function ModRow({
           <span className="readout-sm break-all text-engrave">
             {entry.versionNumber ?? entry.filename}
           </span>
+          {entry.source ? (
+            <span className="text-[0.875rem] text-silk-dim">
+              · {CATALOG_NAMES[asCatalog(entry.source)]}
+            </span>
+          ) : null}
           {why ? <span className="text-[0.875rem] text-silk-dim">· {why}</span> : null}
         </span>
       </div>

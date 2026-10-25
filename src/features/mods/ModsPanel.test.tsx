@@ -14,6 +14,8 @@ const client = vi.hoisted(() => ({
   previewModInstall: vi.fn(),
   installMod: vi.fn(),
   updateMod: vi.fn(),
+  getModpackCatalogs: vi.fn(),
+  openExternal: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -110,6 +112,8 @@ beforeEach(() => {
   client.setModEnabled.mockResolvedValue(undefined);
   client.removeMod.mockResolvedValue(["iris.jar", "sodium.jar"]);
   client.searchMods.mockResolvedValue({ items: [], total: 0 });
+  client.getModpackCatalogs.mockResolvedValue({ curseforge: false });
+  client.openExternal.mockResolvedValue(undefined);
 });
 
 describe("ModsPanel", () => {
@@ -414,5 +418,87 @@ describe("ModsPanel", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it("searches CurseForge when the player picks it, and offers no choice without a key", async () => {
+    client.getModpackCatalogs.mockResolvedValue({ curseforge: true });
+    renderWithQuery(<Panel />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.add }));
+    const picker = await screen.findByRole("combobox", { name: esCommon.modpacks.catalog });
+    await waitFor(() =>
+      expect(client.searchMods).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "modrinth" }),
+      ),
+    );
+    fireEvent.change(picker, { target: { value: "curseforge" } });
+    await waitFor(() =>
+      expect(client.searchMods).toHaveBeenLastCalledWith(
+        expect.objectContaining({ source: "curseforge", page: 0 }),
+      ),
+    );
+    expect(
+      screen.getByRole("searchbox", { name: fill(labels.searchLabel, { catalog: "CurseForge" }) }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers only Modrinth when this build has no CurseForge key", async () => {
+    renderWithQuery(<Panel />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.add }));
+    await screen.findByRole("region", { name: labels.results });
+    expect(
+      screen.queryByRole("combobox", { name: esCommon.modpacks.catalog }),
+    ).not.toBeInTheDocument();
+    expect(client.searchMods).toHaveBeenCalledWith(expect.objectContaining({ source: "modrinth" }));
+  });
+
+  it("sends the player to the page of a mod only CurseForge's site hands out", async () => {
+    const page = "https://www.curseforge.com/projects/448233";
+    client.searchMods.mockResolvedValue({
+      items: [
+        {
+          project: "curseforge:448233",
+          title: "Entity Culling",
+          description: "",
+          iconUrl: null,
+          downloads: 1,
+        },
+      ],
+      total: 1,
+    });
+    client.previewModInstall.mockRejectedValue(new IpcError("manual_download", "by hand", page));
+    renderWithQuery(<Panel />);
+    fireEvent.click(await screen.findByRole("button", { name: labels.add }));
+    const results = await screen.findByRole("region", { name: labels.results });
+    fireEvent.click(
+      await within(results).findByRole("button", { name: `${labels.install} Entity Culling` }),
+    );
+
+    expect(await within(results).findByText(esCommon.errors.manual_download)).toBeInTheDocument();
+    expect(
+      within(results).queryByRole("button", { name: `${labels.install} Entity Culling` }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      within(results).getByRole("button", { name: `${labels.openPage} Entity Culling` }),
+    );
+    expect(client.openExternal).toHaveBeenCalledWith(page);
+  });
+
+  it("names the catalog each installed mod came from", async () => {
+    client.listInstanceMods.mockResolvedValue([
+      iris,
+      { ...sodium, project: "curseforge:394468", source: "curseforge" },
+      loose,
+    ]);
+    renderWithQuery(<Panel />);
+    const list = await screen.findByRole("list", { name: labels.installedLabel });
+    const rows = within(list).getAllByRole("listitem");
+    expect(
+      within(rows[0] as HTMLElement).getByText("Modrinth", { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[1] as HTMLElement).getByText("CurseForge", { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[2] as HTMLElement).queryByText(/Modrinth ·|CurseForge/),
+    ).not.toBeInTheDocument();
   });
 });

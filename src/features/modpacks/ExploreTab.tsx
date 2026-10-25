@@ -4,6 +4,7 @@ import { SelectField } from "../../components/ui/SelectField";
 import { TextField } from "../../components/ui/TextField";
 import { type ModpackCatalog, toIpcError } from "../../ipc/client";
 import { type ModdedLoader, useModpackBrowse } from "./browseStore";
+import { CATALOG_NAMES } from "./catalogNames";
 import { ModpackCard } from "./ModpackCard";
 import {
   MODPACK_PAGE_SIZE,
@@ -13,12 +14,6 @@ import {
 } from "./useModpacks";
 
 const LOADERS: ModdedLoader[] = ["fabric", "quilt", "forge", "neoforge"];
-
-/** Catalog names are brands, never translated. */
-const CATALOG_NAMES: Record<ModpackCatalog, string> = {
-  modrinth: "Modrinth",
-  curseforge: "CurseForge",
-};
 
 function isModdedLoader(value: string): value is ModdedLoader {
   return (LOADERS as string[]).includes(value);

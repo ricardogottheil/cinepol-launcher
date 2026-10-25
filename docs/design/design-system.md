@@ -229,13 +229,16 @@ App shell (`src/app/shell/`):
   then tabs Servers / Mods / Settings / Log styled like the Modpacks tabs.
   Starting the game switches to Log. Deleting the instance returns to the list.
 - **Mods tab**: the installed jars as rule-separated rows (title, version
-  readout, why it is there: "Needed by ..." or "Not on Modrinth", an "Off"
+  readout, its catalog, why it is there: "Needed by ..." or "Not on Modrinth", an "Off"
   plate when disabled; then Update to X, Turn on/off, Remove as plate
   buttons), with a Mods count readout, "Check for updates" (on request; mods
   it could not check are named in `stale`) and "Add mods". "Add mods" shows
   the filter as a readout ("Compatible with 1.21.1 · Fabric"), never as a
-  choice, and results as rows (icon, title, two-line description, downloads
-  readout, Install / Installed / Not compatible). Install first opens a
+  choice, a Modrinth / CurseForge select before the search field (only when
+  CurseForge is configured, as on the modpacks page), and results as rows
+  (icon, title, two-line description, downloads readout, Install / Installed
+  / Not compatible, or "Open page" for a mod only downloadable by hand from
+  CurseForge). Installed rows name their catalog after the version. Install first opens a
   `ConfirmDialog` listing every mod it writes with "for <mod>" on
   dependencies; a refusal stays on the row in `stale`, naming the other mod.
   Remove uses the destructive dialog, with a checkbox (checked) for the

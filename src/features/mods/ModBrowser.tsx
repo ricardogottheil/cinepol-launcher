@@ -3,14 +3,18 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Readout } from "../../components/ui/Readout";
+import { SelectField } from "../../components/ui/SelectField";
 import { TextField } from "../../components/ui/TextField";
 import {
   type InstanceDto,
   type ModInstallPreviewDto,
+  type ModpackCatalog,
   type ModSummaryDto,
+  openExternal,
   toIpcError,
 } from "../../ipc/client";
-import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from "../modpacks/useModpacks";
+import { CATALOG_NAMES } from "../modpacks/catalogNames";
+import { SEARCH_DEBOUNCE_MS, useDebouncedValue, useModpackCatalogs } from "../modpacks/useModpacks";
 import { modErrorText } from "./modErrorText";
 import { MOD_PAGE_SIZE, useInstanceMods, useModInstallPreview, useModSearch } from "./useMods";
 
@@ -20,12 +24,22 @@ const FINAL_REFUSALS = new Set([
   "no_compatible_version",
   "too_many_dependencies",
   "already_exists",
+  "manual_download",
 ]);
 
+/** Why a mod's last check failed, as its row keeps it. */
+interface Refusal {
+  text: string;
+  /** The mod itself cannot be installed, so retrying would only fail again. */
+  final: boolean;
+  /** Where the player can download it by hand. */
+  page: string | null;
+}
+
 /**
- * Modrinth mods that run on this instance: the filter is the instance's own
- * game version and loader, shown as a spec line, never a choice. Installing
- * first shows what comes with the mod.
+ * Mods from Modrinth or CurseForge that run on this instance: the filter is
+ * the instance's own game version and loader, shown as a spec line, never a
+ * choice. Installing first shows what comes with the mod.
  */
 export function ModBrowser({
   instance,
@@ -42,9 +56,13 @@ export function ModBrowser({
   const [text, setText] = useState("");
   const [page, setPage] = useState(0);
   const query = useDebouncedValue(text.trim(), SEARCH_DEBOUNCE_MS);
+  const [catalog, setCatalog] = useState<ModpackCatalog>("modrinth");
+  // Without a key CurseForge is not offered at all.
+  const hasCurseForge = useModpackCatalogs().data?.curseforge === true;
+  const source: ModpackCatalog = hasCurseForge ? catalog : "modrinth";
   const search = useModSearch({
     instanceId: instance.id,
-    source: "modrinth",
+    source,
     query,
     page,
     pageSize: MOD_PAGE_SIZE,
@@ -56,18 +74,18 @@ export function ModBrowser({
   );
   const [picked, setPicked] = useState<ModSummaryDto | null>(null);
   const preview = useModInstallPreview(instance.id, picked?.project ?? null);
-  // Why the last check of a mod failed, kept on its row; `final` when the
-  // mod itself cannot be installed, so retrying would only fail again.
-  const [refused, setRefused] = useState<Record<string, { text: string; final: boolean }>>({});
+  const [refused, setRefused] = useState<Record<string, Refusal>>({});
   const previewError = preview.isFetching ? null : preview.error;
 
   useEffect(() => {
     if (!picked || !previewError) return;
-    const final = FINAL_REFUSALS.has(toIpcError(previewError).code);
-    setRefused((current) => ({
-      ...current,
-      [picked.project]: { text: modErrorText(t, previewError), final },
-    }));
+    const { code, details } = toIpcError(previewError);
+    const refusal: Refusal = {
+      text: modErrorText(t, previewError),
+      final: FINAL_REFUSALS.has(code),
+      page: code === "manual_download" ? (details ?? null) : null,
+    };
+    setRefused((current) => ({ ...current, [picked.project]: refusal }));
     setPicked(null);
   }, [picked, previewError, t]);
 
@@ -89,16 +107,33 @@ export function ModBrowser({
         <Readout unit={t("mods.for")} value={`${instance.gameVersion} · ${loader}`} size="sm" />
         <Button onClick={onDone}>{t("mods.doneAdding")}</Button>
       </div>
-      <TextField
-        label={t("mods.searchLabel")}
-        placeholder={t("mods.searchPlaceholder")}
-        type="search"
-        value={text}
-        onChange={(event) => {
-          setText(event.target.value);
-          setPage(0);
-        }}
-      />
+      <div className="flex flex-wrap items-start gap-4">
+        {hasCurseForge ? (
+          <SelectField
+            label={t("modpacks.catalog")}
+            options={(Object.keys(CATALOG_NAMES) as ModpackCatalog[]).map((value) => ({
+              value,
+              label: CATALOG_NAMES[value],
+            }))}
+            value={source}
+            onChange={(event) => {
+              setCatalog(event.target.value === "curseforge" ? "curseforge" : "modrinth");
+              setPage(0);
+            }}
+          />
+        ) : null}
+        <TextField
+          label={t("mods.searchLabel", { catalog: CATALOG_NAMES[source] })}
+          placeholder={t("mods.searchPlaceholder")}
+          type="search"
+          value={text}
+          className="min-w-[260px] flex-1"
+          onChange={(event) => {
+            setText(event.target.value);
+            setPage(0);
+          }}
+        />
+      </div>
 
       <section aria-label={t("mods.results")} aria-busy={search.isFetching}>
         {search.isPending ? (
@@ -152,6 +187,7 @@ export function ModBrowser({
                     <ResultAction
                       installed={installed.has(mod.project)}
                       refused={refused[mod.project]?.final ?? false}
+                      manualPage={refused[mod.project]?.page ?? null}
                       checking={picked?.project === mod.project}
                       disabled={locked || picked !== null}
                       title={mod.title}
@@ -203,6 +239,7 @@ export function ModBrowser({
 function ResultAction({
   installed,
   refused,
+  manualPage,
   checking,
   disabled,
   title,
@@ -210,6 +247,7 @@ function ResultAction({
 }: {
   installed: boolean;
   refused: boolean;
+  manualPage: string | null;
   checking: boolean;
   disabled: boolean;
   title: string;
@@ -219,6 +257,16 @@ function ResultAction({
   const plate = "plate inline-flex h-11 items-center rounded-plate border px-4";
   if (installed) {
     return <span className={`${plate} border-hairline text-engrave`}>{t("mods.installed")}</span>;
+  }
+  if (manualPage) {
+    return (
+      <Button
+        onClick={() => void openExternal(manualPage)}
+        aria-label={`${t("mods.openPage")} ${title}`}
+      >
+        {t("mods.openPage")}
+      </Button>
+    );
   }
   if (refused) {
     return <span className={`${plate} border-hairline text-stale`}>{t("mods.notCompatible")}</span>;

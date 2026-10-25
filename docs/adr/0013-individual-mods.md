@@ -8,8 +8,8 @@
 Players want single mods, not only whole modpacks, and many do not know which
 version or loader a mod needs. Like Prism Launcher, the launcher picks for
 them: it only offers mods that run on the instance, installs what each mod
-needs, and keeps track of why every jar is there. Modrinth comes first;
-CurseForge mods are a later stage.
+needs, and keeps track of why every jar is there. Mods come from Modrinth
+and, in builds with a CurseForge key, from CurseForge.
 
 ## Decision
 
@@ -43,6 +43,21 @@ CurseForge mods are a later stage.
   cancellable operations with a progress channel.
 - **Update checks are on request** (one catalog call per mod). Mods the
   catalog could not answer for are reported as unchecked, never as current.
+- **Two catalogs, one id space.** CurseForge project and file ids are numbers,
+  so they are kept as `curseforge:<number>`; Modrinth ids never contain a
+  colon. The catalog is read from the id wherever it goes (the registry,
+  dependencies, updates, titles), so `mods.json` keeps its format and needs no
+  migration. Only the search takes a catalog; the player picks it, and the
+  choice only appears when CurseForge is configured. Dependencies resolve in
+  the mod's own catalog.
+- **Hashes.** A jar is verified against the hash its catalog gives (sha512 on
+  Modrinth, sha1 on CurseForge); the registry always keeps the jar's sha512,
+  computed locally when the catalog gives none. Loose jars are identified by
+  Modrinth only (CurseForge identifies files by fingerprint).
+- **Mods only downloadable by hand.** Some CurseForge authors keep their files
+  off third-party launchers. Such a mod, or one a mod requires, is refused
+  (`manual_download`, with its page); the row offers "Open page", and the
+  player adds the jar by hand, after which it shows as a loose jar.
 
 ## Consequences
 
