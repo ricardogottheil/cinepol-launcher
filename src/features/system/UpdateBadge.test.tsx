@@ -42,10 +42,13 @@ describe("UpdateBadge", () => {
     expect(link).toHaveTextContent(esCommon.updates.badge.replace("{{version}}", "0.3.0"));
   });
 
-  it("shows nothing while the launcher is up to date", async () => {
-    client.checkAppUpdate.mockResolvedValue({ kind: "upToDate" });
-    renderBadge();
-    await waitFor(() => expect(client.checkAppUpdate).toHaveBeenCalled());
-    expect(screen.queryByRole("link")).toBeNull();
-  });
+  it.each([{ kind: "upToDate" }, { kind: "notConfigured" }])(
+    "shows nothing when the check says $kind",
+    async (status) => {
+      client.checkAppUpdate.mockResolvedValue(status);
+      const { client: queries } = renderBadge();
+      await waitFor(() => expect(queries.getQueryData(["app-update"])).toEqual(status));
+      expect(screen.queryByRole("link")).toBeNull();
+    },
+  );
 });

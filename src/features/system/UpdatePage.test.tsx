@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError, type ProgressEvent } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
+import { useAppUpdateInstall } from "./appUpdateStore";
 import { UpdatePage } from "./UpdatePage";
 
 const client = vi.hoisted(() => ({
@@ -33,6 +34,7 @@ const installButton = () => screen.findByRole("button", { name: new RegExp(label
 describe("UpdatePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAppUpdateInstall.setState({ installing: false, progress: null, error: null });
     client.getAppInfo.mockResolvedValue({ name: "Cinepol Launcher", version: "0.2.0" });
   });
 
@@ -87,6 +89,25 @@ describe("UpdatePage", () => {
       "aria-valuenow",
       "5",
     );
+  });
+
+  it("keeps the install running when the player leaves and comes back", async () => {
+    client.checkAppUpdate.mockResolvedValue(available);
+    client.installAppUpdate.mockImplementation(() => running(new Promise(() => {})));
+    const first = renderWithQuery(<UpdatePage />);
+    fireEvent.click(await installButton());
+    first.unmount();
+
+    renderWithQuery(<UpdatePage />);
+    expect(await screen.findByText(labels.installing)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: new RegExp(labels.install) })).toBeNull();
+    expect(client.installAppUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("says when the check for updates failed", async () => {
+    client.checkAppUpdate.mockRejectedValue(new IpcError("network", "offline"));
+    renderWithQuery(<UpdatePage />);
+    expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
 
   it("explains a refused install and checks again when the release changed", async () => {

@@ -1,9 +1,10 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
-import { installAppUpdate, type ProgressEvent, toIpcError } from "../../ipc/client";
+import { toIpcError } from "../../ipc/client";
 import { ProgressMeter } from "../instances/ProgressMeter";
+import { useAppUpdateInstall } from "./appUpdateStore";
 import { parseReleaseNotes } from "./releaseNotes";
 import { useAppInfo } from "./useAppInfo";
 import { useAppUpdate } from "./useAppUpdate";
@@ -32,9 +33,11 @@ function ReleaseNotes({ notes }: { notes: string }) {
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: static content
           <ul key={index} className="m-0 flex max-w-[720px] list-none flex-col p-0">
-            {block.items.map((item) => (
+            {block.items.map((item, position) => (
               <li
-                key={item}
+                // Notes may repeat a line, so the text alone is not a key.
+                // biome-ignore lint/suspicious/noArrayIndexKey: static content
+                key={position}
                 className="relative border-b border-hairline py-3 pl-5 text-silk before:absolute before:top-[1.35em] before:left-0 before:size-1.5 before:bg-signal"
               >
                 {item}
@@ -56,27 +59,15 @@ export function UpdatePage() {
   const { t } = useTranslation();
   const status = useAppUpdate();
   const appInfo = useAppInfo();
-  const [progress, setProgress] = useState<ProgressEvent | null>(null);
-  const [installing, setInstalling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { installing, progress, error: code, install: start } = useAppUpdateInstall();
+  const error = code
+    ? code === "already_running"
+      ? t("updates.closeTheGame")
+      : t(`errors.${code}`)
+    : null;
 
   async function install(version: string) {
-    setError(null);
-    setInstalling(true);
-    try {
-      // On success the launcher restarts, so nothing runs after this.
-      await installAppUpdate(version, setProgress).done;
-    } catch (failure) {
-      const code = toIpcError(failure).code;
-      if (code === "update_changed") {
-        await status.refetch();
-      } else {
-        setError(code === "already_running" ? t("updates.closeTheGame") : t(`errors.${code}`));
-      }
-    } finally {
-      setInstalling(false);
-      setProgress(null);
-    }
+    if (await start(version)) await status.refetch();
   }
 
   const update = status.data?.kind === "available" ? status.data : null;
