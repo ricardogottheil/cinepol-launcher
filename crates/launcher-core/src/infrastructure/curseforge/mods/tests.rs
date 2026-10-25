@@ -30,8 +30,34 @@ fn target(loader: LoaderKind) -> ModTarget {
     }
 }
 
-fn files_url(project: u64) -> String {
-    format!("{BASE}/v1/mods/{project}/files?gameVersion=26.2&pageSize=50")
+/// One page of a project's files for one `modLoaderType`.
+fn files_url(project: u64, loader: u8, index: u32) -> String {
+    format!(
+        "{BASE}/v1/mods/{project}/files?gameVersion=26.2&modLoaderType={loader}\
+         &index={index}&pageSize=50"
+    )
+}
+
+/// A Fabric jar of project 100 for 26.2, published at `date`.
+fn file_json(id: u64, date: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "modId": 100,
+        "fileName": format!("mod-{id}.jar"),
+        "fileLength": 10,
+        "hashes": [{ "value": "adac13c5fd8b82819830387cf9c8d8f405bd0ca5", "algo": 1 }],
+        "downloadUrl": format!("https://edge.forgecdn.net/files/1/{id}/mod-{id}.jar"),
+        "gameVersions": ["Fabric", "26.2"],
+        "fileDate": date,
+    })
+}
+
+fn files_page(files: Vec<serde_json::Value>, total: usize) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({
+        "data": files,
+        "pagination": { "totalCount": total },
+    }))
+    .unwrap()
 }
 
 #[tokio::test]
@@ -99,7 +125,7 @@ async fn nothing_is_asked_for_vanilla_or_without_a_key() {
 #[tokio::test]
 async fn reads_a_projects_fitting_files_with_their_hash_and_dependencies() {
     // The fixture also lists other projects' files: they are never trusted.
-    let cf = source(vec![(files_url(844662), fixture("mod-files.json"))]);
+    let cf = source(vec![(files_url(844662, 4, 0), fixture("mod-files.json"))]);
     let versions = ModSource::versions(&cf, "curseforge:844662", &target(LoaderKind::Fabric))
         .await
         .unwrap();
@@ -133,11 +159,21 @@ async fn reads_a_projects_fitting_files_with_their_hash_and_dependencies() {
 
 #[tokio::test]
 async fn maps_release_types_and_every_relation_it_understands() {
-    let cf = source(vec![(files_url(619986), fixture("mod-files.json"))]);
-    // A Quilt instance also runs Fabric files.
+    // A Quilt instance also runs Fabric files: both loaders are asked, and a
+    // file tagged with both is listed once.
+    let cf = source(vec![
+        (files_url(619986, 5, 0), fixture("mod-files.json")),
+        (files_url(619986, 4, 0), fixture("mod-files.json")),
+    ]);
     let versions = ModSource::versions(&cf, "curseforge:619986", &target(LoaderKind::Quilt))
         .await
         .unwrap();
+
+    assert_eq!(
+        cf.http.requests(),
+        [files_url(619986, 5, 0), files_url(619986, 4, 0)]
+    );
+    assert_eq!(versions.len(), 1);
 
     let optigui = &versions[0];
     assert_eq!(optigui.channel, ReleaseChannel::Beta);
@@ -164,7 +200,7 @@ async fn maps_release_types_and_every_relation_it_understands() {
 
 #[tokio::test]
 async fn a_file_its_author_keeps_off_launchers_points_to_its_page_instead() {
-    let cf = source(vec![(files_url(448233), fixture("mod-files.json"))]);
+    let cf = source(vec![(files_url(448233, 4, 0), fixture("mod-files.json"))]);
     let versions = ModSource::versions(&cf, "curseforge:448233", &target(LoaderKind::Fabric))
         .await
         .unwrap();
@@ -244,4 +280,51 @@ async fn ids_from_another_catalog_are_refused_before_any_request() {
             .is_empty()
     );
     assert!(cf.http.requests().is_empty());
+}
+
+#[tokio::test]
+async fn walks_every_page_of_a_loaders_files_to_find_the_newest() {
+    // 51 files: the newest is alone on the second page.
+    let old: Vec<serde_json::Value> = (1..=50)
+        .map(|id| file_json(id, &format!("2025-01-{:02}T10:00:00Z", id % 28 + 1)))
+        .collect();
+    let cf = source(vec![
+        (files_url(100, 4, 0), files_page(old, 51)),
+        (
+            files_url(100, 4, 50),
+            files_page(vec![file_json(51, "2026-10-01T10:00:00Z")], 51),
+        ),
+    ]);
+    let versions = ModSource::versions(&cf, "curseforge:100", &target(LoaderKind::Fabric))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        cf.http.requests(),
+        [files_url(100, 4, 0), files_url(100, 4, 50)]
+    );
+    assert_eq!(versions.len(), 51);
+    assert_eq!(versions[0].id, "curseforge:51");
+}
+
+#[tokio::test]
+async fn orders_files_by_their_moment_however_the_date_is_written() {
+    // Same second; CurseForge drops the fraction when it is zero.
+    let cf = source(vec![(
+        files_url(100, 4, 0),
+        files_page(
+            vec![
+                file_json(1, "2026-10-05T00:51:17Z"),
+                file_json(2, "2026-10-05T00:51:17.5Z"),
+                file_json(3, "2026-10-05T00:51:17.25Z"),
+            ],
+            3,
+        ),
+    )]);
+    let versions = ModSource::versions(&cf, "curseforge:100", &target(LoaderKind::Fabric))
+        .await
+        .unwrap();
+
+    let ids: Vec<&str> = versions.iter().map(|version| version.id.as_str()).collect();
+    assert_eq!(ids, ["curseforge:2", "curseforge:3", "curseforge:1"]);
 }

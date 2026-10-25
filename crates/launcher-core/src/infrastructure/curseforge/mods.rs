@@ -24,6 +24,9 @@ use crate::infrastructure::modrinth::encode;
 
 const MOD_CLASS_ID: u64 = 6;
 const JAR_EXTENSION: &str = ".jar";
+/// Pages of files read per loader: 500 files for one game version is far
+/// beyond any real project, and keeps a broken pagination from looping.
+const MAX_FILE_PAGES: u32 = 10;
 
 impl<H: HttpClient> ModSource for CurseForgeSource<H> {
     async fn search(&self, query: &ModQuery) -> Result<ModPage, ModpackSourceError> {
@@ -59,25 +62,28 @@ impl<H: HttpClient> ModSource for CurseForgeSource<H> {
         target: &ModTarget,
     ) -> Result<Vec<ModVersion>, ModpackSourceError> {
         let id = checked(project)?;
-        if target.accepted_loaders().is_empty() {
-            return Ok(Vec::new());
+        let mut files: Vec<wire::File> = Vec::new();
+        // One listing per loader the target runs (a Quilt instance also runs
+        // Fabric files), so another loader's files never crowd a page.
+        for loader in target.accepted_loaders() {
+            let Some(code) = loader_type(loader) else {
+                continue;
+            };
+            for file in self.loader_files(project, id, target, code).await? {
+                if !files.iter().any(|known| known.id == file.id) {
+                    files.push(file);
+                }
+            }
         }
-        // Filtered by game version here; loaders are checked below, since a
-        // Quilt instance also runs Fabric files.
-        let path = format!(
-            "/v1/mods/{id}/files?gameVersion={}&pageSize={FILES_PAGE}",
-            encode(target.game_version.as_str()),
-        );
-        let answer: wire::Data<Vec<wire::File>> = self.get(&path, project).await?;
-        let mut versions: Vec<ModVersion> = answer
-            .data
+        let mut versions: Vec<ModVersion> = files
             .into_iter()
             .filter(|file| file.mod_id == id && file.is_server_pack != Some(true))
             .map(mod_version)
             .filter(|version| target.accepts(version))
             .collect();
         // Newest first, whatever order CurseForge used.
-        versions.sort_by(|a, b| b.published.cmp(&a.published));
+        versions
+            .sort_by_cached_key(|version| std::cmp::Reverse(moment(version.published.as_deref())));
         Ok(versions)
     }
 
@@ -127,6 +133,54 @@ impl<H: HttpClient> ModSource for CurseForgeSource<H> {
     ) -> Result<HashMap<String, ModVersion>, ModpackSourceError> {
         Ok(HashMap::new())
     }
+}
+
+impl<H: HttpClient> CurseForgeSource<H> {
+    /// Every file of project `id` for the target's game version and one
+    /// `modLoaderType`, page by page.
+    async fn loader_files(
+        &self,
+        project: &str,
+        id: u64,
+        target: &ModTarget,
+        loader: u8,
+    ) -> Result<Vec<wire::File>, ModpackSourceError> {
+        let mut files = Vec::new();
+        for page in 0..MAX_FILE_PAGES {
+            let index = page * FILES_PAGE;
+            let path = format!(
+                "/v1/mods/{id}/files?gameVersion={}&modLoaderType={loader}\
+                 &index={index}&pageSize={FILES_PAGE}",
+                encode(target.game_version.as_str()),
+            );
+            let answer: wire::FilesPage = self.get(&path, project).await?;
+            let read = answer.data.len();
+            files.extend(answer.data);
+            let total = answer.pagination.and_then(|page| page.total_count);
+            let last = read < FILES_PAGE as usize
+                || total.is_some_and(|total| files.len() as u64 >= total);
+            if last {
+                break;
+            }
+        }
+        Ok(files)
+    }
+}
+
+/// A file date as a comparable moment: CurseForge writes ISO 8601 UTC with a
+/// fraction of any length, or none, so the text alone does not sort
+/// (`17Z` would come after `17.5Z`). Missing dates sort first, so last when
+/// newest-first.
+fn moment(date: Option<&str>) -> Option<(String, u32)> {
+    let date = date?.trim_end_matches('Z');
+    let (seconds, fraction) = date.split_once('.').unwrap_or((date, ""));
+    let digits: String = fraction
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .chain(std::iter::repeat('0'))
+        .take(9)
+        .collect();
+    Some((seconds.to_owned(), digits.parse().unwrap_or(0)))
 }
 
 /// The number behind a `curseforge:` id; anything else is refused before it

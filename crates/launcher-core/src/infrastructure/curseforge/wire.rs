@@ -15,6 +15,14 @@ pub struct SearchResponse {
     pub pagination: Option<Pagination>,
 }
 
+/// One page of a project's files.
+#[derive(Debug, Deserialize)]
+pub struct FilesPage {
+    pub data: Vec<File>,
+    #[serde(default)]
+    pub pagination: Option<Pagination>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
