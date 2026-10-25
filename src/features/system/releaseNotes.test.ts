@@ -38,4 +38,15 @@ describe("parseReleaseNotes", () => {
       { kind: "paragraph", text: "Outro <b>x</b>" },
     ]);
   });
+
+  it("splits English from Spanish at the first separator only", () => {
+    const notes = "- English\n\n---\n\n- Uno\n\n---\n\n- Dos";
+    expect(parseReleaseNotes(notes, "es")).toEqual([{ kind: "list", items: ["Uno", "Dos"] }]);
+    expect(parseReleaseNotes(notes, "en")).toEqual([{ kind: "list", items: ["English"] }]);
+  });
+
+  it("falls back to English when the Spanish block only repeats the release name", () => {
+    const notes = "Cinepol Launcher 0.3.0\n\n- New page\n\n---\n\nCinepol Launcher 0.3.0";
+    expect(parseReleaseNotes(notes, "es")).toEqual([{ kind: "list", items: ["New page"] }]);
+  });
 });

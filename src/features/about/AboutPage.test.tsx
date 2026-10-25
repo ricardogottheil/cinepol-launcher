@@ -7,6 +7,7 @@ import {
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import esCommon from "../../i18n/locales/es/common.json";
+import { IpcError } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
 import { AboutPage } from "./AboutPage";
 
@@ -52,6 +53,24 @@ describe("AboutPage", () => {
       "href",
       "/updates",
     );
+  });
+
+  it.each([
+    ["the check is running", () => new Promise(() => {}), esCommon.about.checking],
+    [
+      "the check failed",
+      () => Promise.reject(new IpcError("network", "offline")),
+      esCommon.about.checkFailed,
+    ],
+    [
+      "this build does not update itself",
+      () => Promise.resolve({ kind: "notConfigured" }),
+      esCommon.about.notConfigured,
+    ],
+  ])("says so when %s", async (_case, check, text) => {
+    client.checkAppUpdate.mockImplementation(check);
+    renderAbout();
+    expect(await screen.findByText(text)).toBeInTheDocument();
   });
 
   it("does not offer to change where the server configuration comes from", async () => {

@@ -13,7 +13,8 @@ import { useAppUpdate } from "../system/useAppUpdate";
 export function AboutPage() {
   const { t } = useTranslation();
   const appInfo = useAppInfo();
-  const update = useAppUpdate().data;
+  const check = useAppUpdate();
+  const update = check.data;
   const launcher = useId();
   const legal = useId();
 
@@ -38,7 +39,11 @@ export function AboutPage() {
                   ? t("about.updateAvailable", { version: update.version })
                   : update?.kind === "upToDate"
                     ? t("about.upToDate")
-                    : "—",
+                    : update?.kind === "notConfigured"
+                      ? t("about.notConfigured")
+                      : check.isError
+                        ? t("about.checkFailed")
+                        : t("about.checking"),
             },
           ]}
         />

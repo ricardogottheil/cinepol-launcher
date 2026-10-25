@@ -352,6 +352,9 @@
     "updates": "Actualizaciones",
     "upToDate": "Al día",
     "updateAvailable": "Versión {{version}} disponible",
+    "checking": "Buscando…",
+    "checkFailed": "No se pudo comprobar",
+    "notConfigured": "No en esta versión",
     "openUpdates": "Ver actualizaciones",
     "legalTitle": "Aviso legal"
   },

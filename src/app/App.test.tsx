@@ -13,12 +13,17 @@ const getAppInfo = vi.hoisted(() =>
   vi.fn(async () => ({ name: "Cinepol Launcher", version: "0.1.0" })),
 );
 
+const checkAppUpdate = vi.hoisted(() =>
+  vi.fn(async (): Promise<unknown> => ({ kind: "upToDate" })),
+);
+
 vi.mock("../ipc/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../ipc/client")>()),
   getAppInfo,
   openExternal,
   listAccounts,
   listInstances,
+  checkAppUpdate,
 }));
 
 function renderAt(path: string) {
@@ -70,6 +75,20 @@ describe("App shell", () => {
       "href",
       "https://discord.gg/cinepol",
     );
+  });
+
+  it("announces a newer launcher in the sidebar on every page", async () => {
+    checkAppUpdate.mockResolvedValueOnce({
+      kind: "available",
+      version: "0.4.0",
+      currentVersion: "0.3.0",
+    });
+    renderAt("/instances");
+    const badge = await screen.findByRole("link", {
+      name: new RegExp(esCommon.updates.seeWhatsNew),
+    });
+    expect(badge).toHaveAttribute("href", "/updates");
+    expect(badge).toHaveTextContent(esCommon.updates.badge.replace("{{version}}", "0.4.0"));
   });
 
   it("shows the app version from the backend", async () => {
