@@ -140,6 +140,19 @@ describe("HomePage", () => {
     expect(client.pingServer).toHaveBeenCalledWith("creative.policarpiers.com:25570");
   });
 
+  it("keeps the MOTD for a community main server, never a saved one", async () => {
+    client.getServerConfig.mockResolvedValue({ ...remoteConfig, servers: [] });
+    client.listSavedServers.mockResolvedValue([
+      { id: "h", name: "Hypixel", address: "mc.hypixel.net", instanceId: null },
+    ]);
+    client.pingServer.mockResolvedValue(liveStatus);
+    renderHome();
+    const list = await serverList();
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(1));
+    expect(await within(list).findByText("8 / 100")).toBeInTheDocument();
+    expect(within(list).queryByText(liveStatus.motd)).not.toBeInTheDocument();
+  });
+
   it("shows no server list and no server row when there is no server at all", async () => {
     client.getServerConfig.mockResolvedValue({ ...remoteConfig, servers: [] });
     client.playOnCinepol.mockReturnValue({

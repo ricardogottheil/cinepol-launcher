@@ -200,7 +200,11 @@ function HomeServerRow({ name, address, motd }: { name: string; address: string;
 }
 
 /** The community servers, then the player's saved ones; `servers` is never empty. */
-function HomeServers({ servers }: { servers: { key: string; name: string; address: string }[] }) {
+function HomeServers({
+  servers,
+}: {
+  servers: { key: string; name: string; address: string; main: boolean }[];
+}) {
   const { t } = useTranslation();
   const heading = useId();
   return (
@@ -214,12 +218,12 @@ function HomeServers({ servers }: { servers: { key: string; name: string; addres
         </Link>
       </div>
       <ul aria-labelledby={heading} className="mt-4 mb-0 list-none border-t border-hairline p-0">
-        {servers.map((server, index) => (
+        {servers.map((server) => (
           <HomeServerRow
             key={server.key}
             name={server.name}
             address={server.address}
-            motd={index === 0}
+            motd={server.main}
           />
         ))}
       </ul>
@@ -241,8 +245,12 @@ export function HomePage() {
   const saved = useSavedServers().data ?? [];
   const main = config.servers[0];
   const servers = [
-    ...config.servers.map((server) => ({ key: `community:${server.address}`, ...server })),
-    ...saved.map((server) => ({ key: `saved:${server.id}`, ...server })),
+    ...config.servers.map((server, index) => ({
+      key: `community:${server.address}`,
+      main: index === 0,
+      ...server,
+    })),
+    ...saved.map((server) => ({ key: `saved:${server.id}`, main: false, ...server })),
   ];
 
   return (

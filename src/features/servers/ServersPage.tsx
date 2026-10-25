@@ -15,8 +15,12 @@ import { SavedServerRow, serverFormError } from "./SavedServerRow";
 import { serverLamp } from "./serverLamp";
 import { useSavedServers, useSaveServer, useServerPing } from "./useSavedServers";
 
-/** A community server from the config, with its status and Play (the CINEPOL instance). */
-function CommunityServer({ server }: { server: CommunityServerDto }) {
+/**
+ * A community server from the config, with its status and Play (the CINEPOL
+ * instance). The main server's Play leaves the pick to the backend's own copy
+ * of the config.
+ */
+function CommunityServer({ server, main }: { server: CommunityServerDto; main: boolean }) {
   const { t } = useTranslation();
   const config = useServerConfig().data ?? bundledConfigDto();
   const status = useServerPing(server.address);
@@ -62,7 +66,7 @@ function CommunityServer({ server }: { server: CommunityServerDto }) {
           label={t("servers.play")}
           detail={t("home.gameVersion", { version: config.recommendedVersion })}
           size="compact"
-          onPress={() => void playCinepol(server.address)}
+          onPress={() => void (main ? playCinepol() : playCinepol(server.address))}
         />
       ) : (
         <div className="flex flex-wrap items-center gap-4">
@@ -153,7 +157,11 @@ function AddServerForm() {
 /** The community servers pinned on top, then the servers the player saved, then a form to add one. */
 export function ServersPage() {
   const { t } = useTranslation();
-  const config = useServerConfig().data ?? bundledConfigDto();
+  const configQuery = useServerConfig();
+  const config = configQuery.data ?? bundledConfigDto();
+  // Until the backend answers, only the main server is safe to offer: the
+  // others may not be in the config the backend checks Play against.
+  const community = configQuery.isPlaceholderData ? config.servers.slice(0, 1) : config.servers;
   const servers = useSavedServers();
   const instances = useInstances().data ?? [];
   const yours = useId();
@@ -161,8 +169,8 @@ export function ServersPage() {
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-10 px-gutter-lg py-10">
       <h1 className="display-lg m-0 text-silk">{t("servers.title")}</h1>
-      {config.servers.map((server) => (
-        <CommunityServer key={server.address} server={server} />
+      {community.map((server, index) => (
+        <CommunityServer key={server.address} server={server} main={index === 0} />
       ))}
       <section aria-labelledby={yours} className="flex flex-col gap-2">
         <h2 id={yours} className="display-md m-0 text-silk">

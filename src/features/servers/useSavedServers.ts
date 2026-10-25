@@ -14,12 +14,11 @@ export function useSavedServers() {
   return useQuery({ queryKey: savedServersKey, queryFn: listSavedServers });
 }
 
-/** A server's live status, refreshed every STATUS_REFRESH_MS; idle without an address. */
-export function useServerPing(address: string | undefined) {
+/** A server's live status, refreshed every STATUS_REFRESH_MS. */
+export function useServerPing(address: string) {
   return useQuery({
     queryKey: ["server-status", address],
-    queryFn: () => pingServer(address ?? ""),
-    enabled: address !== undefined,
+    queryFn: () => pingServer(address),
     refetchInterval: STATUS_REFRESH_MS,
     retry: false,
   });

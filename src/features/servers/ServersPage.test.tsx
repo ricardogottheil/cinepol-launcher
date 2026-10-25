@@ -125,6 +125,14 @@ describe("servers page", () => {
     });
   });
 
+  it("leaves the main server to the backend's config when playing it", async () => {
+    renderAt("/servers");
+    const cinepol = await screen.findByRole("region", { name: "CINEPOL" });
+    fireEvent.click(within(cinepol).getByRole("button", { name: new RegExp(labels.play) }));
+    await waitFor(() => expect(client.playOnCinepol).toHaveBeenCalled());
+    expect(client.playOnCinepol.mock.calls[0]?.[0]).not.toHaveProperty("server");
+  });
+
   it("shows only the saved servers when the config lists none", async () => {
     client.getServerConfig.mockResolvedValue({
       name: "CINEPOL",
