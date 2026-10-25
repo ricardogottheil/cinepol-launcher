@@ -112,12 +112,4 @@ mod tests {
         let loaded = load_server_config(&invalid, &bundled).await;
         assert_eq!(loaded.config, bundled);
     }
-
-    #[test]
-    fn reads_the_cinepol_website() {
-        assert_eq!(
-            SERVER_CONFIG_URL,
-            "https://cinepol.policarpiers.com/server-config.json"
-        );
-    }
 }

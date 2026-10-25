@@ -33,7 +33,7 @@ function ToastItem({ toast }: { toast: Toast }) {
         )}
       />
       <span className="min-w-0 flex-1 break-words text-[0.875rem] leading-[1.4] text-silk">
-        {t(toast.message as "errors.cancelled", toast.values ?? {})}
+        {t(toast.message, toast.values ?? {})}
       </span>
       <IconButton label={t("toast.dismiss")} onClick={() => dismiss(toast.id)} className="border-0">
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">

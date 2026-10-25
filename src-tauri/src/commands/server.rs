@@ -21,6 +21,14 @@ pub async fn get_server_config(state: State<'_, AppState>) -> Result<ServerConfi
     Ok(ServerConfigDto::new(&loaded))
 }
 
+/// The community server the player picked, parsed before it reaches the core.
+fn requested_server(server: Option<&str>) -> Result<Option<ServerAddress>, AppError> {
+    server
+        .map(ServerAddress::parse)
+        .transpose()
+        .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))
+}
+
 /// Prepares the managed instance, installs it and joins `server` (a community
 /// server from the config; the main one when `None`, none when the config
 /// lists no server). Install
@@ -35,11 +43,7 @@ pub async fn play_on_cinepol(
     on_log: Channel<LogLineDto>,
     server: Option<String>,
 ) -> Result<LaunchOutcomeDto, AppError> {
-    let server = server
-        .as_deref()
-        .map(ServerAddress::parse)
-        .transpose()
-        .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))?;
+    let server = requested_server(server.as_deref())?;
     let _session = state.cinepol_session.try_enter().ok_or_else(|| {
         AppError::new(
             ErrorCode::AlreadyRunning,
@@ -92,4 +96,20 @@ pub async fn play_on_cinepol(
     let outcome = LaunchOutcomeDto::new(session.instance.id.to_string(), &session.outcome);
     let _ = app.emit(GAME_EXITED, &outcome);
     Ok(outcome)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_the_picked_server_and_refuses_an_invalid_one() {
+        assert_eq!(requested_server(None).unwrap(), None);
+        assert_eq!(
+            requested_server(Some("mc.policarpiers.com:25570")).unwrap(),
+            Some(ServerAddress::parse("mc.policarpiers.com:25570").unwrap())
+        );
+        let error = requested_server(Some("bad host name")).unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidInput);
+    }
 }

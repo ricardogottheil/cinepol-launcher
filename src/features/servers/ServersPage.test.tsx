@@ -6,6 +6,7 @@ import { createAppRouter } from "../../app/router";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError } from "../../ipc/client";
 import { useActivityStore } from "../instances/activityStore";
+import { bundledServerConfig } from "../server/serverConfig";
 
 const client = vi.hoisted(() => ({
   listSavedServers: vi.fn(),
@@ -131,6 +132,23 @@ describe("servers page", () => {
     fireEvent.click(within(cinepol).getByRole("button", { name: new RegExp(labels.play) }));
     await waitFor(() => expect(client.playOnCinepol).toHaveBeenCalled());
     expect(client.playOnCinepol.mock.calls[0]?.[0]).not.toHaveProperty("server");
+  });
+
+  it("offers only the main server until the backend's config arrives", async () => {
+    const bundled = [...bundledServerConfig.servers];
+    bundledServerConfig.servers.push({
+      name: "CINEPOL Creative",
+      address: "creative.example.test",
+    });
+    try {
+      client.getServerConfig.mockReturnValue(new Promise(() => {}));
+      renderAt("/servers");
+      expect(await screen.findByRole("region", { name: "CINEPOL" })).toBeInTheDocument();
+      await savedRow();
+      expect(screen.queryByRole("region", { name: "CINEPOL Creative" })).toBeNull();
+    } finally {
+      bundledServerConfig.servers.splice(0, Infinity, ...bundled);
+    }
   });
 
   it("shows only the saved servers when the config lists none", async () => {

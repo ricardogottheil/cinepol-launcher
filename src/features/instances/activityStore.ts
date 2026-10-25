@@ -46,18 +46,13 @@ export type Activity =
 /** Packwiz syncs with its pack; Modrinth and CurseForge update to their newest version. */
 export type PackSource = "modrinth" | "curseforge" | "packwiz";
 
-/** The outcome of the last modpack update or export; it also shows as a toast. */
-export type ActivityNotice =
-  | { kind: "updated"; kept: number; pending: number }
-  | { kind: "upToDate" }
-  | { kind: "exported"; path: string };
-
 export interface InstanceActivity {
   activity: Activity;
   logs: LogLineDto[];
   error: ClientErrorCode | null;
   lastExit: LaunchOutcomeDto | null;
-  notice?: ActivityNotice | null;
+  /** Counts finished modpack updates, so pages can refresh what an update changed. */
+  updates?: number;
 }
 
 interface ActivityState {
@@ -89,7 +84,7 @@ const IDLE: InstanceActivity = {
 };
 
 /** Client-only state of installs and running games, kept across page changes. */
-export const useActivityStore = create<ActivityState>((set) => {
+export const useActivityStore = create<ActivityState>((set, get) => {
   const update = (instanceId: string, patch: Partial<InstanceActivity>) =>
     set((state) => ({
       byInstance: {
@@ -165,20 +160,21 @@ export const useActivityStore = create<ActivityState>((set) => {
         cancel: operation.cancel,
       },
       error: null,
-      notice: null,
     });
     try {
       const outcome = await operation.done;
       const pending = "pending" in outcome ? outcome.pending.length : 0;
-      const notice: ActivityNotice =
-        "upToDate" in outcome && outcome.upToDate
-          ? { kind: "upToDate" }
-          : { kind: "updated", kept: outcome.files?.kept ?? 0, pending };
-      update(instanceId, { activity: { kind: "idle" }, notice });
-      if (notice.kind === "upToDate") toast("instances.upToDate");
-      else if (notice.kept > 0) {
-        toast("instances.keptChanges", { tone: "success", values: { count: notice.kept } });
-      } else toast("instances.updated", { tone: "success" });
+      if ("upToDate" in outcome && outcome.upToDate) {
+        update(instanceId, { activity: { kind: "idle" } });
+        toast("instances.upToDate");
+      } else {
+        const updates = (get().byInstance[instanceId]?.updates ?? 0) + 1;
+        update(instanceId, { activity: { kind: "idle" }, updates });
+        const kept = outcome.files?.kept ?? 0;
+        if (kept > 0) {
+          toast("instances.keptChanges", { tone: "success", values: { count: kept } });
+        } else toast("instances.updated", { tone: "success" });
+      }
       return { pending };
     } catch (error) {
       fail(instanceId, error);
@@ -187,13 +183,10 @@ export const useActivityStore = create<ActivityState>((set) => {
   };
 
   const exportPack = async (instanceId: string) => {
-    update(instanceId, { activity: { kind: "exporting" }, error: null, notice: null });
+    update(instanceId, { activity: { kind: "exporting" }, error: null });
     try {
       const exported = await exportMrpack(instanceId);
-      update(instanceId, {
-        activity: { kind: "idle" },
-        notice: exported ? { kind: "exported", path: exported.path } : null,
-      });
+      update(instanceId, { activity: { kind: "idle" } });
       if (exported)
         toast("instances.exported", { tone: "success", values: { path: exported.path } });
     } catch (error) {

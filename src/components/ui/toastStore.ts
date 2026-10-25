@@ -1,3 +1,4 @@
+import type { ParseKeys } from "i18next";
 import { create } from "zustand";
 
 /** How long a toast stays when nobody points at it. */
@@ -13,7 +14,7 @@ export interface Toast {
   id: number;
   tone: ToastTone;
   /** An i18n key, translated when it shows so a language change applies. */
-  message: string;
+  message: ParseKeys;
   values?: Record<string, string | number>;
 }
 
@@ -32,7 +33,7 @@ export const useToastStore = create<ToastState>((set) => ({
 
 /** Shows a toast; usable outside React (stores, mutation callbacks). */
 export function toast(
-  message: string,
+  message: ParseKeys,
   { tone = "info", values }: { tone?: ToastTone; values?: Toast["values"] } = {},
 ): number {
   const id = nextId++;

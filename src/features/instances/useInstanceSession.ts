@@ -36,7 +36,7 @@ export function useInstanceSession(instance: InstanceDto) {
   const writingMods = useIsMutating({ mutationKey: modWriteKey(instance.id) }) > 0;
 
   const queryClient = useQueryClient();
-  const { lastExit, notice } = session;
+  const { lastExit, updates } = session;
   // The game rewrites servers.dat when it exits.
   useEffect(() => {
     if (lastExit) void queryClient.invalidateQueries({ queryKey: serversKey(instance.id) });
@@ -45,10 +45,10 @@ export function useInstanceSession(instance: InstanceDto) {
   // An update may move the instance to another game or loader version, and a
   // packwiz update may add files to download by hand.
   useEffect(() => {
-    if (notice?.kind !== "updated") return;
+    if (!updates) return;
     void queryClient.invalidateQueries({ queryKey: instancesKey });
     void queryClient.invalidateQueries({ queryKey: manualDownloadsKey(instance.id) });
-  }, [notice, queryClient, instance.id]);
+  }, [updates, queryClient, instance.id]);
 
   return {
     ...session,

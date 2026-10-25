@@ -155,7 +155,15 @@ function QuickPlay({ recommended }: { recommended: string }) {
 }
 
 /** One server in the Home list: its name and address, then its live reading. */
-function HomeServerRow({ name, address, motd }: { name: string; address: string; motd?: boolean }) {
+function HomeServerRow({
+  name,
+  address,
+  showMotd = false,
+}: {
+  name: string;
+  address: string;
+  showMotd?: boolean;
+}) {
   const { t } = useTranslation();
   const ping = useServerPing(address);
   const status = serverLamp(ping);
@@ -187,7 +195,7 @@ function HomeServerRow({ name, address, motd }: { name: string; address: string;
         </div>
       </div>
       {live ? (
-        motd && live.motd ? (
+        showMotd && live.motd ? (
           <p className="m-0 whitespace-pre-line text-[0.875rem] text-silk-dim">{live.motd}</p>
         ) : null
       ) : (
@@ -223,7 +231,7 @@ function HomeServers({
             key={server.key}
             name={server.name}
             address={server.address}
-            motd={server.main}
+            showMotd={server.main}
           />
         ))}
       </ul>
