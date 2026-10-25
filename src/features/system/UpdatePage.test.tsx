@@ -104,6 +104,20 @@ describe("UpdatePage", () => {
     expect(client.installAppUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the install in sight when a later check no longer offers it", async () => {
+    client.checkAppUpdate.mockResolvedValue(available);
+    client.installAppUpdate.mockImplementation(() => running(new Promise(() => {})));
+    const { client: queries } = renderWithQuery(<UpdatePage />);
+    fireEvent.click(await installButton());
+
+    client.checkAppUpdate.mockResolvedValue({ kind: "upToDate" });
+    await act(() => queries.refetchQueries({ queryKey: ["app-update"] }));
+    await waitFor(() => expect(screen.queryByText(labels.newVersion)).toBeNull());
+
+    expect(screen.getByText(labels.installing)).toBeInTheDocument();
+    expect(screen.queryByText(labels.upToDate)).toBeNull();
+  });
+
   it("says when the check for updates failed", async () => {
     client.checkAppUpdate.mockRejectedValue(new IpcError("network", "offline"));
     renderWithQuery(<UpdatePage />);

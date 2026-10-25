@@ -71,6 +71,18 @@ export function UpdatePage() {
   }
 
   const update = status.data?.kind === "available" ? status.data : null;
+  // A running install stays in sight even if a later check no longer offers it.
+  const installPanel = installing ? (
+    <div className="flex max-w-[560px] flex-col gap-3 rounded-control border border-hairline-lit p-4">
+      <span className="plate text-silk">{t("updates.installing")}</span>
+      <ProgressMeter
+        label={t("updates.downloading")}
+        done={progress?.done ?? 0}
+        total={progress?.total ?? null}
+        unit={progress?.unit ?? "bytes"}
+      />
+    </div>
+  ) : null;
 
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-10 px-gutter-lg py-10">
@@ -85,17 +97,7 @@ export function UpdatePage() {
                 { label: t("updates.newVersion"), value: update.version },
               ]}
             />
-            {installing ? (
-              <div className="flex max-w-[560px] flex-col gap-3 rounded-control border border-hairline-lit p-4">
-                <span className="plate text-silk">{t("updates.installing")}</span>
-                <ProgressMeter
-                  label={t("updates.downloading")}
-                  done={progress?.done ?? 0}
-                  total={progress?.total ?? null}
-                  unit={progress?.unit ?? "bytes"}
-                />
-              </div>
-            ) : (
+            {installPanel ?? (
               <SignalControl
                 label={t("updates.install")}
                 detail={t("updates.product", { version: update.version })}
@@ -112,22 +114,24 @@ export function UpdatePage() {
           {update.notes ? <ReleaseNotes notes={update.notes} /> : null}
         </>
       ) : (
-        <div className="flex flex-col gap-2 border-t border-hairline pt-8">
-          <p role="status" className="display-md m-0 text-silk">
-            {status.isPending
-              ? t("updates.checking")
-              : status.isError
-                ? t(`errors.${toIpcError(status.error).code}`)
-                : status.data?.kind === "notConfigured"
-                  ? t("updates.notConfigured")
-                  : t("updates.upToDate")}
-          </p>
-          {appInfo.data && status.data?.kind === "upToDate" ? (
-            <p className="m-0 text-silk-dim">
-              {t("updates.upToDateDetail", { version: appInfo.data.version })}
+        (installPanel ?? (
+          <div className="flex flex-col gap-2 border-t border-hairline pt-8">
+            <p role="status" className="display-md m-0 text-silk">
+              {status.isPending
+                ? t("updates.checking")
+                : status.isError
+                  ? t(`errors.${toIpcError(status.error).code}`)
+                  : status.data?.kind === "notConfigured"
+                    ? t("updates.notConfigured")
+                    : t("updates.upToDate")}
             </p>
-          ) : null}
-        </div>
+            {appInfo.data && status.data?.kind === "upToDate" ? (
+              <p className="m-0 text-silk-dim">
+                {t("updates.upToDateDetail", { version: appInfo.data.version })}
+              </p>
+            ) : null}
+          </div>
+        ))
       )}
     </div>
   );
