@@ -20,7 +20,7 @@ use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_serve
 use launcher_core::infrastructure::curseforge::CurseForgeSource;
 use launcher_core::infrastructure::fs::{
     JsonAccountRepository, JsonInstanceRepository, JsonModRegistryStore, JsonPackManifestStore,
-    JsonSavedServerRepository, JsonSettingsRepository, StdPackFiles, TokioFileSystem,
+    JsonSavedServerRepository, StdPackFiles, TokioFileSystem,
 };
 use launcher_core::infrastructure::http::{DownloadConfig, DownloadManager, ReqwestHttpClient};
 use launcher_core::infrastructure::java::{ManagedJavaRuntimes, ProcessJavaProbe};
@@ -140,7 +140,6 @@ pub struct AppState {
     pub pack_manifests: JsonPackManifestStore,
     /// The mods the player added one by one to each instance (`mods.json`).
     pub mod_registry: JsonModRegistryStore,
-    pub settings: JsonSettingsRepository,
     /// Checks custom Java executables (`java -version`).
     pub java_probe: ProcessJavaProbe,
     /// Java executables the player picked with the native picker this session.
@@ -252,7 +251,6 @@ impl AppState {
             pack_files: StdPackFiles,
             pack_manifests: JsonPackManifestStore::new(paths.clone()),
             mod_registry: JsonModRegistryStore::new(paths.clone()),
-            settings: JsonSettingsRepository::new(paths.settings_file()),
             java_probe: ProcessJavaProbe::new(),
             picked_java: Mutex::default(),
             servers: NbtServerListStore::new(paths.clone()),

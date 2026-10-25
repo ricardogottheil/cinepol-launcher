@@ -1,16 +1,12 @@
 use launcher_core::application::check_server_status::check_server_status;
-use launcher_core::application::get_settings::get_settings as load_settings;
 use launcher_core::application::install_instance::InstallDeps;
 use launcher_core::application::launch_instance::LaunchDeps;
 use launcher_core::application::load_server_config::load_server_config;
 use launcher_core::application::play_on_cinepol::play_on_cinepol as play;
-use launcher_core::application::update_settings::set_server_config_url as set_url;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::dto::{
-    LaunchOutcomeDto, LogLineDto, ProgressEvent, ServerConfigDto, ServerStatusDto, SettingsDto,
-};
+use crate::dto::{LaunchOutcomeDto, LogLineDto, ProgressEvent, ServerConfigDto, ServerStatusDto};
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
 use crate::logs::ChannelLogSink;
@@ -20,8 +16,7 @@ use crate::state::AppState;
 /// The CINEPOL server config: remote when reachable, bundled otherwise.
 #[tauri::command]
 pub async fn get_server_config(state: State<'_, AppState>) -> Result<ServerConfigDto, AppError> {
-    let loaded =
-        load_server_config(&state.settings, &state.config_source, &state.bundled_config).await;
+    let loaded = load_server_config(&state.config_source, &state.bundled_config).await;
     state.remember_config(loaded.config.clone());
     Ok(ServerConfigDto::new(&loaded))
 }
@@ -95,20 +90,4 @@ pub async fn play_on_cinepol(
     let outcome = LaunchOutcomeDto::new(session.instance.id.to_string(), &session.outcome);
     let _ = app.emit(GAME_EXITED, &outcome);
     Ok(outcome)
-}
-
-#[tauri::command]
-pub async fn get_settings(state: State<'_, AppState>) -> Result<SettingsDto, AppError> {
-    Ok(SettingsDto::from(&load_settings(&state.settings).await?))
-}
-
-/// `None` restores the default config URL.
-#[tauri::command]
-pub async fn set_server_config_url(
-    state: State<'_, AppState>,
-    url: Option<String>,
-) -> Result<SettingsDto, AppError> {
-    Ok(SettingsDto::from(
-        &set_url(url.as_deref(), &state.settings).await?,
-    ))
 }

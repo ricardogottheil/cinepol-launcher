@@ -106,8 +106,6 @@ address: string, minVersion: string, maxVersion: string, recommendedVersion: str
 
 export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versionName: string, motd: string, latencyMs: number | null, };
 
-export type SettingsDto = { serverConfigUrl: string, defaultServerConfigUrl: string, };
-
 export type ModpackSummaryDto = { 
 /**
  * `modrinth` or `curseforge`.
@@ -341,8 +339,6 @@ export interface Commands {
   ping_server: { args: { address: string }; result: ServerStatusDto };
   edit_server_list: { args: { instanceId: string; change: ServerEditDto }; result: ServerListDto };
   export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };
-  get_settings: { args: Record<string, never>; result: SettingsDto };
-  set_server_config_url: { args: { url: string | null }; result: SettingsDto };
 }
 
 /** App-wide events and their payloads. */

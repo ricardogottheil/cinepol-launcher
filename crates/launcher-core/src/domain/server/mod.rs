@@ -5,6 +5,9 @@ mod ports;
 
 pub use ports::{ServerConfigError, ServerConfigSource, ServerStatusError, ServerStatusProbe};
 
+/// Where the launcher reads the CINEPOL server configuration.
+pub const SERVER_CONFIG_URL: &str = "https://cinepol.policarpiers.com/server-config.json";
+
 use std::cmp::Ordering;
 use std::fmt;
 

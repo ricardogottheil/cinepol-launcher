@@ -56,7 +56,6 @@ import type {
   ServerEditDto,
   ServerListDto,
   ServerStatusDto,
-  SettingsDto,
   SkinDto,
 } from "./bindings";
 
@@ -117,7 +116,6 @@ export type {
   ServerEditDto,
   ServerListDto,
   ServerStatusDto,
-  SettingsDto,
   SkinDto,
 };
 

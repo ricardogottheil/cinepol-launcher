@@ -909,23 +909,6 @@ impl From<&launcher_core::domain::server::ServerStatus> for ServerStatusDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-pub struct SettingsDto {
-    pub server_config_url: String,
-    pub default_server_config_url: String,
-}
-
-impl From<&launcher_core::domain::settings::AppSettings> for SettingsDto {
-    fn from(settings: &launcher_core::domain::settings::AppSettings) -> Self {
-        Self {
-            server_config_url: settings.server_config_url.to_string(),
-            default_server_config_url: launcher_core::domain::settings::DEFAULT_SERVER_CONFIG_URL
-                .to_owned(),
-        }
-    }
-}
-
 /// What a pack sync did to the game folder; `kept` counts the player's changes left alone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]

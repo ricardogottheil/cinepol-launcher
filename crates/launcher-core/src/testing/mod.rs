@@ -47,10 +47,7 @@ pub use modpack::{
 pub use mods::{
     FakeModSource, InMemoryModRegistryStore, depends, fabric_instance, mod_jar, mod_version,
 };
-pub use server::{
-    FakeServerConfigSource, FakeServerStatusProbe, InMemorySavedServerRepository,
-    InMemorySettingsRepository,
-};
+pub use server::{FakeServerConfigSource, FakeServerStatusProbe, InMemorySavedServerRepository};
 pub use update::{FakeAppUpdater, update};
 
 /// Records every progress update.

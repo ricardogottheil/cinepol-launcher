@@ -1,4 +1,4 @@
-//! Fakes for the CINEPOL server ports: config source, status probe, settings.
+//! Fakes for the CINEPOL server ports: config source, status probe, saved servers.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -8,7 +8,6 @@ use crate::domain::server::{
     ServerStatusProbe,
 };
 use crate::domain::server_list::ServerAddress;
-use crate::domain::settings::{AppSettings, SettingsError, SettingsRepository};
 
 /// Serves configs by URL; unknown URLs are unavailable (offline).
 #[derive(Debug, Default)]
@@ -57,22 +56,6 @@ impl ServerStatusProbe for FakeServerStatusProbe {
     async fn status(&self, address: &ServerAddress) -> Result<ServerStatus, ServerStatusError> {
         self.pinged.lock().unwrap().push(address.to_string());
         self.answer.clone()
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct InMemorySettingsRepository {
-    settings: Mutex<Option<AppSettings>>,
-}
-
-impl SettingsRepository for InMemorySettingsRepository {
-    async fn load(&self) -> Result<AppSettings, SettingsError> {
-        Ok(self.settings.lock().unwrap().clone().unwrap_or_default())
-    }
-
-    async fn save(&self, settings: &AppSettings) -> Result<(), SettingsError> {
-        *self.settings.lock().unwrap() = Some(settings.clone());
-        Ok(())
     }
 }
 

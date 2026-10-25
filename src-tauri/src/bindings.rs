@@ -19,7 +19,7 @@ use crate::dto::{
     ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto, PackwizUpdateDto,
     PlannedModDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
     SavedServerDto, SavedServerFormDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto,
-    ServerListDto, ServerStatusDto, SettingsDto, SkinDto, SuggestedModDto, WindowSizeDto,
+    ServerListDto, ServerStatusDto, SkinDto, SuggestedModDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -69,7 +69,6 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ConfigOriginDto::decl(cfg),
         ServerConfigDto::decl(cfg),
         ServerStatusDto::decl(cfg),
-        SettingsDto::decl(cfg),
         ModpackSummaryDto::decl(cfg),
         ModpackPageDto::decl(cfg),
         ModpackVersionDto::decl(cfg),
@@ -521,12 +520,6 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             vec![("instanceId", string())],
             format!("{} | null", ModpackExportDto::name(cfg)),
         ),
-        command("get_settings", vec![], SettingsDto::name(cfg)),
-        command(
-            "set_server_config_url",
-            vec![("url", "string | null".to_owned())],
-            SettingsDto::name(cfg),
-        ),
     ]
 }
 
@@ -652,8 +645,6 @@ mod tests {
             "get_server_config",
             "get_server_status",
             "play_on_cinepol",
-            "get_settings",
-            "set_server_config_url",
         ] {
             assert!(
                 rendered.contains(&format!("  {name}: {{ args:")),

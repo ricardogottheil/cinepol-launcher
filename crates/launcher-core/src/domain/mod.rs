@@ -15,5 +15,4 @@ pub mod ports;
 pub mod saved_server;
 pub mod server;
 pub mod server_list;
-pub mod settings;
 pub mod update;

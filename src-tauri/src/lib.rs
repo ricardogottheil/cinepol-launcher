@@ -104,8 +104,6 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::server::get_server_config,
             commands::server::get_server_status,
             commands::server::play_on_cinepol,
-            commands::server::get_settings,
-            commands::server::set_server_config_url,
         ])
         .run(tauri::generate_context!())
 }
