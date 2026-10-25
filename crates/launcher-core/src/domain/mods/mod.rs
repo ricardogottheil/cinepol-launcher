@@ -16,7 +16,7 @@ pub use source::{curseforge_mod_id, curseforge_number, mod_catalog};
 use crate::domain::instance::GameVersion;
 use crate::domain::integrity::Checksum;
 use crate::domain::loader::LoaderKind;
-use crate::domain::modpack::ModpackQuery;
+use crate::domain::modpack::{ModpackQuery, ModpackSourceKind};
 
 /// What a mod has to run on: an instance's Minecraft version and loader.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,11 +48,12 @@ impl ModTarget {
     }
 }
 
-/// A mod search, always for one target; `page` is zero-based.
+/// A mod search, always for one target, in one catalog; `page` is zero-based.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModQuery {
     pub text: String,
     pub target: ModTarget,
+    pub catalog: ModpackSourceKind,
     pub page: u32,
     pub page_size: u32,
 }

@@ -66,6 +66,7 @@ async fn search_asks_for_client_mods_of_the_target_version_and_loaders() {
     let query = ModQuery {
         text: " iris shaders ".into(),
         target: target(LoaderKind::Quilt),
+        catalog: crate::domain::modpack::ModpackSourceKind::Modrinth,
         page: 2,
         page_size: 10,
     };
@@ -86,6 +87,7 @@ async fn search_on_vanilla_finds_nothing_without_asking() {
     let query = ModQuery {
         text: "iris".into(),
         target: target(LoaderKind::Vanilla),
+        catalog: crate::domain::modpack::ModpackSourceKind::Modrinth,
         page: 0,
         page_size: 10,
     };

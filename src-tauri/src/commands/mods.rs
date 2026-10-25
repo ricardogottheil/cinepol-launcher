@@ -1,6 +1,8 @@
-//! Single mods from Modrinth: search filtered by the instance's game version
-//! and loader, an install preview with its dependencies, install, the
-//! installed list, enable/disable, removal and updates.
+//! Single mods from Modrinth and CurseForge: search filtered by the
+//! instance's game version and loader, an install preview with its
+//! dependencies, install, the installed list, enable/disable, removal and
+//! updates. Searches go to the catalog the UI picks; everything else goes to
+//! the catalog each mod id belongs to.
 //!
 //! Commands that change `mods/` hold the instance like a running game, so
 //! two of them never write the same folder (or `mods.json`) at once, and none
@@ -23,11 +25,13 @@ use launcher_core::application::set_mod_enabled::{
 };
 use launcher_core::application::update_mod::update_mod as update;
 use launcher_core::domain::instance::InstanceId;
+use launcher_core::domain::mods::ModSource;
+use launcher_core::infrastructure::mod_catalogs::ModCatalogs;
 use tauri::State;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
-use super::modpacks::hold;
+use super::modpacks::{catalog, hold};
 use super::parse_instance_id;
 use crate::dto::{
     InstalledModDto, ModEntryDto, ModInstallPreviewDto, ModPageDto, ModUpdatesDto, ProgressEvent,
@@ -36,20 +40,24 @@ use crate::error::AppError;
 use crate::progress::ChannelReporter;
 use crate::state::AppState;
 
-/// One page of mods that run on the instance; `page` is zero-based.
+/// One page of mods that run on the instance from `source` (`modrinth`, the
+/// default, or `curseforge`); `page` is zero-based.
 #[tauri::command]
 pub async fn search_mods(
     state: State<'_, AppState>,
     instance_id: String,
+    source: Option<String>,
     query: String,
     page: u32,
     page_size: u32,
 ) -> Result<ModPageDto, AppError> {
     let id = parse_instance_id(&instance_id)?;
+    let catalog = catalog(source.as_deref())?;
     let page = search(
         &state.instances,
-        &state.modrinth,
+        &catalogs(&state),
         &id,
+        catalog,
         query,
         page,
         page_size,
@@ -69,7 +77,7 @@ pub async fn preview_mod_install(
     let id = parse_instance_id(&instance_id)?;
     let deps = PreviewModInstallDeps {
         instances: &state.instances,
-        source: &state.modrinth,
+        source: &catalogs(&state),
         files: &state.pack_files,
         registry: &state.mod_registry,
         paths: &state.paths,
@@ -121,7 +129,7 @@ pub async fn list_instance_mods(
     let id = parse_instance_id(&instance_id)?;
     let deps = ListInstanceModsDeps {
         instances: &state.instances,
-        source: &state.modrinth,
+        source: &catalogs(&state),
         files: &state.pack_files,
         registry: &state.mod_registry,
         paths: &state.paths,
@@ -162,7 +170,7 @@ pub async fn remove_mod(
     let _claim = hold(&state, &id, &CancellationToken::new())?;
     let deps = RemoveModDeps {
         instances: &state.instances,
-        source: &state.modrinth,
+        source: &catalogs(&state),
         files: &state.pack_files,
         registry: &state.mod_registry,
         paths: &state.paths,
@@ -180,7 +188,7 @@ pub async fn check_mod_updates(
     let id = parse_instance_id(&instance_id)?;
     let deps = CheckModUpdatesDeps {
         instances: &state.instances,
-        source: &state.modrinth,
+        source: &catalogs(&state),
         files: &state.pack_files,
         registry: &state.mod_registry,
         paths: &state.paths,
@@ -202,7 +210,7 @@ async fn write(
     let reporter = ChannelReporter::new(on_progress);
     let deps = InstallModDeps {
         instances: &state.instances,
-        source: &state.modrinth,
+        source: &catalogs(state),
         downloader: &state.downloader,
         fs: &state.fs,
         files: &state.pack_files,
@@ -215,4 +223,9 @@ async fn write(
         install(&deps, id, project, &reporter, token).await?
     };
     Ok(written.iter().map(InstalledModDto::from).collect())
+}
+
+/// Both mod catalogs, each mod id answered by its own.
+fn catalogs(state: &AppState) -> impl ModSource + '_ {
+    ModCatalogs::new(&state.modrinth, &state.curseforge)
 }

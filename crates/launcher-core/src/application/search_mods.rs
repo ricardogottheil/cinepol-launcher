@@ -5,7 +5,7 @@
 use thiserror::Error;
 
 use crate::domain::instance::{InstanceId, InstanceRepository, InstanceRepositoryError};
-use crate::domain::modpack::ModpackSourceError;
+use crate::domain::modpack::{ModpackSourceError, ModpackSourceKind};
 use crate::domain::mods::{ModPage, ModQuery, ModSource, ModTarget};
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -16,12 +16,13 @@ pub enum SearchModsError {
     Source(#[from] ModpackSourceError),
 }
 
-/// One page of mods for the instance. The text is trimmed and the page
-/// size clamped before the catalog sees them.
+/// One page of mods for the instance from `catalog`. The text is trimmed
+/// and the page size clamped before the catalog sees them.
 pub async fn search_mods<I: InstanceRepository, S: ModSource>(
     instances: &I,
     source: &S,
     id: &InstanceId,
+    catalog: ModpackSourceKind,
     text: String,
     page: u32,
     page_size: u32,
@@ -33,6 +34,7 @@ pub async fn search_mods<I: InstanceRepository, S: ModSource>(
             game_version: instance.game_version.clone(),
             loader: instance.loader.kind(),
         },
+        catalog,
         page,
         page_size,
     };
@@ -52,9 +54,17 @@ mod tests {
         let id = InstanceId::parse("survival").unwrap();
         fabric_instance(&instances, &id).await;
         let source = FakeModSource::default();
-        let page = search_mods(&instances, &source, &id, "  iris ".into(), 0, 500)
-            .await
-            .unwrap();
+        let page = search_mods(
+            &instances,
+            &source,
+            &id,
+            ModpackSourceKind::CurseForge,
+            "  iris ".into(),
+            0,
+            500,
+        )
+        .await
+        .unwrap();
         let asked = source.searched();
         assert_eq!(asked.len(), 1);
         assert_eq!(asked[0].text, "iris");
@@ -63,17 +73,35 @@ mod tests {
             asked[0].target.loader,
             crate::domain::loader::LoaderKind::Fabric
         );
+        assert_eq!(asked[0].catalog, ModpackSourceKind::CurseForge);
         assert_eq!(asked[0].page_size, 50);
         assert_eq!(page.total, Some(0));
 
-        search_mods(&instances, &source, &id, String::new(), 0, 0)
-            .await
-            .unwrap();
+        search_mods(
+            &instances,
+            &source,
+            &id,
+            ModpackSourceKind::CurseForge,
+            String::new(),
+            0,
+            0,
+        )
+        .await
+        .unwrap();
         assert_eq!(source.searched()[1].page_size, 1);
 
         let other = InstanceId::parse("other").unwrap();
         assert!(matches!(
-            search_mods(&instances, &source, &other, String::new(), 0, 20).await,
+            search_mods(
+                &instances,
+                &source,
+                &other,
+                ModpackSourceKind::Modrinth,
+                String::new(),
+                0,
+                20
+            )
+            .await,
             Err(SearchModsError::Instance(_))
         ));
     }

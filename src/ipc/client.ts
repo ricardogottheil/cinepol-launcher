@@ -159,6 +159,7 @@ const BACKEND_CODES = {
   no_compatible_version: true,
   mod_up_to_date: true,
   too_many_dependencies: true,
+  manual_download: true,
   mod_backup_kept: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
@@ -548,13 +549,15 @@ export function exportMrpack(instanceId: string): Promise<ModpackExportDto | nul
 
 export interface ModSearch {
   instanceId: string;
+  /** The catalog to search; installs and updates follow each mod's own. */
+  source: ModpackCatalog;
   query: string;
   /** Zero-based. */
   page: number;
   pageSize: number;
 }
 
-/** One page of Modrinth mods that run on the instance's game version and loader. */
+/** One page of mods from a catalog that run on the instance's game version and loader. */
 export function searchMods(search: ModSearch): Promise<ModPageDto> {
   return call("search_mods", { ...search });
 }

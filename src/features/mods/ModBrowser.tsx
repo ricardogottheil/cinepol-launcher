@@ -44,6 +44,7 @@ export function ModBrowser({
   const query = useDebouncedValue(text.trim(), SEARCH_DEBOUNCE_MS);
   const search = useModSearch({
     instanceId: instance.id,
+    source: "modrinth",
     query,
     page,
     pageSize: MOD_PAGE_SIZE,

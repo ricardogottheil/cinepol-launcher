@@ -21,7 +21,7 @@ use launcher_core::domain::modpack::{
     ModpackPage, ModpackSourceKind, ModpackSummary, ModpackVersion,
 };
 use launcher_core::domain::mods::{
-    InstalledMod, ModEntry, ModInstallPlan, ModOrigin, ModPage, ModSummary,
+    InstalledMod, ModEntry, ModInstallPlan, ModOrigin, ModPage, ModSummary, mod_catalog,
 };
 use launcher_core::domain::ports::{ProgressStage, ProgressUnit, ProgressUpdate};
 use launcher_core::domain::server_list::ServerList;
@@ -515,6 +515,9 @@ pub struct ModEntryDto {
     pub title: String,
     pub origin: ModOriginDto,
     pub project: Option<String>,
+    /// The catalog the launcher installed it from (`modrinth` or
+    /// `curseforge`); absent for loose jars.
+    pub source: Option<String>,
     pub version_number: Option<String>,
     /// Whether the player added it, rather than another mod needing it.
     pub requested: bool,
@@ -544,6 +547,7 @@ impl ModEntryDto {
                     title: entry.title().to_owned(),
                     origin: entry.origin.into(),
                     project: record.map(|record| record.project.clone()),
+                    source: record.map(|record| source_id(mod_catalog(&record.project)).to_owned()),
                     version_number: record.map(|record| record.version_number.clone()),
                     requested: record.is_none_or(|record| record.requested),
                     required_by: record

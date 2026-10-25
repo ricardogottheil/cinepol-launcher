@@ -147,23 +147,30 @@ async fn resolve<S: ModSource>(
     }
 }
 
-/// The newest installable version of `project` for `target`.
+/// The newest installable version of `project` for `target`, or why there
+/// is none.
 async fn newest<S: ModSource>(
     source: &S,
     target: &ModTarget,
     project: &str,
 ) -> Result<ModVersion, ModPlanError> {
     let versions = source.versions(project, target).await?;
-    match newest_compatible(&versions, target) {
-        Some(version) => Ok(version.clone()),
-        None => {
-            let title = titles(source, &[project.to_owned()])
-                .await
-                .remove(project)
-                .unwrap_or_else(|| project.to_owned());
-            Err(ModPlanError::NoCompatibleVersion { title })
-        }
+    if let Some(version) = newest_compatible(&versions, target) {
+        return Ok(version.clone());
     }
+    let title = titles(source, &[project.to_owned()])
+        .await
+        .remove(project)
+        .unwrap_or_else(|| project.to_owned());
+    // A fitting version the player has to download by hand from its page.
+    let manual = versions
+        .iter()
+        .filter(|version| target.accepts(version))
+        .find_map(|version| version.manual_page.clone());
+    Err(match manual {
+        Some(page) => ModPlanError::ManualDownload { title, page },
+        None => ModPlanError::NoCompatibleVersion { title },
+    })
 }
 
 /// Display names only: when the catalog cannot answer, callers fall back to
@@ -424,6 +431,57 @@ mod tests {
             plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "iris").await,
             Err(ModPlanError::NoCompatibleVersion {
                 title: "Sodium".into()
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn points_to_the_page_of_a_mod_only_its_catalog_site_hands_out() {
+        let blocked = |project: &str, id: &str| {
+            let mut version = mod_version(project, id, "1.21.1", &[Fabric]);
+            version.file = None;
+            version.manual_page = Some(format!("https://www.curseforge.com/projects/{project}"));
+            version
+        };
+        let source = FakeModSource::default()
+            .with(
+                "culling",
+                "Entity Culling",
+                vec![blocked("culling", "culling-1")],
+            )
+            .with(
+                "emf",
+                "Entity Model Features",
+                vec![depends(
+                    mod_version("emf", "emf-1", "1.21.1", &[Fabric]),
+                    Required,
+                    Some("culling"),
+                    None,
+                )],
+            );
+        let page = "https://www.curseforge.com/projects/culling".to_owned();
+        for project in ["culling", "emf"] {
+            assert_eq!(
+                plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), project).await,
+                Err(ModPlanError::ManualDownload {
+                    title: "Entity Culling".into(),
+                    page: page.clone(),
+                }),
+                "{project}"
+            );
+        }
+        // A manual version for another game version is no reason to send the
+        // player to the page: nothing there fits.
+        assert_eq!(
+            plan_mod_install(
+                &source,
+                &target(NeoForge),
+                &ModRegistry::default(),
+                "culling"
+            )
+            .await,
+            Err(ModPlanError::NoCompatibleVersion {
+                title: "Entity Culling".into()
             })
         );
     }

@@ -17,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "mod_backup_kept" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "manual_download" | "mod_backup_kept" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, };
 
@@ -185,7 +185,12 @@ filename: string, enabled: boolean,
 /**
  * The mod's title, or the file name when it is unknown.
  */
-title: string, origin: ModOriginDto, project: string | null, versionNumber: string | null, 
+title: string, origin: ModOriginDto, project: string | null, 
+/**
+ * The catalog the launcher installed it from (`modrinth` or
+ * `curseforge`); absent for loose jars.
+ */
+source: string | null, versionNumber: string | null, 
 /**
  * Whether the player added it, rather than another mod needing it.
  */

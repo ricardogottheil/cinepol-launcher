@@ -108,6 +108,9 @@ pub enum ErrorCode {
     ModUpToDate,
     /// A mod would bring in too many dependencies to install safely.
     TooManyDependencies,
+    /// A mod (or one it needs) only downloads from its catalog's site, by
+    /// hand; `details` is that page.
+    ManualDownload,
     /// A mod update failed and the old jar could not be put back; `details`
     /// is where the launcher kept it.
     ModBackupKept,
@@ -718,6 +721,9 @@ fn mod_plan_error(error: &ModPlanError) -> AppError {
         ModPlanError::NoCompatibleVersion { title } => {
             AppError::new(ErrorCode::NoCompatibleVersion, message).with_details(title.clone())
         }
+        ModPlanError::ManualDownload { page, .. } => {
+            AppError::new(ErrorCode::ManualDownload, message).with_details(page.clone())
+        }
         ModPlanError::Incompatible { with, .. } => {
             AppError::new(ErrorCode::ModIncompatible, message).with_details(with.clone())
         }
@@ -890,6 +896,15 @@ mod tests {
         assert_eq!(
             AppError::from(InstallModError::Plan(ModPlanError::TooManyDependencies)).code,
             ErrorCode::TooManyDependencies
+        );
+        let manual = AppError::from(PreviewModInstallError::Plan(ModPlanError::ManualDownload {
+            title: "Entity Culling".into(),
+            page: "https://www.curseforge.com/projects/448233".into(),
+        }));
+        assert_eq!(manual.code, ErrorCode::ManualDownload);
+        assert_eq!(
+            manual.details.as_deref(),
+            Some("https://www.curseforge.com/projects/448233")
         );
         assert_eq!(
             AppError::from(InstallModError::NotInstalled {

@@ -46,6 +46,7 @@ async fn searches_mods_for_the_target_with_namespaced_ids() {
         &ModQuery {
             text: " fabric api ".into(),
             target: target(LoaderKind::Fabric),
+            catalog: crate::domain::modpack::ModpackSourceKind::CurseForge,
             page: 2,
             page_size: 10,
         },
@@ -74,6 +75,7 @@ async fn nothing_is_asked_for_vanilla_or_without_a_key() {
     let query = ModQuery {
         text: String::new(),
         target: target(LoaderKind::Vanilla),
+        catalog: crate::domain::modpack::ModpackSourceKind::CurseForge,
         page: 0,
         page_size: 10,
     };

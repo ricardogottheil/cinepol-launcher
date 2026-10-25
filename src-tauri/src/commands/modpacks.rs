@@ -56,7 +56,7 @@ const CURSEFORGE_EXTENSION: &str = "zip";
 const CURSEFORGE_FILTER: &str = "CurseForge modpack";
 
 /// The catalog a command talks to: Modrinth unless the UI asks otherwise.
-fn catalog(source: Option<&str>) -> Result<ModpackSourceKind, AppError> {
+pub(super) fn catalog(source: Option<&str>) -> Result<ModpackSourceKind, AppError> {
     match source.map(str::trim) {
         None | Some("") | Some("modrinth") => Ok(ModpackSourceKind::Modrinth),
         Some("curseforge") => Ok(ModpackSourceKind::CurseForge),

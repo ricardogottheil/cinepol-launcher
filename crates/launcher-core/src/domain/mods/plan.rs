@@ -40,6 +40,8 @@ pub enum ModPlanError {
     AlreadyInstalled { title: String },
     #[error("{title} has no version for this instance's game version and loader")]
     NoCompatibleVersion { title: String },
+    #[error("{title} can only be downloaded from its catalog's site: {page}")]
+    ManualDownload { title: String, page: String },
     #[error("{title} cannot run together with {with}")]
     Incompatible { title: String, with: String },
     #[error("installing this mod would bring in more than {MAX_PLANNED_MODS} mods")]
