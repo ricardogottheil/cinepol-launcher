@@ -322,6 +322,13 @@ function InstallDialog({
             </li>
           ))}
         </ul>
+        {preview.suggested.length > 0 ? (
+          <p className="m-0 text-[0.875rem] text-silk-dim">
+            {t("mods.suggested", {
+              mods: preview.suggested.map((suggestion) => suggestion.title).join(", "),
+            })}
+          </p>
+        ) : null}
       </div>
     </ConfirmDialog>
   );

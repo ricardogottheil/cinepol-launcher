@@ -429,12 +429,22 @@ pub struct PlannedModDto {
     pub required_by: Vec<String>,
 }
 
+/// A mod the picked one works better with; never installed with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SuggestedModDto {
+    pub project: String,
+    pub title: String,
+}
+
 /// What installing a mod would write: the picked mod first, then the
-/// required dependencies the instance does not have yet.
+/// required dependencies the instance does not have yet. `suggested` lists
+/// its optional dependencies the instance lacks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ModInstallPreviewDto {
     pub mods: Vec<PlannedModDto>,
+    pub suggested: Vec<SuggestedModDto>,
 }
 
 impl From<&ModInstallPlan> for ModInstallPreviewDto {
@@ -455,6 +465,14 @@ impl From<&ModInstallPlan> for ModInstallPreviewDto {
                     version_number: planned.version.version_number.clone(),
                     requested: planned.requested,
                     required_by: planned.required_by.iter().map(title_of).collect(),
+                })
+                .collect(),
+            suggested: plan
+                .suggested
+                .iter()
+                .map(|suggestion| SuggestedModDto {
+                    project: suggestion.project.clone(),
+                    title: suggestion.title.clone(),
                 })
                 .collect(),
         }

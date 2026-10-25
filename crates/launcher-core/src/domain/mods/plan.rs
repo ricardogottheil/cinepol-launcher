@@ -23,13 +23,22 @@ pub struct PlannedMod {
     pub required_by: BTreeSet<String>,
 }
 
-/// The mods an install writes, the requested one first, and the required
-/// dependencies the instance already has.
+/// An optional dependency of the requested mod: shown to the player, never
+/// installed with it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuggestedMod {
+    pub project: String,
+    pub title: String,
+}
+
+/// The mods an install writes, the requested one first, the required
+/// dependencies the instance already has, and the optional ones it lacks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModInstallPlan {
     pub mods: Vec<PlannedMod>,
     /// `(dependency, needed by)` project pairs already installed.
     pub present: Vec<(String, String)>,
+    pub suggested: Vec<SuggestedMod>,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]

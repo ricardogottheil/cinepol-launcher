@@ -8,7 +8,9 @@ mod registry;
 mod source;
 
 pub use inventory::{DISABLED_SUFFIX, ModEntry, ModOrigin, mod_jar_name};
-pub use plan::{MAX_PLANNED_MODS, ModInstallPlan, ModPlanError, PlannedMod, find_conflict};
+pub use plan::{
+    MAX_PLANNED_MODS, ModInstallPlan, ModPlanError, PlannedMod, SuggestedMod, find_conflict,
+};
 pub use ports::{ModRegistryStore, ModSource};
 pub use registry::{InstalledMod, ModRegistry};
 pub use source::{curseforge_mod_id, curseforge_number, mod_catalog};

@@ -19,7 +19,8 @@ and, in builds with a CurseForge key, from CurseForge.
   beta the player already runs is never downgraded by an update.
 - **Dependencies.** Required dependencies are resolved recursively (at most a
   fixed number of mods per install) and installed with the mod; optional ones
-  are never installed. A mod that declares itself incompatible with an
+  are never installed: the requested mod's optional dependencies the instance
+  lacks are named in the confirmation as suggestions. A mod that declares itself incompatible with an
   installed or planned mod is refused, naming the other mod. The player sees
   the full plan (`preview_mod_install`) before confirming.
 - **Registry.** `instances/<id>/mods.json` records each mod the launcher

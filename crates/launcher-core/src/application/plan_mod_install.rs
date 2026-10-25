@@ -7,15 +7,16 @@ use std::collections::{BTreeSet, HashMap};
 use crate::domain::modpack::ModpackSourceError;
 use crate::domain::mods::{
     DependencyKind, MAX_PLANNED_MODS, ModDependency, ModInstallPlan, ModPlanError, ModRegistry,
-    ModSource, ModTarget, ModVersion, PlannedMod, find_conflict, newest_compatible,
+    ModSource, ModTarget, ModVersion, PlannedMod, SuggestedMod, find_conflict, newest_compatible,
 };
 
 /// Plans installing `project` for `target` next to the `installed` mods.
 ///
 /// Each required dependency is resolved once: a mod already installed or
 /// already planned is reused; a pinned version is taken when it fits the
-/// target, else the newest version of its project that does. Optional and
-/// embedded dependencies are left alone.
+/// target, else the newest version of its project that does. Embedded
+/// dependencies are left alone; the requested mod's optional ones that are
+/// neither installed nor planned are only suggested.
 pub async fn plan_mod_install<S: ModSource>(
     source: &S,
     target: &ModTarget,
@@ -83,11 +84,37 @@ pub async fn plan_mod_install<S: ModSource>(
         }
     }
 
+    let mut optional: Vec<String> = Vec::new();
+    for dependency in &planned[0].0.dependencies {
+        if dependency.kind != DependencyKind::Optional {
+            continue;
+        }
+        // Named only by version: nothing to show without fetching it.
+        let Some(project) = &dependency.project else {
+            continue;
+        };
+        let known = installed.get(project).is_some()
+            || planned
+                .iter()
+                .any(|(version, _)| &version.project == project);
+        if !known && !optional.contains(project) {
+            optional.push(project.clone());
+        }
+    }
     let ids: Vec<String> = planned
         .iter()
         .map(|(version, _)| version.project.clone())
+        .chain(optional.iter().cloned())
         .collect();
     let titles = titles(source, &ids).await;
+    // A suggestion the catalog cannot name is not worth showing.
+    let suggested = optional
+        .into_iter()
+        .filter_map(|project| {
+            let title = titles.get(&project)?.clone();
+            Some(SuggestedMod { project, title })
+        })
+        .collect();
     let title_of = |project: &str| {
         titles
             .get(project)
@@ -115,7 +142,11 @@ pub async fn plan_mod_install<S: ModSource>(
             with: title_of(&other),
         });
     }
-    Ok(ModInstallPlan { mods, present })
+    Ok(ModInstallPlan {
+        mods,
+        present,
+        suggested,
+    })
 }
 
 /// The version to install for one required dependency.
@@ -296,6 +327,34 @@ mod tests {
         assert_eq!(plan.mods[0].title, "Iris Shaders");
         assert_eq!(plan.mods[2].title, "Fabric API");
         assert!(plan.present.is_empty());
+    }
+
+    #[tokio::test]
+    async fn suggests_the_optional_mods_the_requested_one_works_with_unless_installed() {
+        let source = catalog();
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "iris")
+            .await
+            .unwrap();
+        assert_eq!(
+            plan.suggested,
+            [SuggestedMod {
+                project: "modmenu".into(),
+                title: "Mod Menu".into(),
+            }]
+        );
+        // Suggested, never fetched or planned.
+        assert!(!source.asked().contains(&"modmenu".to_owned()));
+        assert!(
+            plan.mods
+                .iter()
+                .all(|planned| planned.version.project != "modmenu")
+        );
+
+        let registry = ModRegistry::new([installed("modmenu", "Mod Menu")]);
+        let plan = plan_mod_install(&catalog(), &target(Fabric), &registry, "iris")
+            .await
+            .unwrap();
+        assert!(plan.suggested.is_empty());
     }
 
     #[tokio::test]

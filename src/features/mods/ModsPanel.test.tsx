@@ -254,6 +254,10 @@ describe("ModsPanel", () => {
           requiredBy: ["Lithium"],
         },
       ],
+      suggested: [
+        { project: "modmenu", title: "Mod Menu" },
+        { project: "sodium-extra", title: "Sodium Extra" },
+      ],
     });
     const operation = pendingOperation();
     client.installMod.mockImplementation(operation.start);
@@ -274,6 +278,10 @@ describe("ModsPanel", () => {
     expect(within(dialog).getByText("Fabric API")).toBeInTheDocument();
     expect(
       within(dialog).getByText(fill(labels.requiredBy, { mods: "Lithium" }), { exact: false }),
+    ).toBeInTheDocument();
+    // Optional mods are named, never counted in what gets installed.
+    expect(
+      within(dialog).getByText(fill(labels.suggested, { mods: "Mod Menu, Sodium Extra" })),
     ).toBeInTheDocument();
     fireEvent.click(
       within(dialog).getByRole("button", { name: fill(labels.confirmInstall_other, { count: 2 }) }),
@@ -370,6 +378,7 @@ describe("ModsPanel", () => {
             requiredBy: [],
           },
         ],
+        suggested: [],
       });
     renderWithQuery(<Panel />);
     fireEvent.click(await screen.findByRole("button", { name: labels.add }));

@@ -19,7 +19,7 @@ use crate::dto::{
     ModpackUpdateDto, ModpackVersionDto, PackFilesDto, PackwizInstallDto, PackwizUpdateDto,
     PlannedModDto, PremiumNameDto, ProgressEvent, ProgressStageDto, ProgressUnitDto,
     SavedServerDto, SavedServerFormDto, ServerConfigDto, ServerDto, ServerEditDto, ServerFormDto,
-    ServerListDto, ServerStatusDto, SettingsDto, SkinDto, WindowSizeDto,
+    ServerListDto, ServerStatusDto, SettingsDto, SkinDto, SuggestedModDto, WindowSizeDto,
 };
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
@@ -82,6 +82,7 @@ fn declarations(cfg: &Config) -> Vec<String> {
         ModSummaryDto::decl(cfg),
         ModPageDto::decl(cfg),
         PlannedModDto::decl(cfg),
+        SuggestedModDto::decl(cfg),
         ModInstallPreviewDto::decl(cfg),
         InstalledModDto::decl(cfg),
         ModOriginDto::decl(cfg),

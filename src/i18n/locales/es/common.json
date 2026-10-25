@@ -495,6 +495,7 @@
     "confirmInstall_one": "Instalar",
     "confirmInstall_other": "Instalar {{count}} mods",
     "requiredBy": "para {{mods}}",
+    "suggested": "Funciona bien con: {{mods}}. No se instalan con este mod; agrégalos desde la búsqueda si los quieres",
     "installing": "Instalando {{mod}}",
     "updating": "Actualizando {{mod}}",
     "progress": "Instalación de mods",

@@ -176,7 +176,9 @@ requested: boolean,
  */
 requiredBy: Array<string>, };
 
-export type ModInstallPreviewDto = { mods: Array<PlannedModDto>, };
+export type SuggestedModDto = { project: string, title: string, };
+
+export type ModInstallPreviewDto = { mods: Array<PlannedModDto>, suggested: Array<SuggestedModDto>, };
 
 export type InstalledModDto = { project: string, title: string, versionNumber: string, filename: string, };
 
