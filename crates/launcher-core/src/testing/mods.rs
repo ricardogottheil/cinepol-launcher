@@ -17,7 +17,8 @@ use super::sha512_hex;
 /// A mod catalog in memory. `versions` answers like the real catalog: only
 /// the versions that fit the target, in the order they were added (add them
 /// newest first). Records every project whose versions were asked for;
-/// `projects_fail` makes the title lookup fail, `identify_fails` the hash
+/// `projects_fail` makes the title lookup fail (`projects_fail_for` only a
+/// lookup that asks for one of those projects), `identify_fails` the hash
 /// lookup. `identify` knows the jar of every version added.
 #[derive(Debug, Default)]
 pub struct FakeModSource {
@@ -25,6 +26,7 @@ pub struct FakeModSource {
     pub versions: Vec<ModVersion>,
     pub asked: Mutex<Vec<String>>,
     pub projects_fail: bool,
+    pub projects_fail_for: Vec<String>,
     pub identify_fails: bool,
     /// Projects whose versions cannot be read (the catalog times out).
     pub versions_fail_for: Vec<String>,
@@ -105,7 +107,7 @@ impl ModSource for FakeModSource {
     }
 
     async fn projects(&self, ids: &[String]) -> Result<Vec<ModSummary>, ModpackSourceError> {
-        if self.projects_fail {
+        if self.projects_fail || ids.iter().any(|id| self.projects_fail_for.contains(id)) {
             return Err(ModpackSourceError::RateLimited {
                 retry_after_secs: 60,
             });

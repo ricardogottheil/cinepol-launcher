@@ -12,6 +12,9 @@ use crate::domain::mods::{
 
 /// At most this many optional mods are suggested for one install.
 pub const MAX_SUGGESTED_MODS: usize = 10;
+/// At most this many optional mods are looked up to name the suggestions, so
+/// a few the catalog cannot name still leave room for others.
+const SUGGESTION_LOOKUPS: usize = MAX_SUGGESTED_MODS * 2;
 
 /// Plans installing `project` for `target` next to the `installed` mods.
 ///
@@ -104,18 +107,18 @@ pub async fn plan_mod_install<S: ModSource>(
             optional.push(project.clone());
         }
     }
-    optional.truncate(MAX_SUGGESTED_MODS);
+    optional.truncate(SUGGESTION_LOOKUPS);
     let ids: Vec<String> = planned
         .iter()
         .map(|(version, _)| version.project.clone())
         .collect();
-    let titles = titles(source, &ids).await;
+    let planned_titles = titles(source, &ids).await;
     // Asked apart, so a suggestion the catalog chokes on never costs the
     // mods being installed their titles. One it cannot name is not shown.
     let suggestion_titles = if optional.is_empty() {
         HashMap::new()
     } else {
-        self::titles(source, &optional).await
+        titles(source, &optional).await
     };
     let suggested = optional
         .into_iter()
@@ -123,9 +126,10 @@ pub async fn plan_mod_install<S: ModSource>(
             let title = suggestion_titles.get(&project)?.clone();
             Some(SuggestedMod { project, title })
         })
+        .take(MAX_SUGGESTED_MODS)
         .collect();
     let title_of = |project: &str| {
-        titles
+        planned_titles
             .get(project)
             .cloned()
             .or_else(|| {
@@ -382,6 +386,38 @@ mod tests {
         assert_eq!(plan.suggested.len(), MAX_SUGGESTED_MODS);
         assert_eq!(plan.suggested[0].title, "Extra 0");
         assert_eq!(plan.mods[0].title, "Hub");
+    }
+
+    #[tokio::test]
+    async fn fills_the_suggestions_past_the_mods_the_catalog_cannot_name() {
+        let mut root = mod_version("hub", "hub-1", "1.21.1", &[Fabric]);
+        let mut source = FakeModSource::default();
+        for index in 0..MAX_SUGGESTED_MODS + 3 {
+            let project = format!("extra-{index}");
+            root = depends(root, Optional, Some(&project), None);
+            // The first three are gone from the catalog.
+            if index >= 3 {
+                source = source.with(&project, &format!("Extra {index}"), Vec::new());
+            }
+        }
+        let source = source.with("hub", "Hub", vec![root]);
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "hub")
+            .await
+            .unwrap();
+        assert_eq!(plan.suggested.len(), MAX_SUGGESTED_MODS);
+        assert_eq!(plan.suggested[0].title, "Extra 3");
+    }
+
+    #[tokio::test]
+    async fn a_failed_suggestion_lookup_drops_the_suggestions_but_keeps_the_titles() {
+        let mut source = catalog();
+        source.projects_fail_for = vec!["modmenu".into()];
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "iris")
+            .await
+            .unwrap();
+        assert!(plan.suggested.is_empty());
+        assert_eq!(plan.mods[0].title, "Iris Shaders");
+        assert_eq!(plan.mods[1].title, "Sodium");
     }
 
     #[tokio::test]
