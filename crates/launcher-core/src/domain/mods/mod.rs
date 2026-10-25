@@ -5,11 +5,13 @@ mod inventory;
 mod plan;
 mod ports;
 mod registry;
+mod source;
 
 pub use inventory::{DISABLED_SUFFIX, ModEntry, ModOrigin, mod_jar_name};
 pub use plan::{MAX_PLANNED_MODS, ModInstallPlan, ModPlanError, PlannedMod, find_conflict};
 pub use ports::{ModRegistryStore, ModSource};
 pub use registry::{InstalledMod, ModRegistry};
+pub use source::{curseforge_mod_id, curseforge_number, mod_catalog};
 
 use crate::domain::instance::GameVersion;
 use crate::domain::integrity::Checksum;
@@ -105,6 +107,9 @@ pub struct ModVersion {
     pub published: Option<String>,
     /// The jar to install, when the version has one this launcher accepts.
     pub file: Option<ModFile>,
+    /// Where the player can download the jar by hand, for a version whose
+    /// author lets only the catalog's own site hand it out (CurseForge).
+    pub manual_page: Option<String>,
     pub dependencies: Vec<ModDependency>,
 }
 
@@ -213,6 +218,7 @@ mod tests {
                 .collect(),
             loaders: loaders.to_vec(),
             published: None,
+            manual_page: None,
             file: Some(ModFile {
                 url: format!("https://cdn.modrinth.com/{id}.jar"),
                 filename: format!("{id}.jar"),
@@ -291,6 +297,7 @@ mod tests {
             game_versions: vec![GameVersion::parse("1.21.1").unwrap()],
             loaders: vec![LoaderKind::Fabric],
             published: None,
+            manual_page: None,
             file: Some(ModFile {
                 url: format!("https://cdn.modrinth.com/{id}.jar"),
                 filename: format!("{id}.jar"),

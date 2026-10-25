@@ -1,0 +1,82 @@
+{
+  "data": [
+    {
+      "id": 306612,
+      "gameId": 432,
+      "name": "Fabric API",
+      "slug": "fabric-api",
+      "links": {
+        "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/fabric-api",
+        "wikiUrl": "https://fabricmc.net/wiki/",
+        "issuesUrl": "https://github.com/FabricMC/fabric/issues",
+        "sourceUrl": "https://github.com/FabricMC/fabric"
+      },
+      "summary": "Core API library for the Fabric toolchain",
+      "classId": 6,
+      "allowModDistribution": true,
+      "logo": {
+        "id": 185822,
+        "modId": 306612,
+        "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/185/822/256/256/636829723898798601.png",
+        "url": "https://media.forgecdn.net/avatars/185/822/636829723898798601.png"
+      },
+      "downloadCount": 238964583,
+      "isAvailable": true,
+      "status": 4
+    },
+    {
+      "id": 308702,
+      "gameId": 432,
+      "name": "Mod Menu",
+      "slug": "modmenu",
+      "links": {
+        "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/modmenu",
+        "wikiUrl": "https://github.com/terraformersmc/modmenu?tab=readme-ov-file#developers",
+        "issuesUrl": "https://github.com/Prospector/ModMenu/issues",
+        "sourceUrl": "https://github.com/Prospector/ModMenu"
+      },
+      "summary": "Adds a mod menu to view the list of mods you have installed.",
+      "classId": 6,
+      "allowModDistribution": true,
+      "logo": {
+        "id": 1577189,
+        "modId": 308702,
+        "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1577/189/256/256/639021849968664892.png",
+        "url": "https://media.forgecdn.net/avatars/1577/189/639021849968664892.png"
+      },
+      "downloadCount": 83677648,
+      "isAvailable": true,
+      "status": 4
+    },
+    {
+      "id": 308769,
+      "gameId": 432,
+      "name": "Fabric Language Kotlin",
+      "slug": "fabric-language-kotlin",
+      "links": {
+        "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/fabric-language-kotlin",
+        "wikiUrl": "",
+        "issuesUrl": "https://github.com/FabricMC/fabric-language-kotlin/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc",
+        "sourceUrl": "https://github.com/FabricMC/fabric-language-kotlin"
+      },
+      "summary": "Fabric language module for Kotlin",
+      "classId": 6,
+      "allowModDistribution": true,
+      "logo": {
+        "id": 1111600,
+        "modId": 308769,
+        "thumbnailUrl": "https://media.forgecdn.net/avatars/thumbnails/1111/600/256/256/638663264350908845.png",
+        "url": "https://media.forgecdn.net/avatars/1111/600/638663264350908845.png"
+      },
+      "downloadCount": 86739733,
+      "isAvailable": true,
+      "status": 4
+    }
+  ],
+  "pagination": {
+    "index": 0,
+    "pageSize": 3,
+    "resultCount": 3,
+    "totalCount": 3
+  }
+}

@@ -155,6 +155,7 @@ impl<H: HttpClient> ModSource for ModrinthSource<H> {
 fn mod_version(version: wire::Version) -> ModVersion {
     ModVersion {
         file: mod_file(&version.files),
+        manual_page: None,
         name: version.name.unwrap_or_else(|| version.id.clone()),
         version_number: version.version_number.unwrap_or_else(|| version.id.clone()),
         channel: match version.version_type.as_deref() {

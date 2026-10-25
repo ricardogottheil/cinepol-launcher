@@ -73,6 +73,20 @@ pub struct File {
     pub file_date: Option<String>,
     #[serde(default)]
     pub is_server_pack: Option<bool>,
+    /// 1 release, 2 beta, 3 alpha.
+    #[serde(default)]
+    pub release_type: Option<u8>,
+    #[serde(default)]
+    pub dependencies: Vec<FileDependency>,
+}
+
+/// Another project a file relates to; `relation_type` is CurseForge's
+/// `FileRelationType`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDependency {
+    pub mod_id: u64,
+    pub relation_type: u8,
 }
 
 /// `algo` 1 is sha1, 2 is md5.

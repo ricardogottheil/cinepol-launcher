@@ -1,12 +1,13 @@
 //! CurseForge API v1 (<https://docs.curseforge.com/rest-api/>): modpack
-//! search, project and file details, and the files and projects a pack's
-//! manifest lists.
+//! search, project and file details, the files and projects a pack's
+//! manifest lists, and individual mods ([`mods`]).
 //!
 //! Every request carries the launcher's API key (`x-api-key`), which is a
 //! build-time setting; without one the source reports itself as not
 //! configured and sends nothing. Requests go through the launcher's
 //! [`HttpClient`] (User-Agent, retries, `Retry-After`).
 
+mod mods;
 mod wire;
 
 #[cfg(test)]
@@ -37,7 +38,7 @@ const BATCH: usize = 200;
 /// Files listed per project; the newest come first.
 const FILES_PAGE: u32 = 50;
 
-/// The CurseForge catalog of modpacks.
+/// The CurseForge catalog of modpacks and of individual mods.
 #[derive(Debug, Clone)]
 pub struct CurseForgeSource<H> {
     http: H,

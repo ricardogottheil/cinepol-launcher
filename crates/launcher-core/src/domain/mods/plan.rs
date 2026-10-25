@@ -92,6 +92,7 @@ mod tests {
                 loaders: Vec::new(),
                 published: None,
                 file: None,
+                manual_page: None,
                 dependencies: incompatible
                     .iter()
                     .map(|other| ModDependency {

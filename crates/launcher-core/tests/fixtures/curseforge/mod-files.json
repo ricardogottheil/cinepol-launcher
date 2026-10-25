@@ -1,0 +1,320 @@
+{
+  "data": [
+    {
+      "id": 9064962,
+      "gameId": 432,
+      "modId": 844662,
+      "isAvailable": true,
+      "displayName": "3.3.11-fabric-26.2",
+      "fileName": "entity_model_features-3.3.11-26.2-fabric.jar",
+      "releaseType": 1,
+      "fileStatus": 4,
+      "hashes": [
+        {
+          "value": "adac13c5fd8b82819830387cf9c8d8f405bd0ca5",
+          "algo": 1
+        },
+        {
+          "value": "06153dc4009f5c29630e9b0916bc8fb1",
+          "algo": 2
+        }
+      ],
+      "fileDate": "2026-10-05T00:51:17.85Z",
+      "fileLength": 664593,
+      "downloadCount": 0,
+      "fileSizeOnDisk": 1634085,
+      "downloadUrl": "https://edge.forgecdn.net/files/9064/962/entity_model_features-3.3.11-26.2-fabric.jar",
+      "gameVersions": [
+        "Client",
+        "Fabric",
+        "Quilt",
+        "26.2"
+      ],
+      "sortableGameVersions": [
+        {
+          "gameVersionName": "Client",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-12-08T00:00:00Z",
+          "gameVersionTypeId": 75208
+        },
+        {
+          "gameVersionName": "Fabric",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-09-01T00:00:00Z",
+          "gameVersionTypeId": 68441
+        },
+        {
+          "gameVersionName": "Quilt",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-05-26T00:00:00Z",
+          "gameVersionTypeId": 68441
+        },
+        {
+          "gameVersionName": "26.2",
+          "gameVersionPadded": "0000000026.0000000002",
+          "gameVersion": "26.2",
+          "gameVersionReleaseDate": "2026-06-16T15:39:22.26Z",
+          "gameVersionTypeId": 86297
+        }
+      ],
+      "dependencies": [
+        {
+          "modId": 568563,
+          "relationType": 3
+        }
+      ],
+      "alternateFileId": 0,
+      "isServerPack": false,
+      "fileFingerprint": 3378403134,
+      "modules": [
+        {
+          "name": "META-INF",
+          "fingerprint": 288295327
+        },
+        {
+          "name": "traben",
+          "fingerprint": 889767979
+        },
+        {
+          "name": "entity_model_features.mixins.json",
+          "fingerprint": 3290434038
+        },
+        {
+          "name": "entity_model_features_15.accesswidener",
+          "fingerprint": 794869614
+        },
+        {
+          "name": "fabric.mod.json",
+          "fingerprint": 509349062
+        },
+        {
+          "name": "icon.png",
+          "fingerprint": 609070734
+        },
+        {
+          "name": "pack.mcmeta",
+          "fingerprint": 2250763913
+        },
+        {
+          "name": "assets",
+          "fingerprint": 2900531708
+        }
+      ]
+    },
+    {
+      "id": 8342668,
+      "gameId": 432,
+      "modId": 619986,
+      "isAvailable": true,
+      "displayName": "OptiGUI 2.3.0-beta.10+26.2",
+      "fileName": "optigui-2.3.0-beta.10+26.2.jar",
+      "releaseType": 2,
+      "fileStatus": 4,
+      "hashes": [
+        {
+          "value": "5f83a64181e374222e28815dd95a5cedc902667d",
+          "algo": 1
+        },
+        {
+          "value": "78000a7f941bbb995a0aaa05a8e38edf",
+          "algo": 2
+        }
+      ],
+      "fileDate": "2026-06-29T20:22:05.137Z",
+      "fileLength": 610116,
+      "downloadCount": 484,
+      "fileSizeOnDisk": 977268,
+      "downloadUrl": "https://edge.forgecdn.net/files/8342/668/optigui-2.3.0-beta.10%2b26.2.jar",
+      "gameVersions": [
+        "Client",
+        "Fabric",
+        "Quilt",
+        "26.2"
+      ],
+      "sortableGameVersions": [
+        {
+          "gameVersionName": "Client",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-12-08T00:00:00Z",
+          "gameVersionTypeId": 75208
+        },
+        {
+          "gameVersionName": "Fabric",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-09-01T00:00:00Z",
+          "gameVersionTypeId": 68441
+        },
+        {
+          "gameVersionName": "Quilt",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-05-26T00:00:00Z",
+          "gameVersionTypeId": 68441
+        },
+        {
+          "gameVersionName": "26.2",
+          "gameVersionPadded": "0000000026.0000000002",
+          "gameVersion": "26.2",
+          "gameVersionReleaseDate": "2026-06-16T15:39:22.26Z",
+          "gameVersionTypeId": 86297
+        }
+      ],
+      "dependencies": [
+        {
+          "modId": 533006,
+          "relationType": 2
+        },
+        {
+          "modId": 306612,
+          "relationType": 3
+        },
+        {
+          "modId": 308769,
+          "relationType": 3
+        }
+      ],
+      "alternateFileId": 8342669,
+      "isServerPack": false,
+      "fileFingerprint": 630498601,
+      "modules": [
+        {
+          "name": "META-INF",
+          "fingerprint": 3765305027
+        },
+        {
+          "name": "opekope2",
+          "fingerprint": 460904002
+        },
+        {
+          "name": "fabric.mod.json",
+          "fingerprint": 3823030090
+        },
+        {
+          "name": "optigui.accesswidener",
+          "fingerprint": 1191319550
+        },
+        {
+          "name": "optigui.mixins.json",
+          "fingerprint": 2748195525
+        },
+        {
+          "name": "assets",
+          "fingerprint": 3075472098
+        },
+        {
+          "name": "LICENSE",
+          "fingerprint": 2563525079
+        }
+      ]
+    },
+    {
+      "id": 9100313,
+      "gameId": 432,
+      "modId": 448233,
+      "isAvailable": true,
+      "displayName": "1.11.3-26.2 - Fabric",
+      "fileName": "entityculling-fabric-1.11.3-mc26.2.jar",
+      "releaseType": 1,
+      "fileStatus": 4,
+      "hashes": [
+        {
+          "value": "a2210d12bdeac78daf7bb2fdc6b5d85448642cdf",
+          "algo": 1
+        },
+        {
+          "value": "f0052f5ee748458b3770437c228e20fe",
+          "algo": 2
+        }
+      ],
+      "fileDate": "2026-10-08T16:52:16.873Z",
+      "fileLength": 1508596,
+      "downloadCount": 0,
+      "fileSizeOnDisk": 1766353,
+      "downloadUrl": null,
+      "gameVersions": [
+        "Client",
+        "Fabric",
+        "26.2"
+      ],
+      "sortableGameVersions": [
+        {
+          "gameVersionName": "Client",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-12-08T00:00:00Z",
+          "gameVersionTypeId": 75208
+        },
+        {
+          "gameVersionName": "Fabric",
+          "gameVersionPadded": "0",
+          "gameVersion": "",
+          "gameVersionReleaseDate": "2022-09-01T00:00:00Z",
+          "gameVersionTypeId": 68441
+        },
+        {
+          "gameVersionName": "26.2",
+          "gameVersionPadded": "0000000026.0000000002",
+          "gameVersion": "26.2",
+          "gameVersionReleaseDate": "2026-06-16T15:39:22.26Z",
+          "gameVersionTypeId": 86297
+        }
+      ],
+      "dependencies": [
+        {
+          "modId": 306612,
+          "relationType": 3
+        }
+      ],
+      "alternateFileId": 0,
+      "isServerPack": false,
+      "fileFingerprint": 691783613,
+      "modules": [
+        {
+          "name": "META-INF",
+          "fingerprint": 1541568749
+        },
+        {
+          "name": "LICENSE-EntityCulling",
+          "fingerprint": 3421239066
+        },
+        {
+          "name": "assets",
+          "fingerprint": 1434789192
+        },
+        {
+          "name": "dev",
+          "fingerprint": 2039190381
+        },
+        {
+          "name": "entityculling.mixins.json",
+          "fingerprint": 2532691108
+        },
+        {
+          "name": "fabric.mod.json",
+          "fingerprint": 1806482820
+        },
+        {
+          "name": "icon.png",
+          "fingerprint": 2931545211
+        },
+        {
+          "name": "pack.mcmeta",
+          "fingerprint": 2247495355
+        },
+        {
+          "name": "LICENSE",
+          "fingerprint": 1929528592
+        },
+        {
+          "name": "com",
+          "fingerprint": 4263860780
+        }
+      ]
+    }
+  ]
+}

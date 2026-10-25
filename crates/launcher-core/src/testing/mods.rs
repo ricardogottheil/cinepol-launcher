@@ -175,6 +175,7 @@ pub fn mod_version(
         game_versions: GameVersion::parse(game).into_iter().collect(),
         loaders: loaders.to_vec(),
         published: None,
+        manual_page: None,
         file: checksum(HashAlgorithm::Sha512, sha512_hex(&mod_jar(id))).map(|checksum| ModFile {
             url: format!("https://cdn.modrinth.com/data/{project}/versions/{id}/{id}.jar"),
             filename: format!("{id}.jar"),
