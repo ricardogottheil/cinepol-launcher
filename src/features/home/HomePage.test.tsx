@@ -19,6 +19,7 @@ const client = vi.hoisted(() => ({
   listInstances: vi.fn(),
   getServerConfig: vi.fn(),
   getServerStatus: vi.fn(),
+  playOnCinepol: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -96,6 +97,29 @@ describe("HomePage", () => {
     renderHome();
     expect(await screen.findByText("polispol1")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: esCommon.home.addAccount })).not.toBeInTheDocument();
+  });
+
+  it("brings Play back with a passing notice when the player cancels", async () => {
+    let reject: (error: unknown) => void = () => {};
+    const done = new Promise((_, fail) => {
+      reject = fail;
+    });
+    client.playOnCinepol.mockReturnValue({ operationId: "op", done, cancel: vi.fn() });
+    renderHome();
+    fireEvent.click(await screen.findByRole("button", { name: new RegExp(esCommon.home.play) }));
+    const cancel = await screen.findByRole("button", { name: esCommon.instances.cancel });
+
+    fireEvent.click(cancel);
+    await act(async () => reject(new IpcError("cancelled", "cancelled")));
+
+    expect(
+      await screen.findByRole("button", { name: new RegExp(esCommon.home.play) }),
+    ).toBeInTheDocument();
+    const notice = screen.getByRole("region", { name: esCommon.toast.region });
+    expect(notice).toHaveTextContent(esCommon.errors.cancelled);
+    // Only the toast says it: nothing stays behind under the control.
+    expect(screen.getAllByText(esCommon.errors.cancelled)).toHaveLength(1);
+    expect(useActivityStore.getState().byInstance[CINEPOL_SESSION]?.error).toBeNull();
   });
 
   it("lists the player's instances", async () => {

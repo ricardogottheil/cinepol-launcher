@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { toast } from "../../components/ui/toastStore";
 import {
   checkModUpdates,
   installMod,
@@ -10,6 +11,7 @@ import {
   removeMod,
   searchMods,
   setModEnabled,
+  toIpcError,
   updateMod,
 } from "../../ipc/client";
 
@@ -102,6 +104,8 @@ export interface ModWrite {
   project: string;
   /** Replaces the installed version instead of adding the mod. */
   update?: boolean;
+  /** How the finished toast names the mod; an update may write nothing new. */
+  title?: string;
 }
 
 /** Installs or updates one mod at a time, with its progress and a way to cancel it. */
@@ -120,6 +124,21 @@ export function useWriteMod(instanceId: string) {
         cancelRef.current = null;
         setProgress(null);
       }
+    },
+    // Here rather than per call, so the toast still shows after leaving the page.
+    onSuccess: (written, { project, update, title }) => {
+      if (update) {
+        toast("mods.updatedDone", { tone: "success", values: { mod: title ?? project } });
+      } else {
+        const mods = written.map((mod) => mod.title);
+        toast("mods.installedDone", {
+          tone: "success",
+          values: { count: mods.length, mods: mods.join(", ") },
+        });
+      }
+    },
+    onError: (error) => {
+      if (toIpcError(error).code === "cancelled") toast("errors.cancelled");
     },
     onSettled: refresh,
   });

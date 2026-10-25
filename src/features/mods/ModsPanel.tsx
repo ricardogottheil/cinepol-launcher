@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { type InstanceDto, toIpcError } from "../../ipc/client";
@@ -15,9 +15,6 @@ export interface ModJob {
   update: boolean;
 }
 
-/** How long the line saying a job finished stays up. */
-export const MOD_NOTICE_MS = 6000;
-
 /**
  * One mod install or update at a time for an instance. The instance page owns
  * it, so the job and its progress outlive switching tabs.
@@ -25,16 +22,9 @@ export const MOD_NOTICE_MS = 6000;
 export function useModJob(instanceId: string) {
   const [job, setJob] = useState<ModJob | null>(null);
   const writer = useWriteMod(instanceId);
-  const { isSuccess, reset } = writer;
-
-  useEffect(() => {
-    if (!isSuccess) return;
-    const timer = setTimeout(reset, MOD_NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [isSuccess, reset]);
   function start(next: ModJob) {
     setJob(next);
-    writer.mutate({ project: next.project, update: next.update });
+    writer.mutate({ project: next.project, update: next.update, title: next.title });
   }
   return { job, writer, start };
 }
@@ -119,16 +109,6 @@ export function ModJobStatus({ jobs }: { jobs: ModJobState }) {
     return (
       <p role="alert" className="m-0 text-[0.875rem] text-stale">
         {modErrorText(t, writer.error)}
-      </p>
-    );
-  }
-  if (writer.isSuccess) {
-    const titles = writer.data.map((written) => written.title);
-    return (
-      <p role="status" className="m-0 text-[0.875rem] text-silk-dim">
-        {job.update
-          ? t("mods.updatedDone", { mod: job.title })
-          : t("mods.installedDone", { count: titles.length, mods: titles.join(", ") })}
       </p>
     );
   }

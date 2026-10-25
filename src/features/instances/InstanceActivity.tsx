@@ -59,8 +59,9 @@ export function InstallProgress({ session }: { session: InstanceSession }) {
 }
 
 /**
- * One line on what happened last: an error, the game running, an update or an
- * export. It takes no room while there is nothing to say.
+ * One line on what is going on or went wrong: an error, the game running, an
+ * export under way. Finished updates and exports show as toasts instead. It
+ * takes no room while there is nothing to say.
  */
 export function InstanceStatus({
   session,
@@ -71,7 +72,7 @@ export function InstanceStatus({
   pendingFilesHint?: boolean;
 }) {
   const { t } = useTranslation();
-  const { error, activity, notice, lastExit } = session;
+  const { error, activity, lastExit } = session;
   return (
     <p role="status" className="m-0 text-[0.875rem] empty:hidden">
       {error ? (
@@ -80,18 +81,6 @@ export function InstanceStatus({
         <span className="text-silk-dim">{t("instances.playing")}</span>
       ) : activity.kind === "exporting" ? (
         <span className="text-silk-dim">{t("instances.exporting")}</span>
-      ) : notice?.kind === "upToDate" ? (
-        <span className="text-silk-dim">{t("instances.upToDate")}</span>
-      ) : notice?.kind === "updated" ? (
-        <span className="text-silk-dim">
-          {notice.kept > 0
-            ? t("instances.keptChanges", { count: notice.kept })
-            : t("instances.updated")}
-        </span>
-      ) : notice?.kind === "exported" ? (
-        <span className="break-all text-silk-dim">
-          {t("instances.exported", { path: notice.path })}
-        </span>
       ) : lastExit?.crashReport && !lastExit.killed ? (
         <CrashNotice instanceId={lastExit.instanceId} report={lastExit.crashReport} />
       ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (

@@ -547,7 +547,10 @@ describe("InstancesPage", () => {
         env: { MESA_GL_VERSION_OVERRIDE: "4.6" },
       }),
     );
-    expect(await within(panel).findByText(settingsLabels.saved)).toBeInTheDocument();
+    // The confirmation passes as a toast instead of staying under the form.
+    const toasts = screen.getByRole("region", { name: esCommon.toast.region });
+    expect(await within(toasts).findByText(settingsLabels.saved)).toBeInTheDocument();
+    expect(within(panel).queryByText(settingsLabels.saved)).not.toBeInTheDocument();
   });
 
   it("does not save a malformed environment line", async () => {

@@ -6,6 +6,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { SelectField } from "../../components/ui/SelectField";
 import { TextAreaField } from "../../components/ui/TextAreaField";
 import { TextField } from "../../components/ui/TextField";
+import { toast } from "../../components/ui/toastStore";
 import {
   type InstanceDto,
   type InstanceSettingsDto,
@@ -105,7 +106,9 @@ function SettingsForm({
       setInvalid(result.error);
       return;
     }
-    save.mutate(result.settings);
+    save.mutate(result.settings, {
+      onSuccess: () => toast("instances.settings.saved", { tone: "success" }),
+    });
   }
 
   const accountOptions = [
@@ -243,8 +246,6 @@ function SettingsForm({
         <p role="status" className="m-0 text-[0.875rem]">
           {save.isError ? (
             <span className="text-stale">{t(`errors.${toIpcError(save.error).code}`)}</span>
-          ) : save.isSuccess ? (
-            <span className="text-silk-dim">{t("instances.settings.saved")}</span>
           ) : null}
         </p>
       </div>

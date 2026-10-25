@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "../../components/ui/toastStore";
 import {
   type ClientErrorCode,
   exportMrpack,
@@ -45,7 +46,7 @@ export type Activity =
 /** Packwiz syncs with its pack; Modrinth and CurseForge update to their newest version. */
 export type PackSource = "modrinth" | "curseforge" | "packwiz";
 
-/** The outcome of the last modpack update or export, shown under the row. */
+/** The outcome of the last modpack update or export; it also shows as a toast. */
 export type ActivityNotice =
   | { kind: "updated"; kept: number; pending: number }
   | { kind: "upToDate" }
@@ -96,6 +97,13 @@ export const useActivityStore = create<ActivityState>((set) => {
       },
     }));
 
+  // A cancel is the player's own choice: say so briefly instead of leaving an error behind.
+  const fail = (instanceId: string, error: unknown) => {
+    const code = toIpcError(error).code;
+    if (code === "cancelled") toast("errors.cancelled");
+    update(instanceId, { activity: { kind: "idle" }, error: code === "cancelled" ? null : code });
+  };
+
   const install = async (instanceId: string): Promise<InstallSummaryDto | null> => {
     const operation = installInstance(instanceId, (event) =>
       update(instanceId, {
@@ -125,7 +133,7 @@ export const useActivityStore = create<ActivityState>((set) => {
       update(instanceId, { activity: { kind: "idle" } });
       return summary;
     } catch (error) {
-      update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
+      fail(instanceId, error);
       return null;
     }
   };
@@ -166,9 +174,13 @@ export const useActivityStore = create<ActivityState>((set) => {
           ? { kind: "upToDate" }
           : { kind: "updated", kept: outcome.files?.kept ?? 0, pending };
       update(instanceId, { activity: { kind: "idle" }, notice });
+      if (notice.kind === "upToDate") toast("instances.upToDate");
+      else if (notice.kept > 0) {
+        toast("instances.keptChanges", { tone: "success", values: { count: notice.kept } });
+      } else toast("instances.updated", { tone: "success" });
       return { pending };
     } catch (error) {
-      update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
+      fail(instanceId, error);
       return null;
     }
   };
@@ -181,8 +193,10 @@ export const useActivityStore = create<ActivityState>((set) => {
         activity: { kind: "idle" },
         notice: exported ? { kind: "exported", path: exported.path } : null,
       });
+      if (exported)
+        toast("instances.exported", { tone: "success", values: { path: exported.path } });
     } catch (error) {
-      update(instanceId, { activity: { kind: "idle" }, error: toIpcError(error).code });
+      fail(instanceId, error);
     }
   };
 
@@ -226,11 +240,11 @@ export const useActivityStore = create<ActivityState>((set) => {
           update(instanceId, { activity: { kind: "idle" }, lastExit: outcome });
           return outcome;
         } catch (retryError) {
-          update(instanceId, { activity: { kind: "idle" }, error: toIpcError(retryError).code });
+          fail(instanceId, retryError);
           return null;
         }
       }
-      update(instanceId, { activity: { kind: "idle" }, error: code });
+      fail(instanceId, error);
       return null;
     }
   };
@@ -285,7 +299,7 @@ export const useActivityStore = create<ActivityState>((set) => {
       update(key, { activity: { kind: "idle" }, lastExit: outcome });
       return outcome;
     } catch (error) {
-      update(key, { activity: { kind: "idle" }, error: toIpcError(error).code });
+      fail(key, error);
       return null;
     }
   };

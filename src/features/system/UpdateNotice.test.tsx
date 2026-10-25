@@ -36,13 +36,13 @@ describe("UpdateNotice", () => {
     client.checkAppUpdate.mockResolvedValueOnce({ kind: "upToDate" });
     const first = renderWithQuery(<UpdateNotice />);
     await waitFor(() => expect(client.checkAppUpdate).toHaveBeenCalled());
-    expect(first.container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     first.unmount();
 
     client.checkAppUpdate.mockResolvedValueOnce({ kind: "notConfigured" });
-    const second = renderWithQuery(<UpdateNotice />);
+    renderWithQuery(<UpdateNotice />);
     await waitFor(() => expect(client.checkAppUpdate).toHaveBeenCalledTimes(2));
-    expect(second.container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("offers the new version with its notes and installs exactly that one", async () => {

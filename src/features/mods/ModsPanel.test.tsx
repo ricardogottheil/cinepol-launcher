@@ -1,9 +1,10 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TOAST_MS } from "../../components/ui/toastStore";
 import esCommon from "../../i18n/locales/es/common.json";
 import { type InstanceDto, IpcError, type ModEntryDto } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
-import { MOD_NOTICE_MS, ModJobStatus, ModsPanel, useModJob } from "./ModsPanel";
+import { ModJobStatus, ModsPanel, useModJob } from "./ModsPanel";
 
 const client = vi.hoisted(() => ({
   listInstanceMods: vi.fn(),
@@ -422,7 +423,7 @@ describe("ModsPanel", () => {
       operation.finish([]);
       const done = fill(labels.updatedDone, { mod: "Iris Shaders" });
       expect(await screen.findByText(done)).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(MOD_NOTICE_MS);
+      await vi.advanceTimersByTimeAsync(TOAST_MS);
       // The reset reaches React on a later tick, which a slow runner may not
       // have taken yet.
       await waitFor(() => expect(screen.queryByText(done)).not.toBeInTheDocument());

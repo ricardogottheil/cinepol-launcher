@@ -156,6 +156,7 @@ Ported in `src/styles/motion.css`:
 | `lamp` (2600ms) | Live dot, only while the server answers | GC:408-422 |
 | `control-flash` (420ms, shutter) | Signal control acknowledges a press | GC:474-488 |
 | underline (260ms, settle) | `[data-underline]` links | GC:448-471 |
+| `toast-in` (280ms, settle) | A toast rises 12px into place | Launcher only |
 | hover colors (160ms, settle) | Plates, nav items | GC:567-645 |
 
 `prefers-reduced-motion: reduce` lands every final state with no animation.
@@ -181,7 +182,17 @@ All live in `src/components/ui/` and are previewed on the dev-only route
 | `Meter` | (launcher only) | Progress as a reading: hairline track, silk fill (never signal), tabular count |
 | `StepList` | How to join, HowToJoin.astro:43-58 | Numbered steps where order matters (Microsoft sign-in) |
 | `BrandGlyph` | src/icons/brandGlyphs.ts | Twitch and Discord only, simple-icons (CC0) |
+| `Toaster` | Launcher only | Passing notices bottom right, mounted once in the shell; see below |
 | `Wordmark` | `src/assets/brand/logo-wordmark.png` | The only logo rendered; never `logo.png` (it carries Mojang's badge, D:997) |
+
+**Toasts** (`toast()` in `src/components/ui/toastStore.ts`): a `panel` plate
+with a `hairline-lit` edge, a small lamp (`signal` for something the player
+did, `engrave` for what happened instead), the message in `silk` and a close
+button. One leaves after 5 s unless the pointer or focus rests on it; at most
+three show. They carry only what passes: a cancel, "Saved", a finished update,
+export or mod install. Errors, crashes and anything the player must act on
+stay inline where they happened. A cancel is the player's own choice: it never
+leaves an error behind.
 
 App shell (`src/app/shell/`):
 
@@ -251,7 +262,8 @@ App shell (`src/app/shell/`):
   (name, address readout, status lamp, players, version, latency, the
   instance select, then Play, Edit and Remove as plate buttons); then the add
   form. Play without an instance focuses the select and says why.
-- **Settings > About**: the version and the legal disclaimer.
+- **Settings**: only About, the version and the legal disclaimer. The server
+  configuration URL is not offered to players.
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (server, recommended version, active account as a spec
   sheet; the signal control "Play"), the CINEPOL banner with its equipment plate

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
+import { Toaster } from "../components/ui/Toaster";
 
 /** A fresh query client that never retries, so failures show at once. */
 export function createTestQueryClient(): QueryClient {
@@ -9,8 +10,19 @@ export function createTestQueryClient(): QueryClient {
   });
 }
 
-/** Renders with a fresh query client that never retries, so failures show at once. */
+/**
+ * Renders with a fresh query client that never retries, so failures show at
+ * once, and the toaster the shell mounts, so toasts can be found too.
+ */
 export function renderWithQuery(ui: ReactElement) {
   const client = createTestQueryClient();
-  return { ...render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>), client };
+  return {
+    ...render(
+      <QueryClientProvider client={client}>
+        {ui}
+        <Toaster />
+      </QueryClientProvider>,
+    ),
+    client,
+  };
 }

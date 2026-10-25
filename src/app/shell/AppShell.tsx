@@ -1,5 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { Toaster } from "../../components/ui/Toaster";
 import { UpdateNotice } from "../../features/system/UpdateNotice";
 import { detectPlatform } from "../../ipc/window";
 import { Sidebar } from "./Sidebar";
@@ -18,6 +19,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

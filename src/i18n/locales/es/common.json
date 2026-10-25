@@ -505,5 +505,9 @@
       "backupKept": "La actualización falló y no se pudo restaurar la versión anterior. Hay una copia en {{path}}",
       "backupKeptBecause": "{{reason}}. No se pudo restaurar la versión anterior; hay una copia en {{path}}"
     }
+  },
+  "toast": {
+    "region": "Notificaciones",
+    "dismiss": "Cerrar"
   }
 }

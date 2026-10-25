@@ -505,5 +505,9 @@
       "backupKept": "The update failed and the previous version could not be put back. A copy is at {{path}}",
       "backupKeptBecause": "{{reason}}. The previous version could not be put back; a copy is at {{path}}"
     }
+  },
+  "toast": {
+    "region": "Notifications",
+    "dismiss": "Dismiss"
   }
 }
