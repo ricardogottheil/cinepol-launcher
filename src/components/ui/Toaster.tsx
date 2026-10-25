@@ -19,7 +19,6 @@ function ToastItem({ toast }: { toast: Toast }) {
   return (
     <li
       data-toast
-      role="status"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
@@ -54,11 +53,14 @@ export function Toaster() {
       aria-label={t("toast.region")}
       className="pointer-events-none fixed right-gutter bottom-gutter z-50 w-[min(380px,calc(100vw-2*var(--spacing-gutter)))]"
     >
-      <ol className="m-0 flex list-none flex-col gap-2 p-0">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} />
-        ))}
-      </ol>
+      {/* The live region is always there, so screen readers hear each toast added to it. */}
+      <div role="status">
+        <ol className="m-0 flex list-none flex-col gap-2 p-0">
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} />
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }

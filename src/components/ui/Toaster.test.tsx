@@ -15,6 +15,8 @@ afterEach(() => {
 describe("Toaster", () => {
   it("announces a toast and lets it go after a while", () => {
     render(<Toaster />);
+    // Present before any toast, or the first one would go unannounced.
+    expect(screen.getByRole("status").textContent).toBe("");
     act(() => {
       toast("errors.cancelled");
     });
