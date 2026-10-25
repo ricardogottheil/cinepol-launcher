@@ -1,15 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import serverBanner from "../../assets/worlds/cinepol-recursos.webp";
 import { Button, plateLinkClass } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
 import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
-import { type ServerStatus, StatusLamp } from "../../components/ui/StatusLamp";
+import { StatusLamp } from "../../components/ui/StatusLamp";
 import { WorldFrame } from "../../components/ui/WorldFrame";
-import { type InstanceDto, toIpcError } from "../../ipc/client";
+import type { InstanceDto } from "../../ipc/client";
 import { useAccounts } from "../accounts/useAccounts";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../instances/activityStore";
 import { CrashNotice } from "../instances/CrashNotice";
@@ -20,7 +20,8 @@ import { ProgressMeter } from "../instances/ProgressMeter";
 import { useInstanceSession } from "../instances/useInstanceSession";
 import { instancesKey, useInstances } from "../instances/useInstances";
 import { bundledConfigDto, useServerConfig } from "../server/useServer";
-import { useServerPing } from "../servers/useSavedServers";
+import { serverLamp } from "../servers/serverLamp";
+import { useSavedServers, useServerPing } from "../servers/useSavedServers";
 
 const plateLink = plateLinkClass;
 
@@ -153,7 +154,83 @@ function QuickPlay({ recommended }: { recommended: string }) {
   );
 }
 
-/** Launcher home: quick play on CINEPOL with its live status, then the player's instances. */
+/** One server in the Home list: its name and address, then its live reading. */
+function HomeServerRow({ name, address, motd }: { name: string; address: string; motd?: boolean }) {
+  const { t } = useTranslation();
+  const ping = useServerPing(address);
+  const status = serverLamp(ping);
+  // After a failed refresh the last readings are stale: show none.
+  const live = ping.isError ? undefined : ping.data;
+  return (
+    <li
+      data-live-status
+      data-status={status}
+      className="flex flex-col gap-2 border-b border-hairline py-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="plate break-words text-silk">{name}</span>
+          <span data-readout className="readout-sm break-all text-engrave">
+            {address}
+          </span>
+        </div>
+        <div className="flex items-start gap-x-6">
+          <Readout
+            unit={t("home.readouts.online")}
+            value={live ? `${live.onlinePlayers} / ${live.maxPlayers}` : null}
+            size="sm"
+            lead={<StatusLamp status={status} />}
+          />
+          {live?.latencyMs != null ? (
+            <Readout unit={t("home.readouts.latency")} value={`${live.latencyMs} ms`} size="sm" />
+          ) : null}
+        </div>
+      </div>
+      {live ? (
+        motd && live.motd ? (
+          <p className="m-0 whitespace-pre-line text-[0.875rem] text-silk-dim">{live.motd}</p>
+        ) : null
+      ) : (
+        <span data-readout className="readout-sm text-engrave">
+          {t(`home.status.${status}` as "home.status.unavailable")}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/** The community servers, then the player's saved ones; `servers` is never empty. */
+function HomeServers({ servers }: { servers: { key: string; name: string; address: string }[] }) {
+  const { t } = useTranslation();
+  const heading = useId();
+  return (
+    <section aria-labelledby={heading} className="flex flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 id={heading} className="display-md m-0 text-silk">
+          {t("home.servers.title")}
+        </h2>
+        <Link to="/servers" className={plateLink}>
+          {t("home.servers.manage")}
+        </Link>
+      </div>
+      <ul aria-labelledby={heading} className="mt-4 mb-0 list-none border-t border-hairline p-0">
+        {servers.map((server, index) => (
+          <HomeServerRow
+            key={server.key}
+            name={server.name}
+            address={server.address}
+            motd={index === 0}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Launcher home: quick play (joining the community's main server, if any), the
+ * servers with their live status, then the player's instances.
+ */
 export function HomePage() {
   const { t } = useTranslation();
   const accounts = useAccounts();
@@ -161,17 +238,12 @@ export function HomePage() {
     accounts.data?.accounts.find((account) => account.id === accounts.data?.activeId)?.username ??
     null;
   const config = useServerConfig().data ?? bundledConfigDto();
+  const saved = useSavedServers().data ?? [];
   const main = config.servers[0];
-  const statusQuery = useServerPing(main?.address);
-  const status: ServerStatus = statusQuery.isPending
-    ? "checking"
-    : statusQuery.isError
-      ? toIpcError(statusQuery.error).code === "server_unreachable"
-        ? "offline"
-        : "unavailable"
-      : "online";
-  // After a failed refresh the last readings are stale: show none.
-  const live = statusQuery.isError ? undefined : statusQuery.data;
+  const servers = [
+    ...config.servers.map((server) => ({ key: `community:${server.address}`, ...server })),
+    ...saved.map((server) => ({ key: `saved:${server.id}`, ...server })),
+  ];
 
   return (
     <div className="@container mx-auto flex max-w-[1120px] flex-col px-gutter-lg">
@@ -179,7 +251,7 @@ export function HomePage() {
         aria-labelledby="quick-play-title"
         className="grid grid-cols-12 items-start gap-x-10 gap-y-8 border-b border-hairline py-10"
       >
-        <div className="col-span-12 flex flex-col @3xl:col-span-7">
+        <div className={`col-span-12 flex flex-col ${servers.length > 0 ? "@3xl:col-span-7" : ""}`}>
           <h1 id="quick-play-title" className="display-lg m-0 text-silk">
             {t("home.title", { server: config.name })}
           </h1>
@@ -187,10 +259,14 @@ export function HomePage() {
           <div className="mt-8 flex flex-wrap items-start gap-x-12 gap-y-6">
             <SpecSheet
               rows={[
-                { label: t("home.spec.server"), value: main?.address ?? "–" },
+                ...(main ? [{ label: t("home.spec.server"), value: main.address }] : []),
                 {
                   label: t("home.spec.version"),
                   value: t("home.recommended", { version: config.recommendedVersion }),
+                },
+                {
+                  label: t("home.readouts.versions"),
+                  value: `${config.minVersion} – ${config.maxVersion}`,
                 },
                 { label: t("home.spec.account"), value: accountName ?? t("home.noAccount") },
               ]}
@@ -205,41 +281,19 @@ export function HomePage() {
           )}
         </div>
 
-        <div className="col-span-12 flex flex-col gap-6 @3xl:col-span-5">
-          <WorldFrame
-            world="overworld"
-            src={serverBanner}
-            caption={config.name}
-            className="hidden @3xl:block"
-          />
-          <div
-            data-live-status
-            data-status={status}
-            className="flex flex-wrap items-start gap-x-10 gap-y-4"
-          >
-            <Readout
-              unit={t("home.readouts.online")}
-              value={live ? `${live.onlinePlayers} / ${live.maxPlayers}` : null}
-              size="md"
-              lead={<StatusLamp status={status} />}
-            />
-            <Readout
-              unit={t("home.readouts.versions")}
-              value={`${config.minVersion} – ${config.maxVersion}`}
-              size="md"
-            />
-            {live?.latencyMs != null ? (
-              <Readout unit={t("home.readouts.latency")} value={`${live.latencyMs} ms`} size="md" />
+        {servers.length > 0 ? (
+          <div className="col-span-12 flex flex-col gap-6 @3xl:col-span-5">
+            {main ? (
+              <WorldFrame
+                world="overworld"
+                src={serverBanner}
+                caption={main.name}
+                className="hidden @3xl:block"
+              />
             ) : null}
+            <HomeServers servers={servers} />
           </div>
-          {live ? (
-            <p className="m-0 whitespace-pre-line text-[0.875rem] text-silk-dim">{live.motd}</p>
-          ) : (
-            <span data-readout className="readout-sm -mt-2 text-engrave">
-              {t(`home.status.${status}` as "home.status.unavailable")}
-            </span>
-          )}
-        </div>
+        ) : null}
       </section>
 
       <section aria-labelledby="instances-title" className="py-10">

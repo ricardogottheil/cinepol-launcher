@@ -55,6 +55,10 @@
       "unavailable": "Status unavailable"
     },
     "bannerCaption": "CINEPOL",
+    "servers": {
+      "title": "Servers",
+      "manage": "All servers"
+    },
     "instances": {
       "title": "Instances",
       "empty": "You have no instances yet.",

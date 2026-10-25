@@ -15,6 +15,7 @@ const client = vi.hoisted(() => ({
   listInstances: vi.fn(),
   launchInstance: vi.fn(),
   playOnCinepol: vi.fn(),
+  getServerConfig: vi.fn(),
   listAccounts: vi.fn(),
 }));
 
@@ -65,6 +66,12 @@ beforeEach(() => {
   );
   client.removeSavedServer.mockResolvedValue(null);
   client.launchInstance.mockReturnValue(new Promise(() => {}));
+  client.getServerConfig.mockRejectedValue(new IpcError("ipc_unavailable", "no backend"));
+  client.playOnCinepol.mockReturnValue({
+    operationId: "op",
+    done: new Promise(() => {}),
+    cancel: vi.fn(),
+  });
 });
 
 function renderAt(path: string) {
@@ -91,6 +98,46 @@ describe("servers page", () => {
     expect(await within(row).findByText("30000 / 100000")).toBeInTheDocument();
     expect(within(row).getByText("40 ms")).toBeInTheDocument();
     expect(client.pingServer).toHaveBeenCalledWith(hypixel.address);
+  });
+
+  it("pins every community server and plays the one picked", async () => {
+    client.getServerConfig.mockResolvedValue({
+      name: "CINEPOL",
+      servers: [
+        { name: "CINEPOL", address: "mc.policarpiers.com" },
+        { name: "CINEPOL Creative", address: "creative.policarpiers.com:25570" },
+      ],
+      minVersion: "1.21.11",
+      maxVersion: "26.2",
+      recommendedVersion: "26.2",
+      links: { website: "https://example.test", twitch: "", discord: "" },
+      origin: "remote",
+    });
+    renderAt("/servers");
+    const creative = await screen.findByRole("region", { name: "CINEPOL Creative" });
+    expect(screen.getByRole("region", { name: "CINEPOL" })).toBeInTheDocument();
+    expect(within(creative).getByText("creative.policarpiers.com:25570")).toBeInTheDocument();
+
+    fireEvent.click(within(creative).getByRole("button", { name: new RegExp(labels.play) }));
+    await waitFor(() => expect(client.playOnCinepol).toHaveBeenCalled());
+    expect(client.playOnCinepol.mock.calls[0]?.[0]).toMatchObject({
+      server: "creative.policarpiers.com:25570",
+    });
+  });
+
+  it("shows only the saved servers when the config lists none", async () => {
+    client.getServerConfig.mockResolvedValue({
+      name: "CINEPOL",
+      servers: [],
+      minVersion: "1.21.11",
+      maxVersion: "26.2",
+      recommendedVersion: "26.2",
+      links: { website: "https://example.test", twitch: "", discord: "" },
+      origin: "remote",
+    });
+    renderAt("/servers");
+    await savedRow();
+    await waitFor(() => expect(screen.queryByRole("region", { name: "CINEPOL" })).toBeNull());
   });
 
   it("is in the Game group of the navigation", async () => {

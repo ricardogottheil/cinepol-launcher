@@ -4,7 +4,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import serverConfig from "../../../config/server-config.json";
 import esCommon from "../../i18n/locales/es/common.json";
@@ -19,6 +19,7 @@ const client = vi.hoisted(() => ({
   listInstances: vi.fn(),
   getServerConfig: vi.fn(),
   pingServer: vi.fn(),
+  listSavedServers: vi.fn(),
   playOnCinepol: vi.fn(),
 }));
 
@@ -32,10 +33,21 @@ beforeEach(() => {
   client.listInstances.mockResolvedValue([]);
   client.getServerConfig.mockRejectedValue(new IpcError("internal", "no backend"));
   client.pingServer.mockRejectedValue(new IpcError("internal", "no backend"));
+  client.listSavedServers.mockResolvedValue([]);
   useActivityStore.setState({ byInstance: {} });
 });
 
 const mainAddress = serverConfig.servers[0]?.address ?? "";
+
+const remoteConfig = {
+  name: "CINEPOL",
+  servers: [{ name: "CINEPOL", address: "play.example.test" }],
+  minVersion: "1.21.11",
+  maxVersion: "26.2",
+  recommendedVersion: "26.2",
+  links: serverConfig.links,
+  origin: "remote",
+};
 
 const liveStatus = {
   onlinePlayers: 8,
@@ -63,6 +75,18 @@ function setSession(kind: "installing" | "running") {
   });
 }
 
+/** The spec sheet: the list that names the recommended version. */
+async function specSheet() {
+  const label = await screen.findByText(esCommon.home.spec.version);
+  const sheet = label.closest("dl");
+  if (!(sheet instanceof HTMLElement)) throw new Error("spec sheet not found");
+  return sheet;
+}
+
+async function serverList() {
+  return screen.findByRole("list", { name: esCommon.home.servers.title });
+}
+
 function renderHome() {
   const rootRoute = createRootRoute({ component: HomePage });
   const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory() });
@@ -79,8 +103,60 @@ describe("HomePage", () => {
   it("shows the server address and the supported range from config", async () => {
     renderHome();
     const { min, max } = serverConfig.versions;
-    expect(await screen.findByText(mainAddress)).toBeInTheDocument();
-    expect(screen.getByText(`${min} – ${max}`)).toBeInTheDocument();
+    const sheet = await specSheet();
+    expect(within(sheet).getByText(mainAddress)).toBeInTheDocument();
+    expect(within(sheet).getByText(`${min} – ${max}`)).toBeInTheDocument();
+  });
+
+  it("lists the community servers first, then the saved ones, each with its status", async () => {
+    client.getServerConfig.mockResolvedValue({
+      ...remoteConfig,
+      servers: [
+        { name: "CINEPOL", address: "mc.policarpiers.com" },
+        { name: "CINEPOL Creative", address: "creative.policarpiers.com:25570" },
+      ],
+    });
+    client.listSavedServers.mockResolvedValue([
+      { id: "h", name: "Hypixel", address: "mc.hypixel.net", instanceId: null },
+    ]);
+    client.pingServer.mockImplementation((address: string) =>
+      address === "mc.hypixel.net"
+        ? Promise.reject(new IpcError("server_unreachable", "timed out"))
+        : Promise.resolve(liveStatus),
+    );
+    renderHome();
+    const list = await serverList();
+    await within(list).findByText("Hypixel");
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows.map((row) => row.querySelector(".plate")?.textContent)).toEqual([
+      "CINEPOL",
+      "CINEPOL Creative",
+      "Hypixel",
+    ]);
+    expect(await within(rows[1] as HTMLElement).findByText("8 / 100")).toBeInTheDocument();
+    expect(
+      await within(rows[2] as HTMLElement).findByText(esCommon.home.status.offline),
+    ).toBeInTheDocument();
+    expect(client.pingServer).toHaveBeenCalledWith("creative.policarpiers.com:25570");
+  });
+
+  it("shows no server list and no server row when there is no server at all", async () => {
+    client.getServerConfig.mockResolvedValue({ ...remoteConfig, servers: [] });
+    client.playOnCinepol.mockReturnValue({
+      operationId: "op",
+      done: new Promise(() => {}),
+      cancel: vi.fn(),
+    });
+    renderHome();
+    const sheet = await specSheet();
+    await waitFor(() =>
+      expect(within(sheet).queryByText(esCommon.home.spec.server)).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("list", { name: esCommon.home.servers.title })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(esCommon.home.play) }));
+    await waitFor(() => expect(client.playOnCinepol).toHaveBeenCalled());
+    expect(client.playOnCinepol.mock.calls[0]?.[0]).not.toHaveProperty("server");
   });
 
   it("asks for an account when none is active", async () => {
@@ -199,17 +275,11 @@ describe("HomePage", () => {
   });
 
   it("uses the remote config when the backend provides one", async () => {
-    client.getServerConfig.mockResolvedValue({
-      name: "CINEPOL",
-      servers: [{ name: "CINEPOL", address: "play.example.test" }],
-      minVersion: "1.21.11",
-      maxVersion: "26.2",
-      recommendedVersion: "26.2",
-      links: serverConfig.links,
-      origin: "remote",
-    });
+    client.getServerConfig.mockResolvedValue(remoteConfig);
     renderHome();
-    expect(await screen.findByText("play.example.test")).toBeInTheDocument();
+    const sheet = await specSheet();
+    expect(await within(sheet).findByText("play.example.test")).toBeInTheDocument();
+    expect(client.pingServer).toHaveBeenCalledWith("play.example.test");
   });
 
   it("labels a running session as playing", async () => {
@@ -257,7 +327,8 @@ describe("HomePage", () => {
     });
     renderHome();
     const account = await screen.findByText("CinepolTest7319");
-    expect(account.closest("dl")).toBe(screen.getByText(mainAddress).closest("dl"));
+    expect(account.closest("dl")).toBe(await specSheet());
+    expect(within(await specSheet()).getByText(mainAddress)).toBeInTheDocument();
   });
 
   it("asks to sign in again when the Microsoft session expired", async () => {

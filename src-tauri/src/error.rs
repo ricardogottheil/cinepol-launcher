@@ -981,6 +981,15 @@ mod tests {
     }
 
     #[test]
+    fn maps_a_server_the_config_does_not_list_to_invalid_input() {
+        use launcher_core::application::play_on_cinepol::PlayOnCinepolError;
+        assert_eq!(
+            AppError::from(PlayOnCinepolError::UnknownServer("example.test".into())).code,
+            ErrorCode::InvalidInput
+        );
+    }
+
+    #[test]
     fn maps_demo_errors_to_codes() {
         assert_eq!(
             AppError::from(ProgressDemoError::Cancelled).code,

@@ -266,17 +266,24 @@ App shell (`src/app/shell/`):
   it. The running install or update shows its stage, meter and Cancel under
   the page header, so it survives switching tabs. Vanilla instances show one
   line saying a loader is needed.
-- **Servers**: CINEPOL pinned first on a `panel` plate with its live status
-  and the page's only signal control (Play); then "Your servers" as rows
+- **Servers**: each community server from the config pinned first on its own
+  `panel` plate with its live status and a signal control (Play joins that
+  server with the CINEPOL instance; none when the config lists no server);
+  then "Your servers" as rows
   (name, address readout, status lamp, players, version, latency, the
   instance select, then Play, Edit and Remove as plate buttons); then the add
   form. Play without an instance focuses the select and says why.
 - **Settings**: only About, the version and the legal disclaimer. The server
   configuration URL is not offered to players.
 - **Home**: a launcher view in the website's style, not the website's content.
-  Quick play on CINEPOL (server, recommended version, active account as a spec
-  sheet; the signal control "Play"), the CINEPOL banner with its equipment plate
-  and the live readouts, then the instances band with its actions. Each
+  Quick play on CINEPOL (main server, recommended version, supported range,
+  active account as a spec sheet; the signal control "Play", which joins the
+  main server), then a "Servers" column: the main server's banner, then one row
+  per server (community servers first, then the saved ones) with its name,
+  address, lamp, players and latency, and the main server's MOTD. With no server
+  at all the column and the server spec row go away and Play takes the full
+  width, starting the recommended version without joining. Then the instances
+  band with its actions. Each
   instance row names it (a link to its own page), reads "loader · version ·
   playtime" ("Never played" before the first game) and has its own Play; the
   row lights to `panel` on hover. Marketing
