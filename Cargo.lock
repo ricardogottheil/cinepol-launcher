@@ -574,7 +574,7 @@ dependencies = [
 
 [[package]]
 name = "cinepol-launcher"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "cinepol-launcher-core",
@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "cinepol-launcher-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "fastnbt",
  "flate2",
