@@ -59,7 +59,8 @@
       "title": "Instancias",
       "empty": "Todavía no tienes instancias.",
       "create": "Nueva instancia",
-      "import": "Importar modpack"
+      "import": "Importar modpack",
+      "neverPlayed": "Sin jugar"
     },
     "session": {
       "playing": "Jugando"

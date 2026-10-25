@@ -59,7 +59,8 @@
       "title": "Instances",
       "empty": "You have no instances yet.",
       "create": "New instance",
-      "import": "Import modpack"
+      "import": "Import modpack",
+      "neverPlayed": "Never played"
     },
     "session": {
       "playing": "Playing"

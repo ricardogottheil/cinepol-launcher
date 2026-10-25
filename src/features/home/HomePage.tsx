@@ -9,17 +9,52 @@ import { SignalControl } from "../../components/ui/SignalControl";
 import { SpecSheet } from "../../components/ui/SpecSheet";
 import { type ServerStatus, StatusLamp } from "../../components/ui/StatusLamp";
 import { WorldFrame } from "../../components/ui/WorldFrame";
-import { toIpcError } from "../../ipc/client";
+import { type InstanceDto, toIpcError } from "../../ipc/client";
 import { useAccounts } from "../accounts/useAccounts";
 import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../instances/activityStore";
 import { CrashNotice } from "../instances/CrashNotice";
 import { splitPlaytime } from "../instances/formatPlaytime";
+import { InstallProgress, InstanceStatus, PlayControl } from "../instances/InstanceActivity";
 import { LogPanel } from "../instances/LogPanel";
 import { ProgressMeter } from "../instances/ProgressMeter";
+import { useInstanceSession } from "../instances/useInstanceSession";
 import { instancesKey, useInstances } from "../instances/useInstances";
 import { bundledConfigDto, useServerConfig, useServerStatus } from "../server/useServer";
 
 const plateLink = plateLinkClass;
+
+/** One instance: its name opens its page, then what it runs and Play. */
+function HomeInstanceRow({ instance }: { instance: InstanceDto }) {
+  const { t } = useTranslation();
+  const session = useInstanceSession(instance);
+  const loader = t(`instances.loaders.${instance.loader}`, { defaultValue: instance.loader });
+  const played =
+    instance.playtimeSecs > 0
+      ? t("instances.playtime", splitPlaytime(instance.playtimeSecs))
+      : t("home.instances.neverPlayed");
+  return (
+    // The hover plate bleeds past the text while the rules stay on the column.
+    <li className="relative isolate flex flex-col gap-3 border-b border-hairline py-4 before:absolute before:inset-y-0 before:-inset-x-4 before:-z-10 before:bg-panel before:opacity-0 before:transition-opacity before:duration-[160ms] before:ease-settle hover:before:opacity-100">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <Link
+            to="/instances/$instanceId"
+            params={{ instanceId: instance.id }}
+            className="display-md text-silk no-underline"
+          >
+            {instance.name}
+          </Link>
+          <span data-readout className="readout-sm text-engrave">
+            {[loader, instance.gameVersion, played].join(" · ")}
+          </span>
+        </div>
+        <PlayControl instance={instance} session={session} />
+      </div>
+      <InstallProgress session={session} />
+      <InstanceStatus session={session} pendingFilesHint />
+    </li>
+  );
+}
 
 /** The player's instances, or an empty state. */
 function HomeInstances() {
@@ -35,17 +70,7 @@ function HomeInstances() {
   return (
     <ul className="mt-6 mb-0 list-none border-t border-hairline p-0">
       {instances.data.map((instance) => (
-        <li
-          key={instance.id}
-          className="flex flex-wrap items-baseline justify-between gap-4 border-b border-hairline py-4"
-        >
-          <Link to="/instances" className="display-md text-silk no-underline hover:text-silk-dim">
-            {instance.name}
-          </Link>
-          <span data-readout className="readout-sm text-engrave">
-            {instance.gameVersion} · {t("instances.playtime", splitPlaytime(instance.playtimeSecs))}
-          </span>
-        </li>
+        <HomeInstanceRow key={instance.id} instance={instance} />
       ))}
     </ul>
   );

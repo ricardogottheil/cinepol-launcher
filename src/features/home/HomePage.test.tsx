@@ -4,7 +4,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import serverConfig from "../../../config/server-config.json";
 import esCommon from "../../i18n/locales/es/common.json";
@@ -137,10 +137,34 @@ describe("HomePage", () => {
     renderHome();
     expect(await screen.findByRole("link", { name: "Survival" })).toHaveAttribute(
       "href",
-      "/instances",
+      "/instances/survival",
     );
-    expect(screen.getByText("26.2 · 2 h 0 min")).toBeInTheDocument();
+    expect(screen.getByText("Vanilla · 26.2 · 2 h 0 min")).toBeInTheDocument();
     expect(screen.queryByText(esCommon.home.instances.empty)).not.toBeInTheDocument();
+  });
+
+  it("names the loader, says when an instance was never played and offers to play it", async () => {
+    client.listInstances.mockResolvedValue([
+      {
+        id: "modded",
+        name: "Modded",
+        gameVersion: "26.3",
+        loader: "fabric",
+        loaderVersion: "0.17.0",
+        origin: "custom",
+        modpackSource: null,
+        updatePackOnLaunch: false,
+        playtimeSecs: 0,
+      },
+    ]);
+    renderHome();
+    const row = (await screen.findByRole("link", { name: "Modded" })).closest("li");
+    expect(row).not.toBeNull();
+    const inRow = within(row as HTMLElement);
+    expect(
+      inRow.getByText(`Fabric · 26.3 · ${esCommon.home.instances.neverPlayed}`),
+    ).toBeInTheDocument();
+    expect(inRow.getByRole("button", { name: esCommon.instances.play })).toBeEnabled();
   });
 
   it("shows the status note and no lamp when the status is unknown", async () => {

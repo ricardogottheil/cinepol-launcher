@@ -276,7 +276,10 @@ App shell (`src/app/shell/`):
 - **Home**: a launcher view in the website's style, not the website's content.
   Quick play on CINEPOL (server, recommended version, active account as a spec
   sheet; the signal control "Play"), the CINEPOL banner with its equipment plate
-  and the live readouts, then the instances band with its actions. Marketing
+  and the live readouts, then the instances band with its actions. Each
+  instance row names it (a link to its own page), reads "loader · version ·
+  playtime" ("Never played" before the first game) and has its own Play; the
+  row lights to `panel` on hover. Marketing
   copy from the website (headlines, pitch, "Copy IP") does not belong here.
 
 ## 7. Iconography and imagery
