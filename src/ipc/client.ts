@@ -168,7 +168,10 @@ const BACKEND_CODES = {
 export class IpcError extends Error {
   readonly code: ClientErrorCode;
   readonly details: string | undefined;
-  /** The backend's `cause`: the failure behind this one, when it sent one. */
+  /**
+   * The backend's `cause`: the failure behind this one, when it sent one.
+   * Named apart because `Error.cause` already exists and holds any value.
+   */
   readonly causeCode: ClientErrorCode | undefined;
 
   constructor(

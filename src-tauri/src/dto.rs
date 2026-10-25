@@ -1212,3 +1212,64 @@ pub enum ServerEditDto {
     Remove { index: u32 },
     Move { from: u32, to: u32 },
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::collections::BTreeSet;
+
+    use launcher_core::domain::mods::{ModVersion, PlannedMod, ReleaseChannel, SuggestedMod};
+
+    use super::*;
+
+    fn version(project: &str) -> ModVersion {
+        ModVersion {
+            id: format!("{project}-1"),
+            project: project.into(),
+            name: project.into(),
+            version_number: "1.0".into(),
+            channel: ReleaseChannel::Release,
+            game_versions: Vec::new(),
+            loaders: Vec::new(),
+            published: None,
+            file: None,
+            manual_page: None,
+            dependencies: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_preview_names_what_comes_with_the_mod_and_what_it_suggests() {
+        let plan = ModInstallPlan {
+            mods: vec![
+                PlannedMod {
+                    title: "Iris Shaders".into(),
+                    version: version("iris"),
+                    requested: true,
+                    required_by: BTreeSet::new(),
+                },
+                PlannedMod {
+                    title: "Sodium".into(),
+                    version: version("sodium"),
+                    requested: false,
+                    required_by: BTreeSet::from(["iris".to_owned()]),
+                },
+            ],
+            present: Vec::new(),
+            suggested: vec![SuggestedMod {
+                project: "modmenu".into(),
+                title: "Mod Menu".into(),
+            }],
+        };
+        let preview = ModInstallPreviewDto::from(&plan);
+        assert_eq!(preview.mods[1].required_by, ["Iris Shaders"]);
+        assert_eq!(
+            preview.suggested,
+            [SuggestedModDto {
+                project: "modmenu".into(),
+                title: "Mod Menu".into(),
+            }]
+        );
+    }
+}

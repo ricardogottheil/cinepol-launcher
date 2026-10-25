@@ -10,8 +10,8 @@ export type PackSource = "modrinth" | "curseforge" | "packwiz";
 /**
  * What an instance is doing right now, shared by its row in the list and its
  * own page: the activity (a mod install counts too), the modpack it follows
- * and the files it still waits for. Mount it once per screen; it refreshes the data the game or an update
- * rewrites.
+ * and the files it still waits for. Mount it once per screen; it refreshes
+ * the data the game or an update rewrites.
  */
 export function useInstanceSession(instance: InstanceDto) {
   const own = useInstanceActivity(instance.id);

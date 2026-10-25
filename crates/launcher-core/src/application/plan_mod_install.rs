@@ -10,6 +10,9 @@ use crate::domain::mods::{
     ModSource, ModTarget, ModVersion, PlannedMod, SuggestedMod, find_conflict, newest_compatible,
 };
 
+/// At most this many optional mods are suggested for one install.
+pub const MAX_SUGGESTED_MODS: usize = 10;
+
 /// Plans installing `project` for `target` next to the `installed` mods.
 ///
 /// Each required dependency is resolved once: a mod already installed or
@@ -101,17 +104,23 @@ pub async fn plan_mod_install<S: ModSource>(
             optional.push(project.clone());
         }
     }
+    optional.truncate(MAX_SUGGESTED_MODS);
     let ids: Vec<String> = planned
         .iter()
         .map(|(version, _)| version.project.clone())
-        .chain(optional.iter().cloned())
         .collect();
     let titles = titles(source, &ids).await;
-    // A suggestion the catalog cannot name is not worth showing.
+    // Asked apart, so a suggestion the catalog chokes on never costs the
+    // mods being installed their titles. One it cannot name is not shown.
+    let suggestion_titles = if optional.is_empty() {
+        HashMap::new()
+    } else {
+        self::titles(source, &optional).await
+    };
     let suggested = optional
         .into_iter()
         .filter_map(|project| {
-            let title = titles.get(&project)?.clone();
+            let title = suggestion_titles.get(&project)?.clone();
             Some(SuggestedMod { project, title })
         })
         .collect();
@@ -355,6 +364,24 @@ mod tests {
             .await
             .unwrap();
         assert!(plan.suggested.is_empty());
+    }
+
+    #[tokio::test]
+    async fn suggests_a_bounded_number_of_optional_mods() {
+        let mut root = mod_version("hub", "hub-1", "1.21.1", &[Fabric]);
+        let mut source = FakeModSource::default();
+        for index in 0..MAX_SUGGESTED_MODS + 5 {
+            let project = format!("extra-{index}");
+            root = depends(root, Optional, Some(&project), None);
+            source = source.with(&project, &format!("Extra {index}"), Vec::new());
+        }
+        let source = source.with("hub", "Hub", vec![root]);
+        let plan = plan_mod_install(&source, &target(Fabric), &ModRegistry::default(), "hub")
+            .await
+            .unwrap();
+        assert_eq!(plan.suggested.len(), MAX_SUGGESTED_MODS);
+        assert_eq!(plan.suggested[0].title, "Extra 0");
+        assert_eq!(plan.mods[0].title, "Hub");
     }
 
     #[tokio::test]

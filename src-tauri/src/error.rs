@@ -779,8 +779,12 @@ impl From<InstallModError> for AppError {
             InstallModError::UpToDate { title } => {
                 return Self::new(ErrorCode::ModUpToDate, message).with_details(title);
             }
-            InstallModError::PreviousKept { backup, error, .. } => {
-                let cause = Self::from(*error).code;
+            InstallModError::PreviousKept {
+                backup,
+                error: failure,
+                ..
+            } => {
+                let cause = Self::from(*failure).code;
                 return Self::new(ErrorCode::ModBackupKept, message)
                     .with_details(backup)
                     .with_cause(cause);
