@@ -124,6 +124,11 @@ pub struct AppError {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub details: Option<String>,
+    /// The failure behind this one, when a single code would hide it (an
+    /// update whose old jar was kept says why the update failed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub cause: Option<ErrorCode>,
 }
 
 impl AppError {
@@ -140,6 +145,7 @@ impl AppError {
             code,
             message,
             details: None,
+            cause: None,
         }
     }
 
@@ -150,6 +156,12 @@ impl AppError {
     /// Adds what the UI shows with the code, such as a mod's title.
     pub fn with_details(mut self, details: impl Into<String>) -> Self {
         self.details = Some(details.into());
+        self
+    }
+
+    /// Adds the code of the failure behind this one.
+    pub fn with_cause(mut self, cause: ErrorCode) -> Self {
+        self.cause = Some(cause);
         self
     }
 }
@@ -759,23 +771,26 @@ impl From<PreviewModInstallError> for AppError {
 impl From<InstallModError> for AppError {
     fn from(error: InstallModError) -> Self {
         let message = error.to_string();
-        let code = match &error {
-            InstallModError::Plan(plan) => return mod_plan_error(plan),
+        let code = match error {
+            InstallModError::Plan(plan) => return mod_plan_error(&plan),
             InstallModError::FileTaken { filename } => {
-                return Self::new(ErrorCode::AlreadyExists, message).with_details(filename.clone());
+                return Self::new(ErrorCode::AlreadyExists, message).with_details(filename);
             }
             InstallModError::UpToDate { title } => {
-                return Self::new(ErrorCode::ModUpToDate, message).with_details(title.clone());
+                return Self::new(ErrorCode::ModUpToDate, message).with_details(title);
             }
-            InstallModError::PreviousKept { backup, .. } => {
-                return Self::new(ErrorCode::ModBackupKept, message).with_details(backup.clone());
+            InstallModError::PreviousKept { backup, error, .. } => {
+                let cause = Self::from(*error).code;
+                return Self::new(ErrorCode::ModBackupKept, message)
+                    .with_details(backup)
+                    .with_cause(cause);
             }
-            InstallModError::Instance(instance) => instance_code(instance),
+            InstallModError::Instance(instance) => instance_code(&instance),
             InstallModError::Download(DownloadError::Io { .. }) | InstallModError::Scratch(_) => {
                 ErrorCode::Internal
             }
             InstallModError::Download(_) => ErrorCode::Network,
-            InstallModError::Files(files) => pack_file_code(files),
+            InstallModError::Files(files) => pack_file_code(&files),
             InstallModError::NotInstalled { .. } => ErrorCode::NotFound,
             InstallModError::Cancelled => ErrorCode::Cancelled,
         };
@@ -881,6 +896,9 @@ mod tests {
         });
         assert_eq!(kept.code, ErrorCode::ModBackupKept);
         assert_eq!(kept.details.as_deref(), Some("/tmp/mods-1/previous.jar"));
+        // Why the update failed travels with it, as its own code.
+        assert_eq!(kept.cause, Some(ErrorCode::Cancelled));
+        assert_eq!(up_to_date.cause, None);
 
         assert_eq!(
             AppError::from(PreviewModInstallError::Plan(ModPlanError::NoLoader)).code,

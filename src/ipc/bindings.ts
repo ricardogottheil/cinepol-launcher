@@ -19,7 +19,12 @@ unit: ProgressUnitDto, };
 
 export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "manual_download" | "mod_backup_kept" | "internal";
 
-export type AppError = { code: ErrorCode, message: string, details?: string, };
+export type AppError = { code: ErrorCode, message: string, details?: string, 
+/**
+ * The failure behind this one, when a single code would hide it (an
+ * update whose old jar was kept says why the update failed).
+ */
+cause?: ErrorCode, };
 
 export type AccountKindDto = "microsoft" | "offline";
 

@@ -75,7 +75,7 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
   Global events are only for app-wide signals (game exited, account expired).
 - Long operations accept a `tokio_util::sync::CancellationToken`.
 - Errors: typed `thiserror` enums in the core, mapped in `src-tauri` to
-  `AppError { code, message, details? }`. The frontend switches on `code`, never
+  `AppError { code, message, details?, cause? }`. The frontend switches on `code`, never
   parses messages.
 - See `docs/adr/` for the recorded decisions.
 

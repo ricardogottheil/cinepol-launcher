@@ -511,7 +511,8 @@
       "incompatibleWith": "Cannot run together with {{mod}}",
       "noVersionFor": "{{mod}} has no version for this Minecraft version and loader",
       "alreadyInstalled": "{{mod}} is already installed",
-      "backupKept": "The update failed and the previous version could not be put back. A copy is at {{path}}"
+      "backupKept": "The update failed and the previous version could not be put back. A copy is at {{path}}",
+      "backupKeptBecause": "{{reason}}. The previous version could not be put back; a copy is at {{path}}"
     }
   }
 }

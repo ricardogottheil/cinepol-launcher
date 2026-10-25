@@ -3,7 +3,7 @@ import { toIpcError } from "../../ipc/client";
 
 /** What a failed mod command says, naming the mod when the backend does. */
 export function modErrorText(t: TFunction, error: unknown): string {
-  const { code, details } = toIpcError(error);
+  const { code, details, causeCode } = toIpcError(error);
   if (details) {
     switch (code) {
       case "mod_incompatible":
@@ -13,7 +13,12 @@ export function modErrorText(t: TFunction, error: unknown): string {
       case "already_exists":
         return t("mods.errors.alreadyInstalled", { mod: details });
       case "mod_backup_kept":
-        return t("mods.errors.backupKept", { path: details });
+        return causeCode
+          ? t("mods.errors.backupKeptBecause", {
+              reason: t(`errors.${causeCode}`),
+              path: details,
+            })
+          : t("mods.errors.backupKept", { path: details });
     }
   }
   return t(`errors.${code}`);

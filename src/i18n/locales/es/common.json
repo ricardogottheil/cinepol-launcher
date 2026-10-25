@@ -511,7 +511,8 @@
       "incompatibleWith": "No puede funcionar junto con {{mod}}",
       "noVersionFor": "{{mod}} no tiene una versión para esta versión de Minecraft y este loader",
       "alreadyInstalled": "{{mod}} ya está instalado",
-      "backupKept": "La actualización falló y no se pudo restaurar la versión anterior. Hay una copia en {{path}}"
+      "backupKept": "La actualización falló y no se pudo restaurar la versión anterior. Hay una copia en {{path}}",
+      "backupKeptBecause": "{{reason}}. No se pudo restaurar la versión anterior; hay una copia en {{path}}"
     }
   }
 }

@@ -168,12 +168,20 @@ const BACKEND_CODES = {
 export class IpcError extends Error {
   readonly code: ClientErrorCode;
   readonly details: string | undefined;
+  /** The backend's `cause`: the failure behind this one, when it sent one. */
+  readonly causeCode: ClientErrorCode | undefined;
 
-  constructor(code: ClientErrorCode, message: string, details?: string) {
+  constructor(
+    code: ClientErrorCode,
+    message: string,
+    details?: string,
+    causeCode?: ClientErrorCode,
+  ) {
     super(message);
     this.name = "IpcError";
     this.code = code;
     this.details = details;
+    this.causeCode = causeCode;
   }
 }
 
@@ -190,7 +198,13 @@ function isAppError(value: unknown): value is AppError {
 /** Normalizes anything a command rejects with into an `IpcError`. */
 export function toIpcError(error: unknown): IpcError {
   if (error instanceof IpcError) return error;
-  if (isAppError(error)) return new IpcError(error.code, error.message, error.details);
+  if (isAppError(error)) {
+    const cause =
+      error.cause !== undefined && Object.hasOwn(BACKEND_CODES, error.cause)
+        ? error.cause
+        : undefined;
+    return new IpcError(error.code, error.message, error.details, cause);
+  }
   return new IpcError("internal", error instanceof Error ? error.message : String(error));
 }
 
