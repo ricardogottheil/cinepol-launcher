@@ -24,6 +24,8 @@ export const PARTIAL_CHECK_STALE_MS = 30 * 1000;
 
 export const instanceModsKey = (instanceId: string) => ["instance-mods", instanceId] as const;
 export const modUpdatesKey = (instanceId: string) => ["mod-updates", instanceId] as const;
+/** The install or update writing an instance's mods, while it runs. */
+export const modWriteKey = (instanceId: string) => ["mod-write", instanceId] as const;
 
 /** One page of mods that run on the instance; off while `enabled` is false (Vanilla). */
 export function useModSearch(search: ModSearch, enabled = true) {
@@ -108,6 +110,7 @@ export function useWriteMod(instanceId: string) {
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const cancelRef = useRef<(() => Promise<boolean>) | null>(null);
   const mutation = useMutation({
+    mutationKey: modWriteKey(instanceId),
     mutationFn: async ({ project, update = false }: ModWrite) => {
       const operation = (update ? updateMod : installMod)(instanceId, project, setProgress);
       cancelRef.current = operation.cancel;

@@ -1,6 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { InstanceDto } from "../../ipc/client";
+import { modWriteKey } from "../mods/useMods";
 import { CINEPOL_SESSION, useInstanceActivity } from "./activityStore";
 import { instancesKey, manualDownloadsKey, serversKey, useManualDownloads } from "./useInstances";
 
@@ -8,8 +9,8 @@ export type PackSource = "modrinth" | "curseforge" | "packwiz";
 
 /**
  * What an instance is doing right now, shared by its row in the list and its
- * own page: the activity, the modpack it follows and the files it still waits
- * for. Mount it once per screen; it refreshes the data the game or an update
+ * own page: the activity (a mod install counts too), the modpack it follows
+ * and the files it still waits for. Mount it once per screen; it refreshes the data the game or an update
  * rewrites.
  */
 export function useInstanceSession(instance: InstanceDto) {
@@ -30,6 +31,9 @@ export function useInstanceSession(instance: InstanceDto) {
   const hasManualFiles = packSource === "packwiz" || packSource === "curseforge";
   const manual = useManualDownloads(instance.id, hasManualFiles);
   const waitingForFiles = (manual.data?.remaining.length ?? 0) > 0;
+  // A mod install or update holds the instance like any other activity,
+  // wherever it was started.
+  const writingMods = useIsMutating({ mutationKey: modWriteKey(instance.id) }) > 0;
 
   const queryClient = useQueryClient();
   const { lastExit, notice } = session;
@@ -48,7 +52,7 @@ export function useInstanceSession(instance: InstanceDto) {
 
   return {
     ...session,
-    busy: session.activity.kind !== "idle",
+    busy: session.activity.kind !== "idle" || writingMods,
     packSource,
     hasManualFiles,
     manual,

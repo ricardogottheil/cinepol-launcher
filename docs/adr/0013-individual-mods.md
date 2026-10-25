@@ -40,7 +40,9 @@ and, in builds with a CurseForge key, from CurseForge.
   (`mod_backup_kept`).
 - **One writer per instance.** Commands that change `mods/` hold the instance
   like a running game (`already_running` otherwise). Install and update are
-  cancellable operations with a progress channel.
+  cancellable operations with a progress channel. The UI mirrors this: while
+  an install or update runs, Play and the other instance actions are off,
+  on the instance's page and in the list alike.
 - **Update checks are on request** (one catalog call per mod). Mods the
   catalog could not answer for are reported as unchecked, never as current.
 - **Two catalogs, one id space.** CurseForge project and file ids are numbers,
