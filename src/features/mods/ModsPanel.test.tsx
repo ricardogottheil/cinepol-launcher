@@ -423,7 +423,9 @@ describe("ModsPanel", () => {
       const done = fill(labels.updatedDone, { mod: "Iris Shaders" });
       expect(await screen.findByText(done)).toBeInTheDocument();
       await vi.advanceTimersByTimeAsync(MOD_NOTICE_MS);
-      expect(screen.queryByText(done)).not.toBeInTheDocument();
+      // The reset reaches React on a later tick, which a slow runner may not
+      // have taken yet.
+      await waitFor(() => expect(screen.queryByText(done)).not.toBeInTheDocument());
     } finally {
       vi.useRealTimers();
     }
