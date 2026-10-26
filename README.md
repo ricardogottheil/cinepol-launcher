@@ -25,13 +25,18 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 
 ## Features
 
-- One click to play on CINEPOL, with live server status.
-- Other servers saved next to CINEPOL, each with its live status and the
-  instance it is played with.
-- Microsoft (premium) and offline profiles, switched from the sidebar; premium
-  profiles can change their skin and cape from the launcher.
+- One click to play on CINEPOL. Home lists the community servers the website
+  publishes (one or more, or none) and the servers you saved, each with its
+  players and ping. Saved servers remember the instance they are played with.
+- Microsoft (premium) and offline profiles, switched from the sidebar. Premium
+  profiles change their skin and cape from the launcher, with a 3D figure to
+  preview the Classic or Slim model and each cape before applying it.
 - Isolated instances with Vanilla, Fabric, Quilt, Forge and NeoForge, each with
-  its own Java, memory, JVM arguments and window size.
+  its own page (Servers, Mods, Settings and Log tabs), Java, memory, JVM
+  arguments, window size and a button to open its game folder.
+- Single mods from Modrinth or CurseForge, searched for the instance's
+  Minecraft version and loader and installed with the dependencies they need.
+  Turn them on or off, remove them, or update them to a compatible version.
 - Modpacks from Modrinth (`.mrpack`), CurseForge (catalog or `.zip`) and
   packwiz, kept up to date without touching the player's own changes. Files
   whose authors forbid third-party downloads are picked up from the
@@ -39,11 +44,11 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 - Automatic Java runtime management.
 - A server list editor, a log viewer with level and text filters, and crash
   reports one click away.
-- Signed automatic updates.
+- Signed automatic updates: a notice in the sidebar opens a page with what's
+  new and installs the update.
 - Windows, macOS and Linux.
 
-The roadmap is split in milestones; see `AGENTS.md` for the architecture and
-`docs/adr/` for the decisions.
+See `AGENTS.md` for the architecture and `docs/adr/` for the decisions.
 
 ## Development
 
