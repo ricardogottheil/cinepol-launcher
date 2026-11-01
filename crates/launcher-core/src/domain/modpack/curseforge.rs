@@ -277,6 +277,7 @@ pub fn resolve_files(
                 checksum,
                 project_id: project.id,
                 file_id: file.id,
+                disabled: false,
             }),
         }
     }
@@ -557,6 +558,7 @@ mod tests {
                 checksum: Checksum::parse(HashAlgorithm::Sha1, SHA1).unwrap(),
                 project_id: 448233,
                 file_id: 9100313,
+                disabled: false,
             }]
         );
     }

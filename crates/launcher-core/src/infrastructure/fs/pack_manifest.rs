@@ -47,6 +47,9 @@ struct PendingRecord {
     hash: String,
     project_id: u64,
     file_id: u64,
+    /// Installed as `<path>.disabled`; absent (false) in older manifests.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    disabled: bool,
 }
 
 fn algorithm_name(algorithm: HashAlgorithm) -> &'static str {
@@ -68,6 +71,7 @@ impl PendingRecord {
             hash: file.checksum.value().to_owned(),
             project_id: file.project_id,
             file_id: file.file_id,
+            disabled: file.disabled,
         }
     }
 
@@ -100,6 +104,7 @@ impl PendingRecord {
             checksum,
             project_id: self.project_id,
             file_id: self.file_id,
+            disabled: self.disabled,
         })
     }
 }
@@ -153,7 +158,7 @@ fn parse(path: &Path, bytes: &[u8]) -> Result<PackManifest, PackFileError> {
             }
             Err(_) => tracing::warn!(
                 manifest = %path.display(),
-                entry = %raw_path,
+                entry = ?raw_path,
                 "skipping an unreadable project entry"
             ),
         }
@@ -269,6 +274,7 @@ mod tests {
             checksum: Checksum::parse(HashAlgorithm::Murmur2, "3608199863").unwrap(),
             project_id: 238_222,
             file_id: 8_367_520,
+            disabled: false,
         }
     }
 
@@ -345,6 +351,37 @@ mod tests {
                 "modrinth:b".to_owned()
             )]
             .into()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_pending_file_to_arrive_turned_off_round_trips() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = store(dir.path());
+        let manifest = PackManifest {
+            pending: vec![
+                ManualFile {
+                    disabled: true,
+                    ..jei()
+                },
+                ManualFile {
+                    path: RelativePath::parse("mods/other.jar").unwrap(),
+                    ..jei()
+                },
+            ],
+            ..PackManifest::default()
+        };
+        store.save(&id(), &manifest).await.unwrap();
+        assert_eq!(store.load(&id()).await.unwrap(), manifest);
+        let path = LauncherPaths::new(dir.path())
+            .instance_dir(&id())
+            .join("pack-manifest.json");
+        let saved: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(saved["pending"][0]["disabled"], true);
+        assert!(
+            saved["pending"][1].get("disabled").is_none(),
+            "written only when set"
         );
     }
 

@@ -259,6 +259,7 @@ impl Metafile {
                     checksum: checksum.clone(),
                     project_id,
                     file_id,
+                    disabled: false,
                 })
             }
             Some(other) => return Err(PackwizError::UnsupportedMode(other.to_owned())),

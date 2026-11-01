@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-use crate::application::modpack_files::has_checksum;
+use crate::application::modpack_files::{disabled_twin, has_checksum};
 use crate::domain::instance::InstanceId;
 use crate::domain::launch::LauncherPaths;
 use crate::domain::modpack::sync::ManualFile;
@@ -55,7 +55,12 @@ where
     let game_dir = deps.paths.game_dir(id);
     let mut outcome = ManualDownloads::default();
     for file in std::mem::take(&mut manifest.pending) {
-        let target = file.path.under(&game_dir);
+        let plain = file.path.under(&game_dir);
+        let target = if file.disabled {
+            disabled_twin(&plain)
+        } else {
+            plain
+        };
         // The player may have put it in the game folder directly.
         let mut installed = has_checksum(deps.files, &target, &file.checksum).await?;
         // A different file already at the path is the player's: never replace
@@ -163,6 +168,7 @@ mod tests {
             .unwrap(),
             project_id: 238_222,
             file_id: 1,
+            disabled: false,
         }
     }
 
@@ -246,6 +252,29 @@ mod tests {
         assert_eq!(outcome.remaining, [jei]);
         assert!(world.read_game_file(ID, "mods/jei.jar").is_none());
         assert_eq!(manifest(&world), before);
+    }
+
+    #[tokio::test]
+    async fn a_file_to_arrive_turned_off_is_installed_turned_off() {
+        let jei = ManualFile {
+            disabled: true,
+            ..manual("mods/jei.jar", b"jei")
+        };
+        let world = world_with(vec![jei.clone()]);
+        let dir = downloads(&world, &[("jei.jar", b"jei")]);
+
+        let outcome = resolve(&world, &dir).await;
+
+        assert_eq!(outcome.resolved, [jei]);
+        assert!(world.read_game_file(ID, "mods/jei.jar").is_none());
+        assert_eq!(
+            world.read_game_file(ID, "mods/jei.jar.disabled").unwrap(),
+            b"jei"
+        );
+        assert_eq!(
+            manifest(&world).files[&rel("mods/jei.jar")],
+            sha1_hex(b"jei")
+        );
     }
 
     #[tokio::test]

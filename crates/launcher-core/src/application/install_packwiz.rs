@@ -414,6 +414,11 @@ pub(crate) mod fixtures {
 
     /// A CurseForge metafile for `filename` (whose content is `bytes`).
     pub fn curseforge(filename: &str, bytes: &[u8]) -> RawMetafile {
+        curseforge_file(5_101_366, filename, bytes)
+    }
+
+    /// Like [`curseforge`], for the JEI project's file `file_id`.
+    pub fn curseforge_file(file_id: u64, filename: &str, bytes: &[u8]) -> RawMetafile {
         RawMetafile {
             name: "Just Enough Items".into(),
             filename: filename.into(),
@@ -422,7 +427,7 @@ pub(crate) mod fixtures {
             hash_format: "murmur2".into(),
             hash: curseforge_fingerprint(bytes).to_string(),
             mode: Some("metadata:curseforge".into()),
-            curseforge: Some((238_222, 5_101_366)),
+            curseforge: Some((238_222, file_id)),
         }
     }
 

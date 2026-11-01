@@ -44,7 +44,10 @@ their own, and an update must not throw that work away.
   URL, or `curseforge:<projectId>`; optional, so older manifests load and
   older launchers ignore it; an unreadable entry is skipped), so when a new
   version renames the file of a mod the player turned off, the new file
-  arrives turned off too. A pack file the
+  arrives turned off too; a renamed file the player must download by hand
+  stays pending with a `disabled` mark and is installed as `<name>.disabled`.
+  A manifest written before `projects` existed cannot follow a rename on its
+  first update (the new file arrives on); later updates can. A pack file the
   player deleted outright comes back. Every file is
   downloaded and verified in a staging folder first, so a network failure leaves
   the game folder as it was; only local moves and deletions follow. The

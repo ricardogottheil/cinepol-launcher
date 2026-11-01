@@ -133,9 +133,12 @@ mod tests {
     use crate::application::modpack_files::fixtures::{FailingDownloader, World, rel};
     use crate::domain::loader::LoaderSpec;
     use crate::domain::modpack::ModpackRef;
+    use crate::domain::modpack::curseforge::CurseForgeFile;
     use crate::domain::modpack::packwiz::RawIndexEntry;
     use crate::domain::mods::DISABLED_SUFFIX;
-    use crate::testing::{FakeDownloader, FakePackwizSource, RecordingReporter, sha1_hex};
+    use crate::testing::{
+        FakeCurseForge, FakeDownloader, FakePackwizSource, RecordingReporter, sha1_hex,
+    };
 
     const ID: &str = "cinepol-pack";
 
@@ -496,6 +499,138 @@ mod tests {
             world.read_game_file(ID, "mods/sodium.jar").unwrap(),
             b"sodium 2"
         );
+    }
+
+    #[tokio::test]
+    async fn a_new_pack_mod_never_replaces_the_players_own_turned_off_copy() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        update_to(&world, None).await;
+        world.write_game_file(ID, "mods/sodium.jar.disabled", b"player build");
+
+        let updated = update_to(&world, Some(("sodium.jar", b"sodium 2"))).await;
+
+        assert_eq!(updated.files.kept, 1);
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+        assert_eq!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .unwrap(),
+            b"player build"
+        );
+    }
+
+    /// Version 1.0 with JEI from CurseForge as file `file_id` named
+    /// `filename`, and a catalog that serves it (or lists it without a
+    /// download URL when `manual`).
+    fn v1_with_jei(
+        file_id: u64,
+        filename: &str,
+        bytes: &[u8],
+        manual: bool,
+    ) -> (FakePackwizSource, FakeDownloader, FakeCurseForge) {
+        let source = source(
+            pack_toml(Some("1.0.2"), "1.21.1"),
+            vec![
+                plain("config/a.toml", b"a1"),
+                plain("config/b.toml", b"b1"),
+                preserved("config/keep.toml", b"k1"),
+                meta("mods/sodium.pw.toml"),
+                meta("mods/jei.pw.toml"),
+            ],
+            vec![
+                (
+                    "mods/sodium.pw.toml",
+                    modrinth("sodium.jar", b"sodium", "both"),
+                ),
+                (
+                    "mods/jei.pw.toml",
+                    curseforge_file(file_id, filename, bytes),
+                ),
+            ],
+        );
+        let url = format!("https://edge.forgecdn.net/files/{file_id}/{filename}");
+        let downloader = FakeDownloader::with([(url.clone(), bytes.to_vec())]);
+        let catalog = FakeCurseForge {
+            files: vec![CurseForgeFile {
+                id: file_id,
+                project_id: 238_222,
+                file_name: filename.into(),
+                length: Some(bytes.len() as u64),
+                sha1: Some(sha1_hex(bytes)),
+                download_url: (!manual).then_some(url),
+            }],
+            ..FakeCurseForge::default()
+        };
+        (source, downloader, catalog)
+    }
+
+    async fn update_with_jei(
+        world: &World,
+        file_id: u64,
+        filename: &str,
+        bytes: &[u8],
+        manual: bool,
+    ) -> UpdatedPackwiz {
+        let (source, downloader, catalog) = v1_with_jei(file_id, filename, bytes, manual);
+        let deps = UpdatePackwizDeps {
+            instances: &world.instances,
+            source: &source,
+            curseforge: &catalog,
+            files: file_deps(world, &downloader),
+        };
+        update_packwiz(
+            &id(),
+            &deps,
+            &RecordingReporter::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_renamed_curseforge_mod_the_player_disabled_arrives_disabled() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        update_with_jei(&world, 1, "jei-1.jar", b"jei 1", false).await;
+        disable(&world, "mods/jei-1.jar");
+
+        update_with_jei(&world, 2, "jei-2.jar", b"jei 2", false).await;
+
+        assert!(world.read_game_file(ID, "mods/jei-2.jar").is_none());
+        assert_eq!(
+            world.read_game_file(ID, "mods/jei-2.jar.disabled").unwrap(),
+            b"jei 2"
+        );
+        assert!(
+            world
+                .read_game_file(ID, "mods/jei-1.jar.disabled")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_renamed_manual_mod_the_player_disabled_waits_to_arrive_disabled() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        update_with_jei(&world, 1, "jei-1.jar", b"jei 1", false).await;
+        disable(&world, "mods/jei-1.jar");
+
+        let updated = update_with_jei(&world, 2, "jei-2.jar", b"jei 2", true).await;
+
+        assert_eq!(updated.pending.len(), 1);
+        assert_eq!(updated.pending[0].path, rel("mods/jei-2.jar"));
+        assert!(updated.pending[0].disabled, "arrives turned off");
+        assert!(
+            world
+                .read_game_file(ID, "mods/jei-1.jar.disabled")
+                .is_none()
+        );
+
+        // Still pending on the next sync, still to arrive turned off.
+        let again = update_with_jei(&world, 2, "jei-2.jar", b"jei 2", true).await;
+        assert!(again.pending[0].disabled);
     }
 
     #[tokio::test]

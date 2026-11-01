@@ -41,6 +41,9 @@ pub struct ManualFile {
     pub checksum: Checksum,
     pub project_id: u64,
     pub file_id: u64,
+    /// Installed as `<path>.disabled`: a new file of a mod the player turned
+    /// off, so it arrives turned off.
+    pub disabled: bool,
 }
 
 impl ManualFile {
@@ -136,6 +139,22 @@ pub fn curseforge_project(project_id: u64) -> String {
     format!("curseforge:{project_id}")
 }
 
+/// The mods the player turned off whose file the new version no longer wants
+/// (`is_wanted`): a renamed file of the same mod arrives turned off too.
+pub fn turned_off_projects<'a>(
+    previous: &'a PackManifest,
+    is_wanted: impl Fn(&RelativePath) -> bool,
+    disabled: &BTreeMap<RelativePath, String>,
+) -> BTreeSet<&'a str> {
+    previous
+        .files
+        .keys()
+        .filter(|path| !is_wanted(path) && disabled.contains_key(*path))
+        .filter_map(|path| previous.projects.get(path))
+        .map(String::as_str)
+        .collect()
+}
+
 /// Plans an install (empty `previous`) or an update.
 ///
 /// `on_disk` holds the current sha1 of every path in `previous` and `incoming`
@@ -153,15 +172,7 @@ pub fn plan_sync(
     let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
     let wanted: BTreeMap<&RelativePath, &IncomingFile> =
         incoming.iter().map(|file| (&file.path, file)).collect();
-    // Mods the player turned off whose file the new version no longer has:
-    // a renamed file of the same mod arrives turned off too.
-    let renamed_off: BTreeSet<&str> = previous
-        .files
-        .keys()
-        .filter(|path| !wanted.contains_key(path) && disabled.contains_key(*path))
-        .filter_map(|path| previous.projects.get(path))
-        .map(String::as_str)
-        .collect();
+    let renamed_off = turned_off_projects(previous, |path| wanted.contains_key(path), disabled);
 
     let mut plan = SyncPlan::default();
     for (path, file) in &wanted {

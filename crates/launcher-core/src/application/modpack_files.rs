@@ -8,7 +8,7 @@
 //! local copies land in a staging folder and are verified there, and only
 //! then are files moved into the game folder.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
@@ -20,6 +20,7 @@ use crate::domain::launch::{LauncherPaths, RelativePath};
 use crate::domain::modpack::mrpack::MrpackIndex;
 use crate::domain::modpack::sync::{
     EntrySource, IncomingFile, ManualFile, PackEntry, PackManifest, curseforge_project, plan_sync,
+    turned_off_projects,
 };
 use crate::domain::modpack::{
     ModpackFile, MrpackArchive, PackFileError, PackFiles, PackManifestStore,
@@ -286,7 +287,7 @@ where
 const UNWRITTEN: &str = "unwritten";
 
 /// `<path>.disabled`, where turning a mod off moves it.
-fn disabled_twin(path: &Path) -> PathBuf {
+pub(crate) fn disabled_twin(path: &Path) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(DISABLED_SUFFIX);
     PathBuf::from(name)
@@ -383,6 +384,19 @@ where
             }
             _ => pending.push(file.clone()),
         }
+    }
+
+    // A pending file of a mod the player turned off arrives turned off once
+    // downloaded, and keeps that mark while it stays pending.
+    let wanted: BTreeSet<&RelativePath> = incoming.iter().map(|file| &file.path).collect();
+    let turned_off = turned_off_projects(previous, |path| wanted.contains(path), &disabled);
+    for file in &mut pending {
+        let was_off = previous
+            .pending
+            .iter()
+            .any(|old| old.path == file.path && old.disabled);
+        file.disabled =
+            was_off || turned_off.contains(curseforge_project(file.project_id).as_str());
     }
 
     let plan = plan_sync(previous, &incoming, &on_disk, &disabled);
@@ -837,6 +851,7 @@ mod tests {
             .unwrap(),
             project_id: 238_222,
             file_id: 1,
+            disabled: false,
         }
     }
 
