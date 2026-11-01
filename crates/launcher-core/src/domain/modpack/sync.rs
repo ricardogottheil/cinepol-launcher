@@ -140,19 +140,24 @@ pub fn curseforge_project(project_id: u64) -> String {
 }
 
 /// The mods the player turned off whose file the new version no longer wants
-/// (`is_wanted`): a renamed file of the same mod arrives turned off too.
-pub fn turned_off_projects<'a>(
-    previous: &'a PackManifest,
+/// (`is_wanted`), and those still waiting as a manual download marked to
+/// arrive turned off: a new file of the same mod arrives turned off too.
+pub fn turned_off_projects(
+    previous: &PackManifest,
     is_wanted: impl Fn(&RelativePath) -> bool,
     disabled: &BTreeMap<RelativePath, String>,
-) -> BTreeSet<&'a str> {
-    previous
+) -> BTreeSet<String> {
+    let renamed = previous
         .files
         .keys()
         .filter(|path| !is_wanted(path) && disabled.contains_key(*path))
-        .filter_map(|path| previous.projects.get(path))
-        .map(String::as_str)
-        .collect()
+        .filter_map(|path| previous.projects.get(path).cloned());
+    let pending = previous
+        .pending
+        .iter()
+        .filter(|file| file.disabled)
+        .map(|file| curseforge_project(file.project_id));
+    renamed.chain(pending).collect()
 }
 
 /// Plans an install (empty `previous`) or an update.

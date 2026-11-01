@@ -635,6 +635,13 @@ mod tests {
         let renamed = update_with_jei(&world, 3, "jei-3.jar", b"jei 3", true).await;
         assert_eq!(renamed.pending[0].path, rel("mods/jei-3.jar"));
         assert!(renamed.pending[0].disabled);
+        // Once CurseForge serves it, it is downloaded turned off.
+        update_with_jei(&world, 3, "jei-3.jar", b"jei 3", false).await;
+        assert!(world.read_game_file(ID, "mods/jei-3.jar").is_none());
+        assert_eq!(
+            world.read_game_file(ID, "mods/jei-3.jar.disabled").unwrap(),
+            b"jei 3"
+        );
     }
 
     #[tokio::test]
