@@ -34,7 +34,10 @@ their own, and an update must not throw that work away.
   `pack-manifest.json` with the path and sha1 of every file the pack installed.
   The pure `plan_sync` writes a file only when it is missing or still matches
   the recorded hash, leaves files the player changed or added alone, and
-  removes dropped pack files only while they are intact. Every file is
+  removes dropped pack files only while they are intact. A pack file the
+  player turned off (`<name>.disabled` next to a missing `<name>`) counts as
+  the player's change: it is not downloaded again, so it stays off. A pack
+  file the player deleted outright comes back. Every file is
   downloaded and verified in a staging folder first, so a network failure leaves
   the game folder as it was; only local moves and deletions follow. The
   manifest is saved only after the whole sync succeeded, so a failed update can

@@ -308,6 +308,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_pack_mod_the_player_disabled_stays_disabled() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        // What turning a mod off does: rename it to `<name>.disabled`.
+        let sodium = world.read_game_file(ID, "mods/sodium.jar").unwrap();
+        world.write_game_file(ID, "mods/sodium.jar.disabled", &sodium);
+        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
+
+        let (source, downloader) = v1();
+        let updated = update(&world, &source, &downloader, &CancellationToken::new())
+            .await
+            .unwrap();
+
+        assert!(
+            world.read_game_file(ID, "mods/sodium.jar").is_none(),
+            "not enabled again"
+        );
+        assert_eq!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .unwrap(),
+            b"sodium"
+        );
+        assert!(downloader.requests().is_empty(), "nothing downloaded");
+        assert_eq!(updated.files.kept, 1);
+    }
+
+    #[tokio::test]
+    async fn a_pack_mod_the_player_deleted_comes_back() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
+
+        let (source, downloader) = v1();
+        update(&world, &source, &downloader, &CancellationToken::new())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            world.read_game_file(ID, "mods/sodium.jar").unwrap(),
+            b"sodium"
+        );
+    }
+
+    #[tokio::test]
     async fn an_unchanged_pack_downloads_nothing() {
         let world = World::new(vec![]);
         install_v1(&world).await;

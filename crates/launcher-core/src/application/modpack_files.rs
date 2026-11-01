@@ -24,6 +24,7 @@ use crate::domain::modpack::sync::{
 use crate::domain::modpack::{
     ModpackFile, MrpackArchive, PackFileError, PackFiles, PackManifestStore,
 };
+use crate::domain::mods::DISABLED_SUFFIX;
 use crate::domain::ports::{
     DownloadError, DownloadRequest, Downloader, FileSystem, FileSystemError, ProgressReporter,
     ProgressStage, StagedReporter,
@@ -282,6 +283,18 @@ where
 /// a real sha1, so the planner writes the file unless the player changed it.
 const UNWRITTEN: &str = "unwritten";
 
+/// Stands in for the sha1 of a file the player turned off (renamed to
+/// `<name>.disabled`): it never matches a real sha1, so the planner treats it
+/// as the player's change and neither writes nor removes it.
+const DISABLED_BY_PLAYER: &str = "disabled-by-player";
+
+/// `<path>.disabled`, where turning a mod off moves it.
+fn disabled_twin(path: &Path) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(DISABLED_SUFFIX);
+    PathBuf::from(name)
+}
+
 /// The shared pipeline; `staging` exists and is released by the caller.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn sync_into<D, F, P, M, R>(
@@ -319,7 +332,11 @@ where
         .chain(manual.iter().map(|f| &f.path));
     for path in previous.files.keys().chain(wanted) {
         if !on_disk.contains_key(path) {
-            let sha1 = deps.files.sha1(&path.under(&game_dir)).await?;
+            let target = path.under(&game_dir);
+            let mut sha1 = deps.files.sha1(&target).await?;
+            if sha1.is_none() && deps.files.sha1(&disabled_twin(&target)).await?.is_some() {
+                sha1 = Some(DISABLED_BY_PLAYER.to_owned());
+            }
             on_disk.insert(path.clone(), sha1);
         }
     }
