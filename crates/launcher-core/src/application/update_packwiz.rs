@@ -470,6 +470,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_turned_off_mod_the_player_changed_is_untracked_until_deleted() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
+        world.write_game_file(ID, "mods/sodium.jar.disabled", b"player build");
+
+        let updated = update_to(&world, Some(("sodium.jar", b"sodium 2"))).await;
+
+        assert_eq!(updated.files.kept, 1);
+        assert_eq!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .unwrap(),
+            b"player build"
+        );
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+        let manifest = world.manifests.load(&id()).await.unwrap();
+        assert!(!manifest.files.contains_key(&rel("mods/sodium.jar")));
+
+        // Once the player deletes their copy, the pack's version comes back.
+        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar.disabled")).unwrap();
+        update_to(&world, Some(("sodium.jar", b"sodium 2"))).await;
+        assert_eq!(
+            world.read_game_file(ID, "mods/sodium.jar").unwrap(),
+            b"sodium 2"
+        );
+    }
+
+    #[tokio::test]
     async fn an_intact_disabled_mod_the_pack_drops_is_removed() {
         let world = World::new(vec![]);
         install_v1(&world).await;

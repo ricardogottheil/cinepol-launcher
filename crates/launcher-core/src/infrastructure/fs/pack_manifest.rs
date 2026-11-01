@@ -144,10 +144,19 @@ fn parse(path: &Path, bytes: &[u8]) -> Result<PackManifest, PackFileError> {
             .map_err(|error| io_error(path, format!("{raw_path}: {error}")))?;
         manifest.files.insert(relative, sha1.value().to_owned());
     }
+    // Only a hint for following renamed mods: a bad entry is dropped rather
+    // than blocking every later update of the instance.
     for (raw_path, project) in record.projects {
-        let relative = RelativePath::parse(&raw_path)
-            .map_err(|_| io_error(path, format!("unsafe file path {raw_path:?}")))?;
-        manifest.projects.insert(relative, project);
+        match RelativePath::parse(&raw_path) {
+            Ok(relative) => {
+                manifest.projects.insert(relative, project);
+            }
+            Err(_) => tracing::warn!(
+                manifest = %path.display(),
+                entry = %raw_path,
+                "skipping an unreadable project entry"
+            ),
+        }
     }
     manifest.pending = record
         .pending
@@ -184,6 +193,7 @@ impl PackManifestStore for JsonPackManifestStore {
             projects: manifest
                 .projects
                 .iter()
+                .filter(|(relative, _)| manifest.files.contains_key(*relative))
                 .map(|(relative, project)| (relative.to_string(), project.clone()))
                 .collect(),
         };
@@ -318,6 +328,46 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, body).unwrap();
         store(dir.path()).load(&id()).await
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_project_entry_is_skipped_not_fatal() {
+        let sha1 = "a".repeat(40);
+        let body = format!(
+            r#"{{"schemaVersion":1,"files":{{"mods/a.jar":"{sha1}","mods/b.jar":"{sha1}"}},"projects":{{"../evil.jar":"modrinth:x","mods/b.jar":"modrinth:b"}}}}"#
+        );
+        let manifest = load_raw(&body).await.unwrap();
+        assert_eq!(manifest.files.len(), 2);
+        assert_eq!(
+            manifest.projects,
+            [(
+                RelativePath::parse("mods/b.jar").unwrap(),
+                "modrinth:b".to_owned()
+            )]
+            .into()
+        );
+    }
+
+    #[tokio::test]
+    async fn saves_projects_only_for_recorded_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = store(dir.path());
+        let a = RelativePath::parse("mods/a.jar").unwrap();
+        let gone = RelativePath::parse("mods/gone.jar").unwrap();
+        let manifest = PackManifest {
+            files: [(a.clone(), "a".repeat(40))].into(),
+            projects: [
+                (a.clone(), "modrinth:a".to_owned()),
+                (gone, "modrinth:gone".to_owned()),
+            ]
+            .into(),
+            ..PackManifest::default()
+        };
+        store.save(&id(), &manifest).await.unwrap();
+        assert_eq!(
+            store.load(&id()).await.unwrap().projects,
+            [(a, "modrinth:a".to_owned())].into()
+        );
     }
 
     #[tokio::test]
