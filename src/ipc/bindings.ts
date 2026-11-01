@@ -304,6 +304,7 @@ export interface Commands {
   get_account_skin: { args: { accountId: string }; result: SkinDto | null };
   change_account_skin: { args: { accountId: string; pngBase64: string; variant: string }; result: null };
   list_account_capes: { args: { accountId: string }; result: CapeDto[] };
+  refresh_account_profile: { args: { accountId: string }; result: AccountDto };
   set_account_cape: { args: { accountId: string; capeId: string | null }; result: null };
   set_active_account: { args: { accountId: string }; result: null };
   list_game_versions: { args: { includeSnapshots: boolean }; result: GameVersionsDto };

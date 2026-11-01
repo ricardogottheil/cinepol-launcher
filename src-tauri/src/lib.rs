@@ -63,6 +63,7 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::saved_servers::ping_server,
             commands::accounts::change_account_skin,
             commands::accounts::list_account_capes,
+            commands::accounts::refresh_account_profile,
             commands::accounts::set_account_cape,
             commands::accounts::set_active_account,
             commands::versions::list_game_versions,

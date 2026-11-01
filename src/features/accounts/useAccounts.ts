@@ -8,6 +8,7 @@ import {
   getAccountSkin,
   listAccountCapes,
   listAccounts,
+  refreshAccountProfile,
   removeAccount,
   setAccountCape,
   setActiveAccount,
@@ -81,6 +82,24 @@ export function useChangeSkin(accountId: string) {
       changeAccountSkin(accountId, pngBase64, slim ? "slim" : "classic"),
     retry: false,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["account-skin", accountId] }),
+  });
+}
+
+/**
+ * Reads the name, skin and capes again from Mojang, for changes made outside
+ * the launcher. Never retried: Mojang limits requests in a row.
+ */
+export function useRefreshAccountProfile(accountId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => refreshAccountProfile(accountId),
+    retry: false,
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: accountsKey }),
+        queryClient.invalidateQueries({ queryKey: ["account-skin", accountId] }),
+        queryClient.invalidateQueries({ queryKey: ["account-capes", accountId] }),
+      ]),
   });
 }
 

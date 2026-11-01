@@ -190,6 +190,11 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             format!("{}[]", CapeDto::name(cfg)),
         ),
         command(
+            "refresh_account_profile",
+            vec![("accountId", string())],
+            AccountDto::name(cfg),
+        ),
+        command(
             "set_account_cape",
             vec![
                 ("accountId", string()),
@@ -601,6 +606,7 @@ mod tests {
             "get_account_skin",
             "change_account_skin",
             "list_account_capes",
+            "refresh_account_profile",
             "set_account_cape",
             "set_active_account",
             "list_game_versions",

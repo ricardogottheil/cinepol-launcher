@@ -21,6 +21,7 @@ use launcher_core::application::list_loader_versions::ListLoaderVersionsError;
 use launcher_core::application::login_microsoft::LoginError;
 use launcher_core::application::modpack_files::PackSyncError;
 use launcher_core::application::preview_mod_install::PreviewModInstallError;
+use launcher_core::application::refresh_account_profile::RefreshAccountProfileError;
 use launcher_core::application::refresh_session::SessionError;
 use launcher_core::application::remove_account::RemoveAccountError;
 use launcher_core::application::remove_mod::RemoveModError;
@@ -462,6 +463,18 @@ impl From<AccountCapesError> for AppError {
             AccountCapesError::NotMicrosoft => ErrorCode::InvalidInput,
             AccountCapesError::Session(session) => session_code(session),
             AccountCapesError::Storage(_) => ErrorCode::Internal,
+        };
+        Self::new(code, error.to_string())
+    }
+}
+
+impl From<RefreshAccountProfileError> for AppError {
+    fn from(error: RefreshAccountProfileError) -> Self {
+        let code = match &error {
+            RefreshAccountProfileError::NotFound => ErrorCode::NotFound,
+            RefreshAccountProfileError::NotMicrosoft => ErrorCode::InvalidInput,
+            RefreshAccountProfileError::Session(session) => session_code(session),
+            RefreshAccountProfileError::Storage(_) => ErrorCode::Internal,
         };
         Self::new(code, error.to_string())
     }

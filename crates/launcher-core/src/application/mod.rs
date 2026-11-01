@@ -38,6 +38,7 @@ pub mod plan_mod_install;
 pub mod play_on_cinepol;
 pub mod prepare_cinepol_instance;
 pub mod preview_mod_install;
+pub mod refresh_account_profile;
 pub mod refresh_session;
 pub mod remove_account;
 pub mod remove_mod;

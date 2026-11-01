@@ -8,7 +8,13 @@ import { SpecSheet } from "../../components/ui/SpecSheet";
 import { type AccountDto, toIpcError } from "../../ipc/client";
 import { SkinViewer } from "./SkinViewer";
 import { type CapeChoice, CapePicker, SkinChanger, type SkinDraft } from "./SkinWardrobe";
-import { useAccountCapes, useAccountSkin, useAccounts, useRemoveAccount } from "./useAccounts";
+import {
+  useAccountCapes,
+  useAccountSkin,
+  useAccounts,
+  useRefreshAccountProfile,
+  useRemoveAccount,
+} from "./useAccounts";
 
 /** Deleting reads in `hazard` and asks first, like deleting an instance. */
 function RemoveProfile({ account }: { account: AccountDto }) {
@@ -42,6 +48,32 @@ function RemoveProfile({ account }: { account: AccountDto }) {
           <p className="m-0">{t("accounts.removeBody")}</p>
         </ConfirmDialog>
       ) : null}
+    </div>
+  );
+}
+
+/** Reads the profile again from Mojang, for a skin or name changed elsewhere. */
+function RefreshProfile({ accountId }: { accountId: string }) {
+  const { t } = useTranslation();
+  const refresh = useRefreshAccountProfile(accountId);
+  let status: string | null = null;
+  if (refresh.isPending) status = t("accounts.refreshing");
+  else if (refresh.error) status = t(`errors.${toIpcError(refresh.error).code}`);
+  else if (refresh.isSuccess) status = t("accounts.refreshed");
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => refresh.mutate()} disabled={refresh.isPending}>
+          {t("accounts.refresh")}
+        </Button>
+        <p
+          role="status"
+          className={`m-0 text-[0.875rem] ${refresh.error ? "text-stale" : "text-silk-dim"}`}
+        >
+          {status}
+        </p>
+      </div>
+      <p className="m-0 text-[0.875rem] text-silk-dim">{t("accounts.refreshHint")}</p>
     </div>
   );
 }
@@ -92,6 +124,7 @@ function Profile({ account }: { account: AccountDto }) {
         />
         {premium ? (
           <>
+            <RefreshProfile accountId={account.id} />
             <SkinChanger
               accountId={account.id}
               slim={slim}

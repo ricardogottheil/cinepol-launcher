@@ -32,6 +32,12 @@ rate-limited skin uploads can lead to an account suspension.
   skin keeps the stored one. Capes are never stored:
   the profile page reads them live from `GET /minecraft/profile`, with their
   textures, and a cape whose texture fails to download is still listed.
+- **Refresh.** The stored skin link and name only change on sign-in or an
+  upload from the launcher, so changes made elsewhere (minecraft.net, another
+  launcher) do not show by themselves. "Refresh profile" on the profile page
+  (`refresh_account_profile`) reads `GET /minecraft/profile` once, never
+  retried, and stores the name and skin it reports into the account as stored
+  after the request; a profile without a skin clears the stored one.
 - **Transport.** `HttpRequester` gained `PUT`, `DELETE` and a
   `multipart/form-data` body, encoded by the launcher (RFC 7578) instead of
   enabling reqwest's `multipart` feature. Field names, file names and media

@@ -5,6 +5,7 @@ use launcher_core::application::check_premium_name::check_premium_name as check;
 use launcher_core::application::create_offline_profile::create_offline_profile;
 use launcher_core::application::list_accounts::list_accounts as list;
 use launcher_core::application::login_microsoft::{LoginDeps, login_microsoft as login};
+use launcher_core::application::refresh_account_profile::refresh_account_profile as refresh;
 use launcher_core::application::remove_account::remove_account as remove;
 use launcher_core::application::select_account::{SelectAccountError, select_account};
 use launcher_core::application::set_cape::set_cape as wear;
@@ -172,6 +173,19 @@ pub async fn list_account_capes(
     let auth = state.msa.as_ref().ok_or_else(not_configured)?;
     let capes = capes(id, &state.accounts, &state.sessions(), auth).await?;
     Ok(capes.iter().map(CapeDto::from).collect())
+}
+
+/// Reads the account's name and skin again from Mojang and stores them, so
+/// changes made outside the launcher show up.
+#[tauri::command]
+pub async fn refresh_account_profile(
+    state: State<'_, AppState>,
+    account_id: String,
+) -> Result<AccountDto, AppError> {
+    let id = parse_account_id(&account_id)?;
+    let auth = state.msa.as_ref().ok_or_else(not_configured)?;
+    let account = refresh(id, &state.accounts, &state.sessions(), auth).await?;
+    Ok(AccountDto::from(&account))
 }
 
 /// Wears an owned cape (`capeId`), or none for `null`.

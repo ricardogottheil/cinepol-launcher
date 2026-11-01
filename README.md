@@ -30,7 +30,8 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
   players and ping. Saved servers remember the instance they are played with.
 - Microsoft (premium) and offline profiles, switched from the sidebar. Premium
   profiles change their skin and cape from the launcher, with a 3D figure to
-  preview the Classic or Slim model and each cape before applying it.
+  preview the Classic or Slim model and each cape before applying it, and
+  refresh their name and skin after changing them outside the launcher.
 - Isolated instances with Vanilla, Fabric, Quilt, Forge and NeoForge, each with
   its own page (Servers, Mods, Settings and Log tabs), Java, memory, JVM
   arguments, window size and a button to open its game folder.

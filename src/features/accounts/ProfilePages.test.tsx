@@ -20,6 +20,7 @@ const client = vi.hoisted(() => ({
   changeAccountSkin: vi.fn(),
   listAccountCapes: vi.fn(),
   setAccountCape: vi.fn(),
+  refreshAccountProfile: vi.fn(),
 }));
 
 vi.mock("./SkinViewer", () => ({
@@ -186,6 +187,44 @@ describe("profile page", () => {
     renderAt("/profile");
     expect(await screen.findByRole("heading", { level: 1, name: "Steve" })).toBeInTheDocument();
     expect(screen.getByText(labels.skinOffline)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.refresh })).not.toBeInTheDocument();
+  });
+
+  it("refreshes a Microsoft profile from Mojang and shows the new name and skin", async () => {
+    client.listAccounts.mockResolvedValue({ accounts: [premium], activeId: "9" });
+    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,OLD", slim: false });
+    renderAt("/profile");
+    const viewer = await screen.findByRole("img", { name: labels.skinLabel });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-texture", "data:image/png;base64,OLD"),
+    );
+
+    const renamed = { ...premium, username: "Polispol2" };
+    client.refreshAccountProfile.mockResolvedValue(renamed);
+    client.listAccounts.mockResolvedValue({ accounts: [renamed], activeId: "9" });
+    client.getAccountSkin.mockResolvedValue({ dataUrl: "data:image/png;base64,NEW", slim: true });
+    fireEvent.click(screen.getByRole("button", { name: labels.refresh }));
+
+    expect(await screen.findByText(labels.refreshed)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Polispol2" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("img", { name: labels.skinLabel })).toHaveAttribute(
+        "data-texture",
+        "data:image/png;base64,NEW",
+      ),
+    );
+    expect(client.refreshAccountProfile).toHaveBeenCalledExactlyOnceWith("9");
+    expect(client.listAccountCapes).toHaveBeenCalledTimes(2);
+  });
+
+  it("explains a failed refresh by its error code and never retries it", async () => {
+    client.listAccounts.mockResolvedValue({ accounts: [premium], activeId: "9" });
+    client.refreshAccountProfile.mockRejectedValue(new IpcError("session_expired", "expired"));
+    renderAt("/profile");
+    fireEvent.click(await screen.findByRole("button", { name: labels.refresh }));
+    expect(await screen.findByText(esCommon.errors.session_expired)).toBeInTheDocument();
+    expect(screen.queryByText(labels.refreshed)).not.toBeInTheDocument();
+    expect(client.refreshAccountProfile).toHaveBeenCalledOnce();
   });
 
   it("deletes the active profile after a confirmation", async () => {

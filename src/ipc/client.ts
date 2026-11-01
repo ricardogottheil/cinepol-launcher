@@ -353,6 +353,11 @@ export function listAccountCapes(accountId: string): Promise<CapeDto[]> {
   return call("list_account_capes", { accountId });
 }
 
+/** Reads the account's name and skin again from Mojang and stores them. */
+export function refreshAccountProfile(accountId: string): Promise<AccountDto> {
+  return call("refresh_account_profile", { accountId });
+}
+
 /** Wears an owned cape, or none for `null`. */
 export function setAccountCape(accountId: string, capeId: string | null): Promise<null> {
   return call("set_account_cape", { accountId, capeId });
