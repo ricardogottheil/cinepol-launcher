@@ -336,6 +336,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_disabled_mod_the_pack_drops_is_left_alone() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        let sodium = world.read_game_file(ID, "mods/sodium.jar").unwrap();
+        world.write_game_file(ID, "mods/sodium.jar.disabled", &sodium);
+        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
+        // Version 1.0 without Sodium.
+        let source = source(
+            pack_toml(Some("1.0"), "1.21.1"),
+            vec![
+                plain("config/a.toml", b"a1"),
+                plain("config/b.toml", b"b1"),
+                preserved("config/keep.toml", b"k1"),
+            ],
+            vec![],
+        );
+
+        let updated = update(
+            &world,
+            &source,
+            &FakeDownloader::default(),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+        assert_eq!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .unwrap(),
+            b"sodium",
+            "the player's file is never deleted"
+        );
+        assert_eq!(updated.files.removed, 0);
+    }
+
+    #[tokio::test]
     async fn a_pack_mod_the_player_deleted_comes_back() {
         let world = World::new(vec![]);
         install_v1(&world).await;
