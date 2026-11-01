@@ -10,7 +10,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use thiserror::Error;
 
-use super::sync::{EntrySource, ManualFile, PackEntry};
+use super::sync::{EntrySource, ManualFile, PackEntry, curseforge_project};
 use crate::domain::instance::GameVersion;
 use crate::domain::integrity::{Checksum, HashAlgorithm};
 use crate::domain::launch::RelativePath;
@@ -267,6 +267,7 @@ pub fn resolve_files(
                     size: file.length,
                 },
                 preserve: false,
+                project: Some(curseforge_project(reference.project_id)),
             }),
             Some(url) => return Err(CurseForgeError::DisallowedDownload(url.clone())),
             None => resolved.manual.push(ManualFile {

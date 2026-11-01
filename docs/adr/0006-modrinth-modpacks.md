@@ -35,9 +35,15 @@ their own, and an update must not throw that work away.
   The pure `plan_sync` writes a file only when it is missing or still matches
   the recorded hash, leaves files the player changed or added alone, and
   removes dropped pack files only while they are intact. A pack file the
-  player turned off (`<name>.disabled` next to a missing `<name>`) counts as
-  the player's change: it is not downloaded again, so it stays off. A pack
-  file the player deleted outright comes back. Every file is
+  player turned off (`<name>.disabled` next to a missing `<name>`) stays off
+  and stays the pack's while it is intact: a new version is written as
+  `<name>.disabled`, an unchanged one is left alone, and a dropped one is
+  removed; a turned-off file the player changed is kept. The manifest also
+  records each file's mod (`projects`: `modrinth:<id>` from the Modrinth CDN
+  URL, or `curseforge:<projectId>`; optional, so older manifests load and
+  older launchers ignore it), so when a new version renames the file of a mod
+  the player turned off, the new file arrives turned off too. A pack file the
+  player deleted outright comes back. Every file is
   downloaded and verified in a staging folder first, so a network failure leaves
   the game folder as it was; only local moves and deletions follow. The
   manifest is saved only after the whole sync succeeded, so a failed update can

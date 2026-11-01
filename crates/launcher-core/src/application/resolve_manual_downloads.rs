@@ -173,6 +173,7 @@ mod tests {
             PackManifest {
                 files: [(rel("mods/sodium.jar"), sha1_hex(b"sodium"))].into(),
                 pending,
+                ..PackManifest::default()
             },
         );
         world

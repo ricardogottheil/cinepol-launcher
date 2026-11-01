@@ -134,7 +134,8 @@ mod tests {
     use crate::domain::loader::LoaderSpec;
     use crate::domain::modpack::ModpackRef;
     use crate::domain::modpack::packwiz::RawIndexEntry;
-    use crate::testing::{FakeDownloader, FakePackwizSource, RecordingReporter};
+    use crate::domain::mods::DISABLED_SUFFIX;
+    use crate::testing::{FakeDownloader, FakePackwizSource, RecordingReporter, sha1_hex};
 
     const ID: &str = "cinepol-pack";
 
@@ -307,14 +308,51 @@ mod tests {
         );
     }
 
+    /// What turning a mod off does: rename it to `<name>.disabled`.
+    fn disable(world: &World, path: &str) {
+        let bytes = world.read_game_file(ID, path).unwrap();
+        world.write_game_file(ID, &format!("{path}{DISABLED_SUFFIX}"), &bytes);
+        std::fs::remove_file(world.game_file(ID, path)).unwrap();
+    }
+
+    /// Version 1.0 with Sodium shipped as `filename` (content `bytes`), or
+    /// without Sodium.
+    fn v1_with_sodium(sodium: Option<(&str, &[u8])>) -> (FakePackwizSource, FakeDownloader) {
+        let mut index = vec![
+            plain("config/a.toml", b"a1"),
+            plain("config/b.toml", b"b1"),
+            preserved("config/keep.toml", b"k1"),
+        ];
+        let mut metafiles = Vec::new();
+        let mut downloads = vec![
+            (format!("{BASE}config/a.toml"), b"a1".to_vec()),
+            (format!("{BASE}config/b.toml"), b"b1".to_vec()),
+            (format!("{BASE}config/keep.toml"), b"k1".to_vec()),
+        ];
+        if let Some((filename, bytes)) = sodium {
+            index.push(meta("mods/sodium.pw.toml"));
+            metafiles.push((
+                "mods/sodium.pw.toml",
+                modrinth_in("sodium", filename, bytes, "both"),
+            ));
+            downloads.push((cdn_in("sodium", filename), bytes.to_vec()));
+        }
+        let source = source(pack_toml(Some("1.0.1"), "1.21.1"), index, metafiles);
+        (source, FakeDownloader::with(downloads))
+    }
+
+    async fn update_to(world: &World, sodium: Option<(&str, &[u8])>) -> UpdatedPackwiz {
+        let (source, downloader) = v1_with_sodium(sodium);
+        update(world, &source, &downloader, &CancellationToken::new())
+            .await
+            .unwrap()
+    }
+
     #[tokio::test]
     async fn a_pack_mod_the_player_disabled_stays_disabled() {
         let world = World::new(vec![]);
         install_v1(&world).await;
-        // What turning a mod off does: rename it to `<name>.disabled`.
-        let sodium = world.read_game_file(ID, "mods/sodium.jar").unwrap();
-        world.write_game_file(ID, "mods/sodium.jar.disabled", &sodium);
-        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
+        disable(&world, "mods/sodium.jar");
 
         let (source, downloader) = v1();
         let updated = update(&world, &source, &downloader, &CancellationToken::new())
@@ -332,43 +370,136 @@ mod tests {
             b"sodium"
         );
         assert!(downloader.requests().is_empty(), "nothing downloaded");
-        assert_eq!(updated.files.kept, 1);
+        assert_eq!(updated.files.unchanged, 4);
+        let manifest = world.manifests.load(&id()).await.unwrap();
+        assert!(
+            manifest.files.contains_key(&rel("mods/sodium.jar")),
+            "still the pack's file"
+        );
     }
 
     #[tokio::test]
-    async fn a_disabled_mod_the_pack_drops_is_left_alone() {
+    async fn a_disabled_pack_mod_gets_the_new_version_and_stays_off() {
         let world = World::new(vec![]);
         install_v1(&world).await;
-        let sodium = world.read_game_file(ID, "mods/sodium.jar").unwrap();
-        world.write_game_file(ID, "mods/sodium.jar.disabled", &sodium);
-        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
-        // Version 1.0 without Sodium.
-        let source = source(
-            pack_toml(Some("1.0"), "1.21.1"),
-            vec![
-                plain("config/a.toml", b"a1"),
-                plain("config/b.toml", b"b1"),
-                preserved("config/keep.toml", b"k1"),
-            ],
-            vec![],
-        );
+        disable(&world, "mods/sodium.jar");
 
-        let updated = update(
-            &world,
-            &source,
-            &FakeDownloader::default(),
-            &CancellationToken::new(),
-        )
-        .await
-        .unwrap();
+        let updated = update_to(&world, Some(("sodium.jar", b"sodium 2"))).await;
 
         assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
         assert_eq!(
             world
                 .read_game_file(ID, "mods/sodium.jar.disabled")
                 .unwrap(),
-            b"sodium",
-            "the player's file is never deleted"
+            b"sodium 2"
+        );
+        assert_eq!(updated.files.written, 1);
+        let manifest = world.manifests.load(&id()).await.unwrap();
+        assert_eq!(
+            manifest.files.get(&rel("mods/sodium.jar")).unwrap(),
+            &sha1_hex(b"sodium 2")
+        );
+
+        // A second update of the same version downloads nothing.
+        let again = update_to(&world, Some(("sodium.jar", b"sodium 2"))).await;
+        assert_eq!(again.files.written, 0);
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_disabled_mod_the_player_turns_back_on_keeps_getting_updates() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        disable(&world, "mods/sodium.jar");
+        let (source, downloader) = v1();
+        update(&world, &source, &downloader, &CancellationToken::new())
+            .await
+            .unwrap();
+        // Turned back on.
+        let off = world.game_file(ID, "mods/sodium.jar.disabled");
+        std::fs::rename(&off, world.game_file(ID, "mods/sodium.jar")).unwrap();
+
+        update_to(&world, Some(("sodium.jar", b"sodium 2"))).await;
+
+        assert_eq!(
+            world.read_game_file(ID, "mods/sodium.jar").unwrap(),
+            b"sodium 2"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_renamed_mod_the_player_disabled_arrives_disabled() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        disable(&world, "mods/sodium.jar");
+
+        update_to(&world, Some(("sodium-2.jar", b"sodium 2"))).await;
+
+        assert!(world.read_game_file(ID, "mods/sodium-2.jar").is_none());
+        assert_eq!(
+            world
+                .read_game_file(ID, "mods/sodium-2.jar.disabled")
+                .unwrap(),
+            b"sodium 2"
+        );
+        assert!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .is_none(),
+            "the old version goes"
+        );
+        let manifest = world.manifests.load(&id()).await.unwrap();
+        assert_eq!(
+            manifest.projects.get(&rel("mods/sodium-2.jar")).unwrap(),
+            "modrinth:sodium"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_renamed_mod_the_player_left_on_arrives_on() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+
+        update_to(&world, Some(("sodium-2.jar", b"sodium 2"))).await;
+
+        assert_eq!(
+            world.read_game_file(ID, "mods/sodium-2.jar").unwrap(),
+            b"sodium 2"
+        );
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+    }
+
+    #[tokio::test]
+    async fn an_intact_disabled_mod_the_pack_drops_is_removed() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        disable(&world, "mods/sodium.jar");
+
+        let updated = update_to(&world, None).await;
+
+        assert!(world.read_game_file(ID, "mods/sodium.jar").is_none());
+        assert!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .is_none()
+        );
+        assert_eq!(updated.files.removed, 1);
+    }
+
+    #[tokio::test]
+    async fn a_changed_disabled_mod_the_pack_drops_is_kept() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        std::fs::remove_file(world.game_file(ID, "mods/sodium.jar")).unwrap();
+        world.write_game_file(ID, "mods/sodium.jar.disabled", b"player build");
+
+        let updated = update_to(&world, None).await;
+
+        assert_eq!(
+            world
+                .read_game_file(ID, "mods/sodium.jar.disabled")
+                .unwrap(),
+            b"player build"
         );
         assert_eq!(updated.files.removed, 0);
     }

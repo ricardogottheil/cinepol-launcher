@@ -20,7 +20,9 @@ use crate::domain::modpack::curseforge::is_allowed_download;
 use crate::domain::modpack::packwiz::{
     Metafile, MetafileSource, PackwizError, PackwizIndex, PackwizPack,
 };
-use crate::domain::modpack::sync::{EntrySource, ManualFile, PackEntry, PackManifest};
+use crate::domain::modpack::sync::{
+    EntrySource, ManualFile, PackEntry, PackManifest, curseforge_project,
+};
 use crate::domain::modpack::{
     CurseForgeLookup, ModpackRef, ModpackSourceError, ModpackSourceKind, PackFileError,
     PackFileLocation, PackFiles, PackLocation, PackManifestStore, PackwizSource,
@@ -191,6 +193,7 @@ pub(crate) async fn download_curseforge_files<L: CurseForgeLookup>(
                     size,
                 },
                 preserve: false,
+                project: Some(curseforge_project(file.project_id)),
             }),
             None => manual.push(file),
         }
@@ -257,6 +260,7 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
                 path: entry.alias.unwrap_or(entry.path),
                 source,
                 preserve: entry.preserve,
+                project: None,
             });
             continue;
         }
@@ -281,6 +285,7 @@ pub(crate) async fn read_packwiz<W: PackwizSource>(
                     size: None,
                 },
                 preserve: entry.preserve,
+                project: None,
             }),
             MetafileSource::CurseForge(file) => manual.push(file),
         }
@@ -388,10 +393,18 @@ pub(crate) mod fixtures {
     /// A metafile downloading `filename` (whose content is `bytes`) from Modrinth.
     pub fn modrinth(filename: &str, bytes: &[u8], side: &str) -> RawMetafile {
         RawMetafile {
+            url: Some(cdn(filename)),
+            ..modrinth_in(project_of(filename), filename, bytes, side)
+        }
+    }
+
+    /// Like [`modrinth`], from the Modrinth project `project`.
+    pub fn modrinth_in(project: &str, filename: &str, bytes: &[u8], side: &str) -> RawMetafile {
+        RawMetafile {
             name: filename.into(),
             filename: filename.into(),
             side: Some(side.into()),
-            url: Some(cdn(filename)),
+            url: Some(cdn_in(project, filename)),
             hash_format: "sha512".into(),
             hash: sha512_hex(bytes),
             mode: None,
@@ -413,8 +426,17 @@ pub(crate) mod fixtures {
         }
     }
 
+    /// The CDN URL of `filename`, from a project named after its stem.
     pub fn cdn(filename: &str) -> String {
-        format!("https://cdn.modrinth.com/data/x/{filename}")
+        cdn_in(project_of(filename), filename)
+    }
+
+    pub fn cdn_in(project: &str, filename: &str) -> String {
+        format!("https://cdn.modrinth.com/data/{project}/versions/v/{filename}")
+    }
+
+    fn project_of(filename: &str) -> &str {
+        filename.split('.').next().unwrap_or(filename)
     }
 
     pub fn source(

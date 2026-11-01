@@ -29,6 +29,11 @@ struct ManifestRecord {
     /// Files waiting for a manual download; absent in older manifests.
     #[serde(default)]
     pending: Vec<PendingRecord>,
+    /// Path in the game folder to the mod it belongs to (`modrinth:<id>`,
+    /// `curseforge:<id>`); absent in older manifests, which older launchers
+    /// ignore.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    projects: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -139,6 +144,11 @@ fn parse(path: &Path, bytes: &[u8]) -> Result<PackManifest, PackFileError> {
             .map_err(|error| io_error(path, format!("{raw_path}: {error}")))?;
         manifest.files.insert(relative, sha1.value().to_owned());
     }
+    for (raw_path, project) in record.projects {
+        let relative = RelativePath::parse(&raw_path)
+            .map_err(|_| io_error(path, format!("unsafe file path {raw_path:?}")))?;
+        manifest.projects.insert(relative, project);
+    }
     manifest.pending = record
         .pending
         .into_iter()
@@ -170,6 +180,11 @@ impl PackManifestStore for JsonPackManifestStore {
                 .pending
                 .iter()
                 .map(PendingRecord::from_manual)
+                .collect(),
+            projects: manifest
+                .projects
+                .iter()
+                .map(|(relative, project)| (relative.to_string(), project.clone()))
                 .collect(),
         };
         let bytes = serde_json::to_vec_pretty(&record).map_err(|error| io_error(&path, error))?;
@@ -212,6 +227,11 @@ mod tests {
                 (RelativePath::parse("options.txt").unwrap(), "b".repeat(40)),
             ]
             .into(),
+            projects: [(
+                RelativePath::parse("mods/a.jar").unwrap(),
+                "modrinth:AANobbMI".to_owned(),
+            )]
+            .into(),
             pending: vec![jei()],
         };
         store.save(&id(), &manifest).await.unwrap();
@@ -223,6 +243,7 @@ mod tests {
             serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
         assert_eq!(saved["schemaVersion"], 1);
         assert_eq!(saved["files"]["mods/a.jar"], "a".repeat(40));
+        assert_eq!(saved["projects"]["mods/a.jar"], "modrinth:AANobbMI");
         assert_eq!(saved["pending"][0]["path"], "mods/jei.jar");
         assert_eq!(saved["pending"][0]["hashFormat"], "murmur2");
         assert_eq!(saved["pending"][0]["hash"], "3608199863");
@@ -255,6 +276,7 @@ mod tests {
         );
         let manifest = load_raw(&body).await.unwrap();
         assert!(manifest.pending.is_empty());
+        assert!(manifest.projects.is_empty());
         assert_eq!(manifest.files.len(), 1);
     }
 

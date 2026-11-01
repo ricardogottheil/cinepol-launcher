@@ -304,6 +304,7 @@ where
                 sha1: file.sha1,
             },
             preserve: false,
+            project: None,
         }));
         sync_into(
             files,

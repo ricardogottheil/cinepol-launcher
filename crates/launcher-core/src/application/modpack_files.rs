@@ -19,7 +19,7 @@ use crate::domain::integrity::Checksum;
 use crate::domain::launch::{LauncherPaths, RelativePath};
 use crate::domain::modpack::mrpack::MrpackIndex;
 use crate::domain::modpack::sync::{
-    EntrySource, IncomingFile, ManualFile, PackEntry, PackManifest, plan_sync,
+    EntrySource, IncomingFile, ManualFile, PackEntry, PackManifest, curseforge_project, plan_sync,
 };
 use crate::domain::modpack::{
     ModpackFile, MrpackArchive, PackFileError, PackFiles, PackManifestStore,
@@ -217,6 +217,7 @@ where
                 size: Some(file.size),
             },
             preserve: false,
+            project: None,
         })
         .collect();
     entries.extend(staged.into_iter().map(|file| PackEntry {
@@ -226,6 +227,7 @@ where
             sha1: file.sha1,
         },
         preserve: false,
+        project: None,
     }));
     let synced = sync_into(
         &deps.file_sync(),
@@ -283,11 +285,6 @@ where
 /// a real sha1, so the planner writes the file unless the player changed it.
 const UNWRITTEN: &str = "unwritten";
 
-/// Stands in for the sha1 of a file the player turned off (renamed to
-/// `<name>.disabled`): it never matches a real sha1, so the planner treats it
-/// as the player's change and neither writes nor removes it.
-const DISABLED_BY_PLAYER: &str = "disabled-by-player";
-
 /// `<path>.disabled`, where turning a mod off moves it.
 fn disabled_twin(path: &Path) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
@@ -325,7 +322,10 @@ where
         .filter(|file| !sources.contains_key(&file.path))
         .collect();
 
+    // A file the player turned off lives at `<path>.disabled`: the planner
+    // sees its sha1 there, so the pack keeps updating it while it stays off.
     let mut on_disk = BTreeMap::new();
+    let mut disabled = BTreeMap::new();
     let wanted = sources
         .keys()
         .copied()
@@ -333,23 +333,32 @@ where
     for path in previous.files.keys().chain(wanted) {
         if !on_disk.contains_key(path) {
             let target = path.under(&game_dir);
-            let mut sha1 = deps.files.sha1(&target).await?;
-            if sha1.is_none() && deps.files.sha1(&disabled_twin(&target)).await?.is_some() {
-                sha1 = Some(DISABLED_BY_PLAYER.to_owned());
+            let sha1 = deps.files.sha1(&target).await?;
+            if sha1.is_none()
+                && let Some(off) = deps.files.sha1(&disabled_twin(&target)).await?
+            {
+                disabled.insert(path.clone(), off);
             }
             on_disk.insert(path.clone(), sha1);
         }
     }
     let disk = |path: &RelativePath| on_disk.get(path).cloned().flatten();
+    let file_of = |path: &RelativePath, off: bool| {
+        let target = path.under(&game_dir);
+        if off { disabled_twin(&target) } else { target }
+    };
 
     let mut incoming = Vec::new();
     for (path, entry) in &sources {
-        let target = path.under(&game_dir);
+        let off = disabled.get(*path);
+        let target = file_of(path, off.is_some());
         let recorded = previous.files.get(*path).map(String::as_str);
-        let sha1 = incoming_sha1(deps.files, entry, &target, disk(path), recorded).await?;
+        let current = disk(path).or_else(|| off.cloned());
+        let sha1 = incoming_sha1(deps.files, entry, &target, current, recorded).await?;
         incoming.push(IncomingFile {
             path: (*path).clone(),
             sha1,
+            project: entry.project(),
         });
     }
     // A manual file already in place with the right hash is installed.
@@ -363,13 +372,15 @@ where
                 incoming.push(IncomingFile {
                     path: file.path.clone(),
                     sha1,
+                    project: Some(curseforge_project(file.project_id)),
                 })
             }
             _ => pending.push(file.clone()),
         }
     }
 
-    let plan = plan_sync(previous, &incoming, &on_disk);
+    let plan = plan_sync(previous, &incoming, &on_disk, &disabled);
+    let target = |path: &RelativePath| file_of(path, plan.disabled.contains(path));
     if cancel.is_cancelled() {
         return Err(PackSyncError::Cancelled);
     }
@@ -433,16 +444,16 @@ where
         return Err(PackSyncError::Cancelled);
     }
     for (from, path) in placements {
-        deps.files.place(&from, &path.under(&game_dir)).await?;
+        deps.files.place(&from, &target(path)).await?;
     }
     for path in &plan.remove {
-        deps.files.remove_file(&path.under(&game_dir)).await?;
+        deps.files.remove_file(&target(path)).await?;
     }
     // Record what was actually written: a declared sha1 may be wrong, and
     // other sources declare none.
     let mut manifest = plan.manifest;
     for path in &plan.write {
-        match deps.files.sha1(&path.under(&game_dir)).await? {
+        match deps.files.sha1(&target(path)).await? {
             Some(sha1) => manifest.files.insert(path.clone(), sha1),
             None => manifest.files.remove(path),
         };
@@ -796,6 +807,7 @@ mod tests {
                 size: Some(bytes.len() as u64),
             },
             preserve: false,
+            project: None,
         }
     }
 
@@ -931,6 +943,7 @@ mod tests {
                 checksum: Checksum::parse(HashAlgorithm::Sha1, &sha1_hex(declared)).unwrap(),
             },
             preserve: false,
+            project: None,
         };
 
         let good = [local("config/good.toml", "good.toml", b"good")];
