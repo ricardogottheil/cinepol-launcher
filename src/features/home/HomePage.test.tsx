@@ -301,6 +301,31 @@ describe("HomePage", () => {
     expect(await screen.findByText(esCommon.home.session.playing)).toBeInTheDocument();
   });
 
+  it("keeps the game log off Home while a session runs", async () => {
+    useActivityStore.setState({
+      byInstance: {
+        [CINEPOL_SESSION]: {
+          activity: { kind: "running", cancel: vi.fn().mockResolvedValue(true) },
+          error: null,
+          lastExit: null,
+          logs: [
+            {
+              stream: "stdout",
+              line: "Setting user: Steve",
+              level: null,
+              thread: null,
+              logger: null,
+            },
+          ],
+        },
+      },
+    });
+    renderHome();
+    expect(await screen.findByText(esCommon.home.session.playing)).toBeInTheDocument();
+    expect(screen.queryByRole("log")).not.toBeInTheDocument();
+    expect(screen.queryByText("Setting user: Steve")).not.toBeInTheDocument();
+  });
+
   it("hides the last readings once the server stops answering", async () => {
     client.pingServer.mockResolvedValue(liveStatus);
     const { client: queries } = renderHome();

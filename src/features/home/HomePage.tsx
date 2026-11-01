@@ -15,7 +15,6 @@ import { CINEPOL_SESSION, useActivityStore, useInstanceActivity } from "../insta
 import { CrashNotice } from "../instances/CrashNotice";
 import { splitPlaytime } from "../instances/formatPlaytime";
 import { InstallProgress, InstanceStatus, PlayControl } from "../instances/InstanceActivity";
-import { LogPanel } from "../instances/LogPanel";
 import { ProgressMeter } from "../instances/ProgressMeter";
 import { useInstanceSession } from "../instances/useInstanceSession";
 import { instancesKey, useInstances } from "../instances/useInstances";
@@ -78,10 +77,13 @@ function HomeInstances() {
   );
 }
 
-/** The signal control and what follows a press: install progress, the running game, errors. */
+/**
+ * The signal control and what follows a press: install progress, the running
+ * game and errors. The game log stays on the instance page, never on Home.
+ */
 function QuickPlay({ recommended }: { recommended: string }) {
   const { t } = useTranslation();
-  const { activity, logs, error, lastExit } = useInstanceActivity(CINEPOL_SESSION);
+  const { activity, error, lastExit } = useInstanceActivity(CINEPOL_SESSION);
   const playCinepol = useActivityStore((state) => state.playCinepol);
   const queryClient = useQueryClient();
   const previousKind = useRef(activity.kind);
@@ -149,7 +151,6 @@ function QuickPlay({ recommended }: { recommended: string }) {
           </span>
         ) : null}
       </p>
-      {activity.kind === "running" || logs.length > 0 ? <LogPanel lines={logs} /> : null}
     </div>
   );
 }
