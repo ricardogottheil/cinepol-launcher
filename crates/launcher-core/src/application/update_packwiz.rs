@@ -631,6 +631,10 @@ mod tests {
         // Still pending on the next sync, still to arrive turned off.
         let again = update_with_jei(&world, 2, "jei-2.jar", b"jei 2", true).await;
         assert!(again.pending[0].disabled);
+        // Renamed again while still pending: the mark follows the mod.
+        let renamed = update_with_jei(&world, 3, "jei-3.jar", b"jei 3", true).await;
+        assert_eq!(renamed.pending[0].path, rel("mods/jei-3.jar"));
+        assert!(renamed.pending[0].disabled);
     }
 
     #[tokio::test]

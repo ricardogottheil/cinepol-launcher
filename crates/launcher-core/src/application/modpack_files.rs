@@ -391,10 +391,11 @@ where
     let wanted: BTreeSet<&RelativePath> = incoming.iter().map(|file| &file.path).collect();
     let turned_off = turned_off_projects(previous, |path| wanted.contains(path), &disabled);
     for file in &mut pending {
+        // By project, so a second rename while pending keeps the mark.
         let was_off = previous
             .pending
             .iter()
-            .any(|old| old.path == file.path && old.disabled);
+            .any(|old| old.disabled && old.project_id == file.project_id);
         file.disabled =
             was_off || turned_off.contains(curseforge_project(file.project_id).as_str());
     }

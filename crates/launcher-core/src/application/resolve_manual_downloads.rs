@@ -56,16 +56,23 @@ where
     let mut outcome = ManualDownloads::default();
     for file in std::mem::take(&mut manifest.pending) {
         let plain = file.path.under(&game_dir);
-        let target = if file.disabled {
-            disabled_twin(&plain)
-        } else {
-            plain
-        };
-        // The player may have put it in the game folder directly.
-        let mut installed = has_checksum(deps.files, &target, &file.checksum).await?;
+        let off = disabled_twin(&plain);
+        // The player may have put it in the game folder directly, turned on
+        // or off: where they put it wins over the pack's mark.
+        let mut placed = None;
+        for path in [&plain, &off] {
+            if has_checksum(deps.files, path, &file.checksum).await? {
+                placed = Some(path.clone());
+                break;
+            }
+        }
+        let mut installed = placed.is_some();
+        let target = placed.unwrap_or(if file.disabled { off } else { plain.clone() });
         // A different file already at the path is the player's: never replace
         // it (the file stays pending, like a sync keeps player changes).
-        let free = installed || deps.files.sha1(&target).await?.is_none();
+        let free = installed
+            || (deps.files.sha1(&plain).await?.is_none()
+                && deps.files.sha1(&target).await?.is_none());
         if !installed
             && free
             && let Some(candidate) = find(deps.files, &found, &file).await?
@@ -275,6 +282,26 @@ mod tests {
             manifest(&world).files[&rel("mods/jei.jar")],
             sha1_hex(b"jei")
         );
+    }
+
+    #[tokio::test]
+    async fn a_copy_the_player_already_put_in_place_wins_over_the_off_mark() {
+        let jei = ManualFile {
+            disabled: true,
+            ..manual("mods/jei.jar", b"jei")
+        };
+        let world = world_with(vec![jei.clone()]);
+        world.write_game_file(ID, "mods/jei.jar", b"jei");
+        let dir = downloads(&world, &[("jei.jar", b"jei")]);
+
+        let outcome = resolve(&world, &dir).await;
+
+        assert_eq!(outcome.resolved, [jei]);
+        assert!(
+            world.read_game_file(ID, "mods/jei.jar.disabled").is_none(),
+            "no second copy"
+        );
+        assert_eq!(world.read_game_file(ID, "mods/jei.jar").unwrap(), b"jei");
     }
 
     #[tokio::test]
