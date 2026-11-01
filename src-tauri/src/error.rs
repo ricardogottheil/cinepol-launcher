@@ -403,6 +403,8 @@ impl From<launcher_core::application::play_on_cinepol::PlayOnCinepolError> for A
             PlayOnCinepolError::UnknownServer(_) => {
                 Self::new(ErrorCode::InvalidInput, error.to_string())
             }
+            PlayOnCinepolError::InstallPack(pack) => Self::from(pack),
+            PlayOnCinepolError::UpdatePack(pack) => Self::from(pack),
         }
     }
 }

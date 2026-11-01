@@ -5,7 +5,7 @@ import type { InstanceDto } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
 import { useWriteMod } from "../mods/useMods";
 import { PlayControl } from "./InstanceActivity";
-import { useInstanceSession } from "./useInstanceSession";
+import { isCinepolInstance, useInstanceSession } from "./useInstanceSession";
 
 const client = vi.hoisted(() => ({
   installMod: vi.fn(),
@@ -77,5 +77,47 @@ describe("useInstanceSession", () => {
 
     await waitFor(() => expect(client.installMod).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: esCommon.instances.play })).toBeEnabled();
+  });
+});
+
+const PACK = "https://pack.policarpiers.com/pack.toml";
+
+const base: InstanceDto = {
+  id: "a",
+  name: "A",
+  gameVersion: "26.2",
+  loader: "vanilla",
+  loaderVersion: null,
+  origin: "custom",
+  modpackSource: null,
+  modpackProject: null,
+  updatePackOnLaunch: false,
+  playtimeSecs: 0,
+};
+const vanilla: InstanceDto = { ...base, origin: "cinepolServer" };
+const pack: InstanceDto = {
+  ...base,
+  origin: "modpack",
+  modpackSource: "packwiz",
+  modpackProject: PACK,
+};
+
+describe("isCinepolInstance", () => {
+  it("is the community pack's packwiz instance when the config names a pack", () => {
+    expect(isCinepolInstance(pack, { pack: PACK })).toBe(true);
+    expect(isCinepolInstance(vanilla, { pack: PACK })).toBe(false);
+    expect(
+      isCinepolInstance(
+        { ...pack, modpackProject: "https://example.org/pack.toml" },
+        { pack: PACK },
+      ),
+    ).toBe(false);
+    expect(isCinepolInstance({ ...pack, modpackSource: "modrinth" }, { pack: PACK })).toBe(false);
+  });
+
+  it("is the managed Vanilla instance without a pack", () => {
+    expect(isCinepolInstance(vanilla, { pack: null })).toBe(true);
+    expect(isCinepolInstance(pack, { pack: null })).toBe(false);
+    expect(isCinepolInstance(vanilla, undefined)).toBe(true);
   });
 });

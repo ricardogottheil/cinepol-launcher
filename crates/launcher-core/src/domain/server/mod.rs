@@ -183,6 +183,9 @@ pub struct ServerConfig {
     pub servers: Vec<CommunityServer>,
     pub versions: SupportedVersions,
     pub links: CommunityLinks,
+    /// The community's packwiz modpack (`pack.toml`), which Play installs.
+    /// `None` makes Play use a Vanilla instance.
+    pub pack: Option<HttpsUrl>,
 }
 
 impl ServerConfig {

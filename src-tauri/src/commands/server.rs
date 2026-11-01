@@ -1,7 +1,7 @@
 use launcher_core::application::install_instance::InstallDeps;
 use launcher_core::application::launch_instance::LaunchDeps;
 use launcher_core::application::load_server_config::load_server_config;
-use launcher_core::application::play_on_cinepol::play_on_cinepol as play;
+use launcher_core::application::play_on_cinepol::{CinepolPackDeps, play_on_cinepol as play};
 use launcher_core::domain::server_list::ServerAddress;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
@@ -29,7 +29,8 @@ fn requested_server(server: Option<&str>) -> Result<Option<ServerAddress>, AppEr
         .map_err(|error| AppError::new(ErrorCode::InvalidInput, error.to_string()))
 }
 
-/// Prepares the managed instance, installs it and joins `server` (a community
+/// Prepares the managed instance (the community pack's instance, installed or
+/// synced first, when the config names a pack), installs it and joins `server` (a community
 /// server from the config; the main one when `None`, none when the config
 /// lists no server). Install
 /// progress, then a `launching` step, arrive through `on_progress`; the game
@@ -76,6 +77,12 @@ pub async fn play_on_cinepol(
         launcher_name: crate::state::LAUNCHER_NAME,
         launcher_version: &state.launcher_version,
     };
+    let pack_sync = state.pack_sync();
+    let pack = CinepolPackDeps {
+        source: &state.packwiz,
+        curseforge: &state.curseforge,
+        files: pack_sync.file_sync(),
+    };
     // Claimed in `state.games` too, so kill_instance and the instances page
     // see this session.
     let result = play(
@@ -85,6 +92,7 @@ pub async fn play_on_cinepol(
         &state.games,
         &install,
         &launch,
+        &pack,
         &ChannelReporter::new(on_progress),
         ChannelLogSink::new(on_log),
         &token,

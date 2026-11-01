@@ -20,6 +20,7 @@ export function bundledConfigDto(): ServerConfigDto {
     maxVersion: config.versions.max,
     recommendedVersion: config.versions.recommended,
     links: config.links,
+    pack: config.pack ?? null,
     origin: "bundled",
   };
 }

@@ -6,6 +6,7 @@ use crate::domain::instance::{
     Instance, InstanceOrigin, InstanceRepository, InstanceRepositoryError,
 };
 use crate::domain::loader::LoaderSpec;
+use crate::domain::modpack::{ModpackSourceKind, PackLocation};
 use crate::domain::server::ServerConfig;
 use crate::domain::server_list::{ServerEntry, ServerListStore};
 
@@ -26,6 +27,19 @@ pub async fn find_cinepol_instance<R: InstanceRepository>(
         .await?
         .into_iter()
         .find(|instance| instance.origin == InstanceOrigin::CinepolServer))
+}
+
+/// The community pack instance: the packwiz instance installed from
+/// `location`, when it exists.
+pub async fn find_cinepol_pack_instance<R: InstanceRepository>(
+    instances: &R,
+    location: &PackLocation,
+) -> Result<Option<Instance>, InstanceRepositoryError> {
+    let wanted = location.as_string();
+    Ok(instances.list().await?.into_iter().find(|instance| {
+        matches!(&instance.origin, InstanceOrigin::Modpack(pack)
+            if pack.source == ModpackSourceKind::Packwiz && pack.project == wanted)
+    }))
 }
 
 /// Reuses the instance whose origin is `CinepolServer` (moving it to the

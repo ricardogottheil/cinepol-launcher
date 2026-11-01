@@ -14,6 +14,8 @@ export interface ServerConfig {
   servers: CommunityServerEntry[];
   versions: { min: string; max: string; recommended: string };
   links: { website: string; twitch: string; discord: string };
+  /** The community's packwiz `pack.toml`, which Play installs. */
+  pack?: string;
 }
 
 export const bundledServerConfig: ServerConfig = bundled;

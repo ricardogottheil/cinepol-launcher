@@ -32,6 +32,12 @@ website lists, next to the servers the player saved (ADR 0012).
   With no servers, Play starts the recommended version without joining.
 - **Joining another.** `play_on_cinepol` takes an optional `server`; it must
   be one the config lists, checked before anything is installed.
+- **Community pack.** An optional top-level `pack` (any schema) is the https
+  URL of the community's packwiz `pack.toml`. Older launchers ignore it, so it
+  needs no schema bump; a non-https value makes the whole config invalid, like
+  any other bad field. With a pack, Play uses the packwiz instance installed
+  from that URL (installing it when there is none and syncing it before every
+  launch); without one, Play keeps the managed Vanilla instance.
 - **Status.** Every server, community or saved, is pinged with `ping_server`;
   the dedicated CINEPOL status command is gone.
 

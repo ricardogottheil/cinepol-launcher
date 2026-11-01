@@ -25,6 +25,9 @@ struct ConfigFile {
     servers: Option<Vec<ServerSection>>,
     versions: VersionsSection,
     links: LinksSection,
+    /// Optional in any schema: the packwiz `pack.toml` Play installs.
+    #[serde(default)]
+    pack: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,11 +125,18 @@ pub fn parse_server_config(bytes: &[u8]) -> Result<ServerConfig, ServerConfigErr
         twitch: HttpsUrl::parse(&file.links.twitch).map_err(invalid)?,
         discord: HttpsUrl::parse(&file.links.discord).map_err(invalid)?,
     };
+    let pack = file
+        .pack
+        .as_deref()
+        .map(HttpsUrl::parse)
+        .transpose()
+        .map_err(invalid)?;
     Ok(ServerConfig {
         name,
         servers,
         versions,
         links,
+        pack,
     })
 }
 
@@ -205,6 +215,10 @@ mod tests {
         assert_eq!(config.versions.recommended().as_str(), "26.2");
         assert_eq!(config.links.twitch.as_str(), "https://twitch.tv/polispol1");
         assert_eq!(config.links.discord.as_str(), "https://discord.gg/cinepol");
+        assert_eq!(
+            config.pack.as_ref().map(HttpsUrl::as_str),
+            Some("https://pack.policarpiers.com/pack.toml")
+        );
     }
 
     #[test]
@@ -249,6 +263,23 @@ mod tests {
     }
 
     #[test]
+    fn the_pack_is_optional() {
+        let without = with(|v| {
+            v.as_object_mut().unwrap().remove("pack");
+        });
+        assert_eq!(parse_server_config(&without).unwrap().pack, None);
+        let mut schema_one = schema_one();
+        schema_one["pack"] = "https://pack.example.org/pack.toml".into();
+        assert_eq!(
+            parse_server_config(&serde_json::to_vec(&schema_one).unwrap())
+                .unwrap()
+                .pack
+                .map(|pack| pack.as_str().to_owned()),
+            Some("https://pack.example.org/pack.toml".to_owned())
+        );
+    }
+
+    #[test]
     fn rejects_unsafe_or_inconsistent_configs() {
         type Edit = Box<dyn FnOnce(&mut serde_json::Value)>;
         let too_many: Vec<serde_json::Value> = (0..=MAX_COMMUNITY_SERVERS)
@@ -273,6 +304,8 @@ mod tests {
             Box::new(|v| v["versions"]["min"] = "../1.21".into()),
             Box::new(|v| v["links"]["twitch"] = "http://twitch.tv/polispol1".into()),
             Box::new(|v| v["links"]["discord"] = "javascript:alert(1)".into()),
+            Box::new(|v| v["pack"] = "http://pack.policarpiers.com/pack.toml".into()),
+            Box::new(|v| v["pack"] = "C:/pack.toml".into()),
         ];
         for edit in cases {
             assert!(matches!(

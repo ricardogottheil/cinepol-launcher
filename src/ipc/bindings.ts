@@ -72,6 +72,12 @@ loader: string, loaderVersion: string | null, origin: InstanceOriginDto,
  */
 modpackSource: string | null, 
 /**
+ * For modpack instances: the project (a packwiz `pack.toml` URL for
+ * packwiz). Play on CINEPOL runs the packwiz instance whose URL is the
+ * config's `pack`.
+ */
+modpackProject: string | null, 
+/**
  * packwiz instances sync their pack before every launch.
  */
 updatePackOnLaunch: boolean, playtimeSecs: number, };
@@ -112,7 +118,12 @@ name: string,
 /**
  * Possibly empty; the first is the main server, where Play goes.
  */
-servers: Array<CommunityServerDto>, minVersion: string, maxVersion: string, recommendedVersion: string, links: CommunityLinksDto, origin: ConfigOriginDto, };
+servers: Array<CommunityServerDto>, minVersion: string, maxVersion: string, recommendedVersion: string, links: CommunityLinksDto, 
+/**
+ * The community's packwiz `pack.toml`, which Play installs; `null` when
+ * Play uses a Vanilla instance.
+ */
+pack: string | null, origin: ConfigOriginDto, };
 
 export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versionName: string, motd: string, latencyMs: number | null, };
 

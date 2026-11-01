@@ -387,10 +387,19 @@ describe("InstancesPage", () => {
     expect(screen.queryByText(esCommon.errors.not_installed)).not.toBeInTheDocument();
   });
 
-  it("shows a Play on CINEPOL session on the CINEPOL row and stops it from there", async () => {
+  it("shows a Play on CINEPOL session on the community pack row and stops it from there", async () => {
     client.listInstances.mockResolvedValue([
       instance,
-      { ...instance, id: "cinepol", name: "CINEPOL", origin: "cinepolServer" },
+      // The old managed Vanilla instance is not the one Play runs any more.
+      { ...instance, id: "vanilla", name: "Old CINEPOL", origin: "cinepolServer" },
+      {
+        ...instance,
+        id: "cinepol",
+        name: "CINEPOL",
+        origin: "modpack",
+        modpackSource: "packwiz",
+        modpackProject: "https://pack.policarpiers.com/pack.toml",
+      },
     ]);
     client.killInstance.mockResolvedValue(true);
     useActivityStore.setState({
@@ -406,9 +415,11 @@ describe("InstancesPage", () => {
     fireEvent.click(within(row).getByRole("button", { name: labels.stop }));
     await waitFor(() => expect(client.killInstance).toHaveBeenCalledWith("cinepol"));
 
-    const other = screen.getByRole("heading", { name: "Survival" }).closest("li");
-    if (!other) throw new Error("no Survival row");
-    expect(within(other).getByRole("button", { name: labels.play })).toBeEnabled();
+    for (const name of ["Survival", "Old CINEPOL"]) {
+      const other = screen.getByRole("heading", { name }).closest("li");
+      if (!other) throw new Error(`no ${name} row`);
+      expect(within(other).getByRole("button", { name: labels.play })).toBeEnabled();
+    }
   });
 
   it("offers modpack updates only on modpack instances and reports kept changes", async () => {

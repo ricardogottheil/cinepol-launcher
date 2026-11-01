@@ -72,6 +72,7 @@ pub(crate) mod fixtures {
                 twitch: HttpsUrl::parse("https://twitch.tv/polispol1").unwrap(),
                 discord: HttpsUrl::parse("https://discord.gg/cinepol").unwrap(),
             },
+            pack: None,
         }
     }
 }

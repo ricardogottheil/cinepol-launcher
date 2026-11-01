@@ -1,7 +1,8 @@
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import type { InstanceDto } from "../../ipc/client";
+import type { InstanceDto, ServerConfigDto } from "../../ipc/client";
 import { modWriteKey } from "../mods/useMods";
+import { useServerConfig } from "../server/useServer";
 import { CINEPOL_SESSION, useInstanceActivity } from "./activityStore";
 import { instancesKey, manualDownloadsKey, serversKey, useManualDownloads } from "./useInstances";
 
@@ -13,12 +14,26 @@ export type PackSource = "modrinth" | "curseforge" | "packwiz";
  * and the files it still waits for. Mount it once per screen; it refreshes
  * the data the game or an update rewrites.
  */
+/**
+ * Whether Play on CINEPOL runs this instance: the community pack's instance
+ * when the config names a pack, otherwise the managed Vanilla one.
+ */
+export function isCinepolInstance(
+  instance: InstanceDto,
+  config: Pick<ServerConfigDto, "pack"> | undefined,
+): boolean {
+  const pack = config?.pack;
+  if (pack) return instance.modpackSource === "packwiz" && instance.modpackProject === pack;
+  return instance.origin === "cinepolServer";
+}
+
 export function useInstanceSession(instance: InstanceDto) {
   const own = useInstanceActivity(instance.id);
   const cinepolSession = useInstanceActivity(CINEPOL_SESSION);
+  const config = useServerConfig();
   // A Play on CINEPOL session started from Home runs this instance too.
   const session =
-    instance.origin === "cinepolServer" && cinepolSession.activity.kind !== "idle"
+    isCinepolInstance(instance, config.data) && cinepolSession.activity.kind !== "idle"
       ? cinepolSession
       : own;
   const packSource: PackSource | null =

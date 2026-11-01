@@ -684,6 +684,10 @@ pub struct InstanceDto {
     pub origin: InstanceOriginDto,
     /// For modpack instances: `modrinth`, `curseforge` or `packwiz`.
     pub modpack_source: Option<String>,
+    /// For modpack instances: the project (a packwiz `pack.toml` URL for
+    /// packwiz). Play on CINEPOL runs the packwiz instance whose URL is the
+    /// config's `pack`.
+    pub modpack_project: Option<String>,
     /// packwiz instances sync their pack before every launch.
     pub update_pack_on_launch: bool,
     #[ts(type = "number")]
@@ -705,6 +709,10 @@ impl From<&Instance> for InstanceDto {
             },
             modpack_source: match &instance.origin {
                 InstanceOrigin::Modpack(pack) => Some(source_id(pack.source).to_owned()),
+                _ => None,
+            },
+            modpack_project: match &instance.origin {
+                InstanceOrigin::Modpack(pack) => Some(pack.project.clone()),
                 _ => None,
             },
             update_pack_on_launch: instance.settings.update_pack_on_launch,
@@ -868,6 +876,9 @@ pub struct ServerConfigDto {
     pub max_version: String,
     pub recommended_version: String,
     pub links: CommunityLinksDto,
+    /// The community's packwiz `pack.toml`, which Play installs; `null` when
+    /// Play uses a Vanilla instance.
+    pub pack: Option<String>,
     pub origin: ConfigOriginDto,
 }
 
@@ -895,6 +906,7 @@ impl ServerConfigDto {
                 twitch: config.links.twitch.to_string(),
                 discord: config.links.discord.to_string(),
             },
+            pack: config.pack.as_ref().map(ToString::to_string),
             origin: match loaded.origin {
                 ConfigOrigin::Remote => ConfigOriginDto::Remote,
                 ConfigOrigin::Bundled { .. } => ConfigOriginDto::Bundled,
