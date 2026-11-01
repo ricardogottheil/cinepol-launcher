@@ -505,6 +505,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_hand_downloaded_file_the_player_turned_off_stays() {
+        let world = World::new(vec![]);
+        install_v1(&world).await;
+        let (source, downloader) = v2();
+        let cancel = CancellationToken::new();
+        let sync = || update(&world, &source, &downloader, &cancel);
+        sync().await.unwrap();
+        // JEI is a manual CurseForge download.
+        world.write_game_file(ID, "mods/jei.jar", b"jei");
+        assert!(sync().await.unwrap().pending.is_empty());
+        disable(&world, "mods/jei.jar");
+
+        let updated = sync().await.unwrap();
+
+        assert_eq!(
+            world.read_game_file(ID, "mods/jei.jar.disabled").unwrap(),
+            b"jei"
+        );
+        assert!(world.read_game_file(ID, "mods/jei.jar").is_none());
+        assert!(updated.pending.is_empty());
+        assert_eq!(updated.files.removed, 0);
+    }
+
+    #[tokio::test]
     async fn a_pack_mod_the_player_deleted_comes_back() {
         let world = World::new(vec![]);
         install_v1(&world).await;

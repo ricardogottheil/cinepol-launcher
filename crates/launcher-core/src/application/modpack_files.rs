@@ -364,10 +364,16 @@ where
     // A manual file already in place with the right hash is installed.
     let mut pending = Vec::new();
     for file in manual {
-        match disk(&file.path) {
+        // A turned-off one counts too, so it stays installed and off.
+        let off = disabled.get(&file.path);
+        match disk(&file.path).or_else(|| off.cloned()) {
             Some(sha1)
-                if has_checksum(deps.files, &file.path.under(&game_dir), &file.checksum)
-                    .await? =>
+                if has_checksum(
+                    deps.files,
+                    &file_of(&file.path, off.is_some()),
+                    &file.checksum,
+                )
+                .await? =>
             {
                 incoming.push(IncomingFile {
                     path: file.path.clone(),
