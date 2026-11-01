@@ -11,6 +11,7 @@ import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError } from "../../ipc/client";
 import { renderWithQuery } from "../../test/render";
 import { CINEPOL_SESSION, useActivityStore } from "../instances/activityStore";
+import { bundledConfigDto } from "../server/useServer";
 import { HomePage } from "./HomePage";
 
 const client = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ const client = vi.hoisted(() => ({
   pingServer: vi.fn(),
   listSavedServers: vi.fn(),
   playOnCinepol: vi.fn(),
+  launchInstance: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -47,6 +49,31 @@ const remoteConfig = {
   recommendedVersion: "26.2",
   links: serverConfig.links,
   origin: "remote",
+};
+
+const survival = {
+  id: "survival",
+  name: "Survival",
+  gameVersion: "26.2",
+  loader: "vanilla",
+  loaderVersion: null,
+  origin: "custom",
+  modpackSource: null,
+  modpackProject: null,
+  updatePackOnLaunch: false,
+  playtimeSecs: 0,
+};
+
+/** The instance Play runs: installed from the bundled config's pack. */
+const communityPack = {
+  ...survival,
+  id: "cinepol",
+  name: "CINEPOL",
+  loader: "fabric",
+  loaderVersion: "0.19.3",
+  origin: "modpack",
+  modpackSource: "packwiz",
+  modpackProject: serverConfig.pack,
 };
 
 const liveStatus = {
@@ -211,6 +238,42 @@ describe("HomePage", () => {
     // Only the toast says it: nothing stays behind under the control.
     expect(screen.getAllByText(esCommon.errors.cancelled)).toHaveLength(1);
     expect(useActivityStore.getState().byInstance[CINEPOL_SESSION]?.error).toBeNull();
+  });
+
+  it("offers no Play with… without another instance, even next to the community pack", async () => {
+    client.getServerConfig.mockResolvedValue(bundledConfigDto());
+    client.listInstances.mockResolvedValue([communityPack]);
+    renderHome();
+    expect(await screen.findByRole("link", { name: "CINEPOL" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(esCommon.home.playWith)).not.toBeInTheDocument();
+  });
+
+  it("joins the main server with the instance picked in Play with…", async () => {
+    client.getServerConfig.mockResolvedValue(bundledConfigDto());
+    client.launchInstance.mockReturnValue(new Promise(() => {}));
+    client.listInstances.mockResolvedValue([
+      communityPack,
+      { ...survival, id: "old", name: "Old CINEPOL", origin: "cinepolServer" },
+      survival,
+    ]);
+    renderHome();
+    const picker = await screen.findByLabelText(esCommon.home.playWith);
+    const options = within(picker)
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(options).toEqual(["Old CINEPOL · 26.2", "Survival · 26.2"]);
+
+    fireEvent.change(picker, { target: { value: "survival" } });
+    fireEvent.click(screen.getByRole("button", { name: esCommon.home.playWithStart }));
+
+    await waitFor(() =>
+      expect(client.launchInstance).toHaveBeenCalledWith(
+        "survival",
+        expect.any(Function),
+        mainAddress,
+      ),
+    );
+    expect(client.playOnCinepol).not.toHaveBeenCalled();
   });
 
   it("lists the player's instances", async () => {

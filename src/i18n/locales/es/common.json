@@ -36,6 +36,9 @@
     "title": "Jugar en {{server}}",
     "play": "Jugar",
     "gameVersion": "Minecraft {{version}}",
+    "playWith": "Jugar con…",
+    "playWithOption": "{{name}} · {{version}}",
+    "playWithStart": "Entrar con esta instancia",
     "spec": {
       "server": "Servidor",
       "version": "Versión",

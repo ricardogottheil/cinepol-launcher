@@ -21,6 +21,7 @@ import { instancesKey, useInstances } from "../instances/useInstances";
 import { bundledConfigDto, useServerConfig } from "../server/useServer";
 import { serverLamp } from "../servers/serverLamp";
 import { useSavedServers, useServerPing } from "../servers/useSavedServers";
+import { PlayWith } from "./PlayWith";
 
 const plateLink = plateLinkClass;
 
@@ -104,11 +105,14 @@ function QuickPlay({ recommended }: { recommended: string }) {
   return (
     <div data-enter-control className="mt-8 flex flex-col gap-4">
       {activity.kind === "idle" ? (
-        <SignalControl
-          label={t("home.play")}
-          detail={t("home.gameVersion", { version: recommended })}
-          onPress={() => void playCinepol()}
-        />
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+          <SignalControl
+            label={t("home.play")}
+            detail={t("home.gameVersion", { version: recommended })}
+            onPress={() => void playCinepol()}
+          />
+          <PlayWith />
+        </div>
       ) : (
         <div className="flex flex-col gap-3 rounded-control border border-hairline-lit p-4">
           <div className="flex items-center justify-between gap-4">

@@ -25,7 +25,10 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
 
 ## Features
 
-- One click to play on CINEPOL. Home lists the community servers the website
+- One click to play on CINEPOL: Play installs the community modpack (a
+  packwiz pack the website names) the first time and keeps it up to date,
+  and "Play with…" joins the server with any other instance. Home lists the
+  community servers the website
   publishes (one or more, or none) and the servers you saved, each with its
   players and ping. Saved servers remember the instance they are played with.
 - Microsoft (premium) and offline profiles, switched from the sidebar. Premium
