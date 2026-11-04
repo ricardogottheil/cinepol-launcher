@@ -112,8 +112,12 @@ mod linux {
     /// Reads one queued ICMP error and returns the router that sent it, when
     /// it is about probe `sequence` (the queue holds the probe it bounced).
     pub(super) fn read_error(socket: &UdpSocket, sequence: u16) -> Option<IpAddr> {
+        /// Control messages hold `cmsghdr`s, which need pointer alignment.
+        #[repr(C, align(8))]
+        struct Control([u8; 512]);
+
         let mut data = [0u8; 576];
-        let mut control = [0u8; 512];
+        let mut control = Control([0u8; 512]);
         let mut iov = libc::iovec {
             iov_base: data.as_mut_ptr().cast(),
             iov_len: data.len(),
@@ -122,8 +126,8 @@ mod linux {
         let mut message: libc::msghdr = unsafe { zeroed() };
         message.msg_iov = &raw mut iov;
         message.msg_iovlen = 1;
-        message.msg_control = control.as_mut_ptr().cast();
-        message.msg_controllen = control.len() as _;
+        message.msg_control = control.0.as_mut_ptr().cast();
+        message.msg_controllen = control.0.len() as _;
         // SAFETY: the header points to buffers that outlive the call.
         let length = unsafe {
             libc::recvmsg(
@@ -138,24 +142,34 @@ mod linux {
         if bounced_sequence != sequence {
             return None;
         }
-        // SAFETY: CMSG_* walk the control buffer the kernel just filled,
-        // bounded by msg_controllen.
+        // The error and, right after it, the offender's address (SO_EE_OFFENDER).
+        let needed = size_of::<libc::sock_extended_err>() + size_of::<libc::sockaddr_in>();
+        // SAFETY: CMSG_* walk the aligned control buffer the kernel just
+        // filled, bounded by msg_controllen. The payload is read only when
+        // cmsg_len covers it, and with read_unaligned, since CMSG_DATA only
+        // promises the alignment of cmsghdr.
         unsafe {
             let mut header = libc::CMSG_FIRSTHDR(&raw const message);
             while !header.is_null() {
                 if (*header).cmsg_level == libc::IPPROTO_IP
                     && (*header).cmsg_type == libc::IP_RECVERR
                 {
-                    let error = libc::CMSG_DATA(header).cast::<libc::sock_extended_err>();
-                    if (*error).ee_origin != libc::SO_EE_ORIGIN_ICMP {
+                    if ((*header).cmsg_len as usize) < libc::CMSG_LEN(needed as u32) as usize {
                         return None;
                     }
-                    // SO_EE_OFFENDER: the sender's address follows the struct.
-                    let offender = error.add(1).cast::<libc::sockaddr_in>();
-                    if libc::c_int::from((*offender).sin_family) != libc::AF_INET {
+                    let data = libc::CMSG_DATA(header);
+                    let error = data.cast::<libc::sock_extended_err>().read_unaligned();
+                    if error.ee_origin != libc::SO_EE_ORIGIN_ICMP {
                         return None;
                     }
-                    let address = u32::from_be((*offender).sin_addr.s_addr);
+                    let offender = data
+                        .add(size_of::<libc::sock_extended_err>())
+                        .cast::<libc::sockaddr_in>()
+                        .read_unaligned();
+                    if libc::c_int::from(offender.sin_family) != libc::AF_INET {
+                        return None;
+                    }
+                    let address = u32::from_be(offender.sin_addr.s_addr);
                     return Some(IpAddr::V4(Ipv4Addr::from(address)));
                 }
                 header = libc::CMSG_NXTHDR(&raw const message, header);

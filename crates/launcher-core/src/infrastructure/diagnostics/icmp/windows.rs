@@ -72,22 +72,38 @@ pub(super) fn probe(
         )
     };
     let rtt = started.elapsed();
+    // SAFETY: the buffer is larger than one ICMP_ECHO_REPLY; read it
+    // unaligned because a Vec<u8> carries no alignment.
+    let echo = unsafe { reply.as_ptr().cast::<ICMP_ECHO_REPLY>().read_unaligned() };
     if count == 0 {
         // SAFETY: reads the calling thread's last error.
         let code = unsafe { GetLastError() };
+        // A zero count can still carry an IP_STATUS (a hop's "TTL expired",
+        // an unreachable): use the reply when it names a router, as .NET's
+        // Ping does, and count the probe as lost otherwise.
         return if code == IP_REQ_TIMED_OUT {
             Ok(ProbeOutcome::TimedOut)
+        } else if IP_STATUS_CODES.contains(&code) {
+            Ok(if echo.Address != 0 && echo.Status == code {
+                outcome(&echo, target, rtt)
+            } else {
+                ProbeOutcome::TimedOut
+            })
         } else {
             Err(HopProbeError::Failed(format!(
                 "IcmpSendEcho failed with error {code}"
             )))
         };
     }
-    // SAFETY: IcmpSendEcho wrote at least one ICMP_ECHO_REPLY at the start
-    // of the buffer; read it unaligned because a Vec<u8> carries no alignment.
-    let echo = unsafe { reply.as_ptr().cast::<ICMP_ECHO_REPLY>().read_unaligned() };
+    Ok(outcome(&echo, target, rtt))
+}
+
+/// The `IP_STATUS` values IcmpSendEcho reports (IP_STATUS_BASE 11000 and up).
+const IP_STATUS_CODES: std::ops::RangeInclusive<u32> = 11_000..=11_050;
+
+fn outcome(echo: &ICMP_ECHO_REPLY, target: Ipv4Addr, rtt: Duration) -> ProbeOutcome {
     let from = IpAddr::V4(Ipv4Addr::from(echo.Address.to_ne_bytes()));
-    Ok(match echo.Status {
+    match echo.Status {
         IP_SUCCESS => ProbeOutcome::Reply {
             from,
             rtt,
@@ -107,5 +123,5 @@ pub(super) fn probe(
             reached: from == IpAddr::V4(target),
         },
         _ => ProbeOutcome::TimedOut,
-    })
+    }
 }
