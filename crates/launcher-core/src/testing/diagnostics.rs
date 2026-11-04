@@ -196,7 +196,10 @@ impl ConnectionTimer for FakeConnectionTimer {
         }
         let mut connects = self.connects.lock().unwrap();
         *connects += 1;
-        if self.losing_every.is_some_and(|n| (*connects).is_multiple_of(n)) {
+        if self
+            .losing_every
+            .is_some_and(|n| (*connects).is_multiple_of(n))
+        {
             return Ok(None);
         }
         Ok(Some(self.rtt))

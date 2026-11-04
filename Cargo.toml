@@ -40,6 +40,9 @@ tauri-plugin-updater = "=2.13.1"
 hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "system-config"] }
 base64 = "0.22.1"
 # Pinned: parses packwiz `pack.toml`, `index.toml` and `*.pw.toml` (no writer needed).
+socket2 = "0.6.5"
+libc = "0.2.191"
+windows-sys = "0.61.2"
 toml = { version = "=1.1.6", default-features = false, features = ["std", "serde", "parse"] }
 # `v1` selects the native stores: macOS Keychain, Windows Credential Manager, Linux Secret Service.
 keyring = { version = "4.2.0", default-features = false, features = ["v1"] }

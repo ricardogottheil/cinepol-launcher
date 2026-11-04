@@ -48,6 +48,7 @@ pub struct ResolvedTarget {
     /// The host the game connects to (the SRV target when there is one).
     pub host: String,
     pub address: SocketAddr,
+    /// How long looking up the host's address took.
     pub dns: Duration,
 }
 

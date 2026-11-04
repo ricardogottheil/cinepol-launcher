@@ -70,22 +70,33 @@ impl<R: SrvResolver> MinecraftServerPinger<R> {
     /// Where to connect: the written port directly, otherwise the SRV record,
     /// otherwise the host on 25565.
     async fn connect_target(&self, address: &ServerAddress) -> (String, u16) {
-        let host = address.host();
-        let direct = (host.to_owned(), address.effective_port());
-        if has_explicit_port(address) || host.parse::<IpAddr>().is_ok() {
-            return direct;
+        connect_target(&self.resolver, address, self.connect_timeout).await
+    }
+}
+
+/// Where the game connects to `address`: the written port directly, otherwise
+/// the `_minecraft._tcp` SRV record (looked up within `srv_timeout`),
+/// otherwise the host on 25565.
+pub(crate) async fn connect_target<R: SrvResolver>(
+    resolver: &R,
+    address: &ServerAddress,
+    srv_timeout: Duration,
+) -> (String, u16) {
+    let host = address.host();
+    let direct = (host.to_owned(), address.effective_port());
+    if has_explicit_port(address) || host.parse::<IpAddr>().is_ok() {
+        return direct;
+    }
+    let name = format!("_minecraft._tcp.{host}");
+    match timeout(srv_timeout, resolver.lookup_srv(&name)).await {
+        Ok(Ok(records)) => best_target(&records).unwrap_or(direct),
+        Ok(Err(error)) => {
+            tracing::debug!(%name, %error, "SRV lookup failed, using the default port");
+            direct
         }
-        let name = format!("_minecraft._tcp.{host}");
-        match timeout(self.connect_timeout, self.resolver.lookup_srv(&name)).await {
-            Ok(Ok(records)) => best_target(&records).unwrap_or(direct),
-            Ok(Err(error)) => {
-                tracing::debug!(%name, %error, "SRV lookup failed, using the default port");
-                direct
-            }
-            Err(_) => {
-                tracing::debug!(%name, "SRV lookup timed out, using the default port");
-                direct
-            }
+        Err(_) => {
+            tracing::debug!(%name, "SRV lookup timed out, using the default port");
+            direct
         }
     }
 }

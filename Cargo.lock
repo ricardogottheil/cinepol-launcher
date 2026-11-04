@@ -604,6 +604,7 @@ dependencies = [
  "hex",
  "hickory-resolver",
  "keyring",
+ "libc",
  "md-5",
  "regex-lite",
  "reqwest",
@@ -611,6 +612,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2 0.11.1",
+ "socket2",
  "tar",
  "tempfile",
  "thiserror 2.0.21",
@@ -619,6 +621,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "tracing",
  "uuid",
+ "windows-sys 0.61.2",
  "zip 9.0.3",
 ]
 
