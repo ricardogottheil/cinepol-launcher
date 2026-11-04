@@ -10,12 +10,13 @@ describe("tones", () => {
       "unknown",
     ]);
     expect([dnsTone(6), dnsTone(300), dnsTone(900)]).toEqual(["good", "warn", "bad"]);
-    expect([lossTone(0, 300), lossTone(2, 300), lossTone(10, 300), lossTone(0, 0)]).toEqual([
-      "good",
-      "warn",
-      "bad",
-      "unknown",
-    ]);
+    expect([
+      lossTone(0, 300),
+      lossTone(1.3, 300),
+      lossTone(2, 300),
+      lossTone(10, 300),
+      lossTone(0, 0),
+    ]).toEqual(["good", "good", "warn", "bad", "unknown"]);
   });
 });
 

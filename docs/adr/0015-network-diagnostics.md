@@ -52,8 +52,11 @@ should run that test for any server and explain the result in plain words.
   answers**. Loss or delay at a single router is how routers deprioritize
   answering probes, and is ignored. Ten samples come first; a port that never
   accepts a connection is "unreachable".
-- **Report.** The frontend writes the report as plain monospace text in the
-  player's language. The core uploads it unchanged to mclo.gs
+- **Report.** The frontend writes the report as plain monospace text, always
+  in neutral English whatever the UI language, because players send it to the
+  server's host or to their ISP. It states the target, the start time with its
+  UTC offset, the method, an assessment in third person, and a hop table with
+  a zone column (LAN, ISP, Transit, Server). The core uploads it unchanged to mclo.gs
   (`POST https://api.mclo.gs/1/log`, JSON `content` and `source`), and links
   expire after 90 days. "Copy as text" copies the same report. The home and
   provider hops are hidden by default, in the report and in the table; one

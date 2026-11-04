@@ -647,21 +647,6 @@
       "expires": "Los links de mclo.gs vencen a los 90 días.",
       "expiresIn_one": "El link vence en {{count}} día.",
       "expiresIn_other": "El link vence en {{count}} días."
-    },
-    "report": {
-      "title": "Diagnóstico de red de Cinepol Launcher",
-      "server": "Servidor",
-      "date": "Fecha",
-      "duration": "Duración",
-      "ran": "{{elapsed}} de {{planned}}",
-      "stoppedEarly": "(detenida antes)",
-      "launcher": "Launcher",
-      "verdict": "Resultado",
-      "loss": "pérdida",
-      "players": "jugadores",
-      "jitter": "jitter",
-      "hopsHidden": "Saltos (el router y el proveedor del jugador están ocultos):",
-      "hopsShown": "Saltos:"
     }
   }
 }

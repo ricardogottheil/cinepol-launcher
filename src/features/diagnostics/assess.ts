@@ -19,10 +19,14 @@ export function dnsTone(ms: number | null | undefined): Tone {
   return "bad";
 }
 
-/** Lost packets in percent; nothing to say before a probe was sent. */
+/**
+ * Lost packets in percent; nothing to say before a probe was sent. "Good" ends
+ * at 2 %, where the core's verdict starts calling loss a problem, so the card
+ * never disagrees with a healthy verdict.
+ */
 export function lossTone(percent: number, sent: number): Tone {
   if (sent === 0) return "unknown";
-  if (percent < 1) return "good";
+  if (percent < 2) return "good";
   if (percent < 5) return "warn";
   return "bad";
 }

@@ -451,7 +451,7 @@ function Share({ diagnostic }: { diagnostic: DiagnosticDto }) {
   const state = useDiagnostics();
   const running = state.running;
   const report = () =>
-    renderReport(t, {
+    renderReport({
       diagnostic,
       startedAt: state.startedAt ?? new Date(),
       launcherVersion: appInfo?.version ?? null,

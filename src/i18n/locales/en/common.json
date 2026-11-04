@@ -649,19 +649,73 @@
       "expiresIn_other": "The link expires in {{count}} days."
     },
     "report": {
-      "title": "Cinepol Launcher network diagnosis",
-      "server": "Server",
-      "date": "Date",
+      "title": "Network path report (Cinepol Launcher)",
+      "target": "Target",
+      "resolved": "Resolved to",
+      "started": "Started",
       "duration": "Duration",
-      "ran": "{{elapsed}} of {{planned}}",
+      "ran": "{{elapsed}} of {{planned}} planned",
       "stoppedEarly": "(stopped early)",
-      "launcher": "Launcher",
-      "verdict": "Verdict",
-      "loss": "loss",
-      "players": "players",
-      "jitter": "jitter",
-      "hopsHidden": "Hops (the player's router and provider are hidden):",
-      "hopsShown": "Hops:"
+      "client": "Client",
+      "method": "Method",
+      "methodText": "one ICMP echo per hop (increasing TTL) and one TCP connect per second; a Server List Ping every 5 s. IPv4.",
+      "assessment": "Assessment",
+      "verdict": {
+        "measuring": "Not enough samples yet.",
+        "healthy": "No loss, latency or jitter problem found on the path.",
+        "nameNotFound": "The server name did not resolve.",
+        "unreachable": "The server port did not accept TCP connections.",
+        "issue": {
+          "loss": "packet loss",
+          "latency": "high latency",
+          "jitter": "high jitter"
+        },
+        "where": {
+          "home": "{{issue}}, starting in the client's local network.",
+          "provider": "{{issue}}, starting at the client's access ISP.",
+          "internet": "{{issue}}, starting in transit between the client's ISP and the server's network.",
+          "server": "{{issue}}, starting near the server (last hops of the path).",
+          "unknown": "{{issue}} between the client and the server; the starting hop is unclear."
+        }
+      },
+      "summary": "Summary",
+      "dns": "DNS lookup",
+      "tcp": "TCP connect",
+      "slp": "Server List Ping",
+      "destinationLoss": "Loss to destination",
+      "failed": "{{loss}} failed",
+      "lost": "{{loss}} lost",
+      "jitter": "jitter {{jitter}} ms",
+      "players": "{{online}}/{{max}} players",
+      "hops": "Hops",
+      "hopsHidden": "the client's local network and access ISP are hidden",
+      "hopsShown": "all hops shown",
+      "hidden": {
+        "home": "(hidden)",
+        "provider": "(hidden)",
+        "internet": "(hidden)",
+        "server": "(hidden)"
+      },
+      "noReply": "(no reply)",
+      "zone": {
+        "home": "LAN",
+        "provider": "ISP",
+        "internet": "Transit",
+        "server": "Server"
+      },
+      "columns": {
+        "host": "Host",
+        "zone": "Zone",
+        "loss": "Loss",
+        "sent": "Sent",
+        "last": "Last",
+        "average": "Avg",
+        "best": "Best",
+        "worst": "Worst",
+        "jitter": "Jitter"
+      },
+      "unavailable": "Per-hop probing was not available on this system; the summary uses TCP connects only.",
+      "notes": "Times are in milliseconds. Loss or delay at a single hop that does not carry on to the following hops is usually ICMP rate limiting on that router, not real loss."
     }
   }
 }

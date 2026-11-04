@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../app/App";
 import { createAppRouter } from "../../app/router";
+import enCommon from "../../i18n/locales/en/common.json";
 import esCommon from "../../i18n/locales/es/common.json";
 import type { DiagnosticDto } from "../../ipc/client";
 import { useDiagnostics } from "./diagnosticsStore";
@@ -144,9 +145,9 @@ describe("DiagnosticsPage", () => {
       await screen.findByRole("link", { name: "https://mclo.gs/WnMMikq" }),
     ).toBeInTheDocument();
     const [report] = client.shareDiagnosticReport.mock.calls[0] as [string];
-    expect(report).toContain(labels.report.title);
+    expect(report).toContain(enCommon.diagnostics.report.title);
     expect(report).not.toContain("192.168.68.1");
-    expect(report).toContain("Launcher: Cinepol Launcher 0.5.0");
+    expect(report).toContain("Client: Cinepol Launcher 0.5.0");
     expect(
       screen.getByText(new RegExp(labels.share.expiresIn_other.replace("{{count}}", "90"))),
     ).toBeInTheDocument();
