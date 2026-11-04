@@ -20,7 +20,8 @@
     "modpacks": "Modpacks",
     "profile": "Profile",
     "about": "About",
-    "designKit": "Design kit"
+    "designKit": "Design kit",
+    "diagnostics": "Diagnostics"
   },
   "navGroups": {
     "game": "Game",
@@ -453,7 +454,8 @@
     "alreadySaved": "That server is already saved.",
     "invalidServer": "Check the name and the address.",
     "openHome": "Open Home",
-    "cinepolRunning": "CINEPOL is running."
+    "cinepolRunning": "CINEPOL is running.",
+    "testConnection": "Test connection"
   },
   "updates": {
     "title": "Launcher update",
@@ -540,5 +542,126 @@
   "toast": {
     "region": "Notifications",
     "dismiss": "Dismiss"
+  },
+  "diagnostics": {
+    "title": "Network diagnosis",
+    "lead": "Measures the connection from your computer to a server, hop by hop, and tells you in plain words where a problem starts. Share the report with the staff when the server feels laggy.",
+    "server": "Server",
+    "otherAddress": "Another address…",
+    "addressLabel": "Address",
+    "duration": "Duration",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "start": "Test",
+    "stop": "Stop",
+    "ready": "Ready to test",
+    "starting": "Starting the test…",
+    "readyDetail": "The launcher sends small packets to every hop between your computer and the server and measures how long each one takes and how many get lost. Five minutes catches the lag that comes and goes; you can stop earlier and keep what was measured.",
+    "progress": "Testing… {{left}} left. You can leave this page; the test keeps running.",
+    "progressLabel": "Test progress",
+    "liveVerdict": "This reading updates while the test runs.",
+    "tone": {
+      "good": "Good",
+      "warn": "So-so",
+      "bad": "Bad",
+      "unknown": "Not measured yet"
+    },
+    "cards": {
+      "dns": "DNS",
+      "tcp": "TCP connection",
+      "tcpDetail": "{{loss}} failed",
+      "minecraft": "Minecraft ping",
+      "players": "{{online}}/{{max}} players",
+      "loss": "Loss to the server",
+      "jitter": "Jitter {{jitter}} ms"
+    },
+    "verdict": {
+      "measuring": "Measuring… the first results show in a few seconds.",
+      "healthy": "Your connection to the server looks fine.",
+      "nameNotFound": "The server's address could not be found.",
+      "unreachable": "The server does not answer.",
+      "where": {
+        "home": "The problem starts in your home network (Wi-Fi or router).",
+        "provider": "The problem starts at your internet provider.",
+        "internet": "The problem is on the internet, between your provider and the server.",
+        "server": "The problem is near the server.",
+        "unknown": "There is a problem between you and the server."
+      },
+      "issue": {
+        "loss": "Packets are getting lost on the way, which feels like lag and rubber-banding.",
+        "latency": "The ping is high, so everything you do reaches the server late.",
+        "jitter": "The ping jumps up and down, which feels like lag spikes."
+      },
+      "advice": {
+        "healthy": "If the game still lags, the cause is more likely the game or your computer than the network.",
+        "nameNotFound": "Check the address, or try again in a minute in case your internet just dropped.",
+        "unreachable": "The server may be down or restarting. Check the community's announcements, then try again.",
+        "home": "Try a network cable instead of Wi-Fi, move closer to the router, or restart it.",
+        "provider": "Restart your router; if it keeps happening, contact your internet provider and share this report.",
+        "internet": "These problems usually go away on their own. If it lasts, share this report with the staff.",
+        "server": "Share this report with the server's staff so they can look into it.",
+        "unknown": "Share this report with the server's staff."
+      }
+    },
+    "zones": {
+      "home": "Your network",
+      "provider": "Your provider",
+      "internet": "Internet",
+      "server": "Server's network"
+    },
+    "hops": {
+      "title_one": "Technical details: {{count}} hop",
+      "title_other": "Technical details: {{count}} hops",
+      "showPrivate": "Show my router and provider",
+      "host": "Host",
+      "loss": "Loss",
+      "sent": "Sent",
+      "last": "Last",
+      "average": "Avg",
+      "best": "Best",
+      "worst": "Worst",
+      "jitter": "Jitter",
+      "history": "History",
+      "noAnswer": "No answer",
+      "hidden": {
+        "home": "Your network (hidden)",
+        "provider": "Your provider (hidden)",
+        "internet": "Hidden",
+        "server": "Hidden"
+      },
+      "explain": "Times are in milliseconds. Loss at a single hop that does not continue to the next ones is normal: many routers answer these probes last.",
+      "unavailable": "This system does not let the launcher measure each hop, so the result only uses the connection to the server."
+    },
+    "share": {
+      "title": "Share the report",
+      "createLink": "Create link",
+      "creating": "Creating link…",
+      "copyText": "Copy as text",
+      "copyLink": "Copy link",
+      "copied": "Report copied",
+      "linkCopied": "Link copied",
+      "copyFailed": "Could not copy to the clipboard",
+      "afterTest": "The report is ready when the test ends or you stop it.",
+      "privateHidden": "Your router and provider stay hidden in the report.",
+      "privateShown": "The report includes your router and provider.",
+      "expires": "Links on mclo.gs expire after 90 days.",
+      "expiresIn_one": "The link expires in {{count}} day.",
+      "expiresIn_other": "The link expires in {{count}} days."
+    },
+    "report": {
+      "title": "Cinepol Launcher network diagnosis",
+      "server": "Server",
+      "date": "Date",
+      "duration": "Duration",
+      "ran": "{{elapsed}} of {{planned}}",
+      "stoppedEarly": "(stopped early)",
+      "launcher": "Launcher",
+      "verdict": "Verdict",
+      "loss": "loss",
+      "players": "players",
+      "jitter": "jitter",
+      "hopsHidden": "Hops (the player's router and provider are hidden):",
+      "hopsShown": "Hops:"
+    }
   }
 }

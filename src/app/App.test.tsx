@@ -41,7 +41,7 @@ describe("App shell", () => {
         [esCommon.nav.home, esCommon.nav.instances, esCommon.nav.servers, esCommon.nav.modpacks],
       ],
       [esCommon.navGroups.player, [esCommon.nav.profile]],
-      [esCommon.navGroups.launcher, [esCommon.nav.about]],
+      [esCommon.navGroups.launcher, [esCommon.nav.diagnostics, esCommon.nav.about]],
     ];
     for (const [group, items] of groups) {
       const list = within(nav).getByRole("list", { name: group });

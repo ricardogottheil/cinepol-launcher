@@ -1,6 +1,7 @@
+import { Link } from "@tanstack/react-router";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../components/ui/Button";
+import { Button, plateLinkClass } from "../../components/ui/Button";
 import { Readout } from "../../components/ui/Readout";
 import { SelectField } from "../../components/ui/SelectField";
 import { StatusLamp } from "../../components/ui/StatusLamp";
@@ -106,6 +107,9 @@ export function SavedServerRow({
         ) : (
           <Button onClick={onPlay}>{t("servers.play")}</Button>
         )}
+        <Link to="/diagnostics" search={{ server: server.address }} className={plateLinkClass}>
+          {t("servers.testConnection")}
+        </Link>
         {editing ? null : (
           <Button onClick={() => setEditing(true)} disabled={busy}>
             {t("servers.edit")}

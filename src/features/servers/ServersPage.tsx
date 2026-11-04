@@ -61,6 +61,9 @@ function CommunityServer({ server, main }: { server: CommunityServerDto; main: b
           <Readout unit={t("home.readouts.latency")} value={`${live.latencyMs} ms`} size="sm" />
         ) : null}
       </div>
+      <Link to="/diagnostics" search={{ server: server.address }} className={plateLinkClass}>
+        {t("servers.testConnection")}
+      </Link>
       {session.activity.kind === "idle" ? (
         <SignalControl
           label={t("servers.play")}

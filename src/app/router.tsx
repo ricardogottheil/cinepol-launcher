@@ -9,6 +9,7 @@ import { AboutPage } from "../features/about/AboutPage";
 import { AddProfilePage } from "../features/accounts/AddProfilePage";
 import { ProfilePage } from "../features/accounts/ProfilePage";
 import { DesignKitPage } from "../features/design-kit/DesignKitPage";
+import { DiagnosticsPage } from "../features/diagnostics/DiagnosticsPage";
 import { HomePage } from "../features/home/HomePage";
 import { InstanceDetailPage } from "../features/instances/InstanceDetailPage";
 import { InstancesPage } from "../features/instances/InstancesPage";
@@ -49,6 +50,14 @@ const routeTree = rootRoute.addChildren([
   }),
   createRoute({ getParentRoute: () => rootRoute, path: "/profile", component: ProfilePage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/profile/new", component: AddProfilePage }),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/diagnostics",
+    component: DiagnosticsPage,
+    // `?server=` preselects the server to test (the servers page links here).
+    validateSearch: (search: Record<string, unknown>): { server?: string } =>
+      typeof search.server === "string" ? { server: search.server } : {},
+  }),
   createRoute({ getParentRoute: () => rootRoute, path: "/about", component: AboutPage }),
   createRoute({ getParentRoute: () => rootRoute, path: "/updates", component: UpdatePage }),
   ...(import.meta.env.DEV ? [designRoute] : []),

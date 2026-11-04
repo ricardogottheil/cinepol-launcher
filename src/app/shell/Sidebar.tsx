@@ -8,13 +8,22 @@ import { UpdateBadge } from "../../features/system/UpdateBadge";
 import { openExternal } from "../../ipc/client";
 
 type NavItem = {
-  to: "/" | "/instances" | "/servers" | "/modpacks" | "/profile" | "/about" | "/design";
+  to:
+    | "/"
+    | "/instances"
+    | "/servers"
+    | "/modpacks"
+    | "/profile"
+    | "/diagnostics"
+    | "/about"
+    | "/design";
   key:
     | "nav.home"
     | "nav.instances"
     | "nav.servers"
     | "nav.modpacks"
     | "nav.profile"
+    | "nav.diagnostics"
     | "nav.about"
     | "nav.designKit";
 };
@@ -35,6 +44,7 @@ const GROUPS: { key: NavGroupKey; items: NavItem[] }[] = [
   {
     key: "navGroups.launcher",
     items: [
+      { to: "/diagnostics", key: "nav.diagnostics" },
       { to: "/about", key: "nav.about" },
       ...(import.meta.env.DEV ? [{ to: "/design", key: "nav.designKit" } as const] : []),
     ],

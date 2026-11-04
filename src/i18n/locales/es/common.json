@@ -20,7 +20,8 @@
     "modpacks": "Modpacks",
     "profile": "Perfil",
     "about": "Acerca de",
-    "designKit": "Kit de diseño"
+    "designKit": "Kit de diseño",
+    "diagnostics": "Diagnóstico"
   },
   "navGroups": {
     "game": "Juego",
@@ -453,7 +454,8 @@
     "alreadySaved": "Ese servidor ya está guardado.",
     "invalidServer": "Revisa el nombre y la dirección.",
     "openHome": "Ir a Inicio",
-    "cinepolRunning": "CINEPOL está en curso."
+    "cinepolRunning": "CINEPOL está en curso.",
+    "testConnection": "Probar conexión"
   },
   "updates": {
     "title": "Actualización del launcher",
@@ -540,5 +542,126 @@
   "toast": {
     "region": "Notificaciones",
     "dismiss": "Cerrar"
+  },
+  "diagnostics": {
+    "title": "Diagnóstico de red",
+    "lead": "Mide la conexión de tu computadora a un servidor, salto por salto, y te dice en palabras simples dónde empieza el problema. Comparte el reporte con el staff cuando el servidor vaya con lag.",
+    "server": "Servidor",
+    "otherAddress": "Otra dirección…",
+    "addressLabel": "Dirección",
+    "duration": "Duración",
+    "minutes_one": "{{count}} minuto",
+    "minutes_other": "{{count}} minutos",
+    "start": "Probar",
+    "stop": "Detener",
+    "ready": "Listo para probar",
+    "starting": "Iniciando la prueba…",
+    "readyDetail": "El launcher manda paquetes pequeños a cada salto entre tu computadora y el servidor, y mide cuánto tarda cada uno y cuántos se pierden. Con cinco minutos se ve el lag que va y viene; puedes detenerla antes y conservar lo medido.",
+    "progress": "Probando… faltan {{left}}. Puedes salir de esta página; la prueba sigue.",
+    "progressLabel": "Progreso de la prueba",
+    "liveVerdict": "Este resultado se actualiza mientras la prueba sigue.",
+    "tone": {
+      "good": "Bien",
+      "warn": "Regular",
+      "bad": "Mal",
+      "unknown": "Sin medir todavía"
+    },
+    "cards": {
+      "dns": "DNS",
+      "tcp": "Conexión TCP",
+      "tcpDetail": "{{loss}} fallidas",
+      "minecraft": "Ping de Minecraft",
+      "players": "{{online}}/{{max}} jugadores",
+      "loss": "Pérdida al servidor",
+      "jitter": "Jitter {{jitter}} ms"
+    },
+    "verdict": {
+      "measuring": "Midiendo… los primeros resultados aparecen en unos segundos.",
+      "healthy": "Tu conexión al servidor se ve bien.",
+      "nameNotFound": "No se encontró la dirección del servidor.",
+      "unreachable": "El servidor no responde.",
+      "where": {
+        "home": "El problema empieza en tu red de casa (Wi-Fi o router).",
+        "provider": "El problema empieza en tu proveedor de internet.",
+        "internet": "El problema está en internet, entre tu proveedor y el servidor.",
+        "server": "El problema está cerca del servidor.",
+        "unknown": "Hay un problema entre tú y el servidor."
+      },
+      "issue": {
+        "loss": "Se están perdiendo paquetes en el camino; se siente como lag y tirones.",
+        "latency": "El ping es alto, así que todo lo que haces llega tarde al servidor.",
+        "jitter": "El ping sube y baja mucho; se siente como picos de lag."
+      },
+      "advice": {
+        "healthy": "Si el juego sigue con lag, lo más probable es que la causa sea el juego o tu computadora, no la red.",
+        "nameNotFound": "Revisa la dirección, o vuelve a probar en un minuto por si se cortó tu internet.",
+        "unreachable": "Puede que el servidor esté caído o reiniciándose. Mira los anuncios de la comunidad y vuelve a probar.",
+        "home": "Prueba con un cable de red en lugar de Wi-Fi, acércate al router o reinícialo.",
+        "provider": "Reinicia tu router; si sigue pasando, contacta a tu proveedor de internet y compártele este reporte.",
+        "internet": "Estos problemas suelen resolverse solos. Si dura, comparte este reporte con el staff.",
+        "server": "Comparte este reporte con el staff del servidor para que lo revisen.",
+        "unknown": "Comparte este reporte con el staff del servidor."
+      }
+    },
+    "zones": {
+      "home": "Tu red",
+      "provider": "Tu proveedor",
+      "internet": "Internet",
+      "server": "Red del servidor"
+    },
+    "hops": {
+      "title_one": "Detalles técnicos: {{count}} salto",
+      "title_other": "Detalles técnicos: {{count}} saltos",
+      "showPrivate": "Mostrar mi router y mi proveedor",
+      "host": "Host",
+      "loss": "Pérdida",
+      "sent": "Env.",
+      "last": "Últ.",
+      "average": "Prom.",
+      "best": "Mejor",
+      "worst": "Peor",
+      "jitter": "Jitter",
+      "history": "Historial",
+      "noAnswer": "Sin respuesta",
+      "hidden": {
+        "home": "Tu red (oculto)",
+        "provider": "Tu proveedor (oculto)",
+        "internet": "Oculto",
+        "server": "Oculto"
+      },
+      "explain": "Los tiempos están en milisegundos. Una pérdida en un solo salto que no sigue en los siguientes es normal: muchos routers responden estas pruebas al final de su lista.",
+      "unavailable": "Este sistema no deja que el launcher mida cada salto, así que el resultado solo usa la conexión al servidor."
+    },
+    "share": {
+      "title": "Compartir el reporte",
+      "createLink": "Crear link",
+      "creating": "Creando link…",
+      "copyText": "Copiar como texto",
+      "copyLink": "Copiar link",
+      "copied": "Reporte copiado",
+      "linkCopied": "Link copiado",
+      "copyFailed": "No se pudo copiar al portapapeles",
+      "afterTest": "El reporte está listo cuando la prueba termina o la detienes.",
+      "privateHidden": "Tu router y tu proveedor quedan ocultos en el reporte.",
+      "privateShown": "El reporte incluye tu router y tu proveedor.",
+      "expires": "Los links de mclo.gs vencen a los 90 días.",
+      "expiresIn_one": "El link vence en {{count}} día.",
+      "expiresIn_other": "El link vence en {{count}} días."
+    },
+    "report": {
+      "title": "Diagnóstico de red de Cinepol Launcher",
+      "server": "Servidor",
+      "date": "Fecha",
+      "duration": "Duración",
+      "ran": "{{elapsed}} de {{planned}}",
+      "stoppedEarly": "(detenida antes)",
+      "launcher": "Launcher",
+      "verdict": "Resultado",
+      "loss": "pérdida",
+      "players": "jugadores",
+      "jitter": "jitter",
+      "hopsHidden": "Saltos (el router y el proveedor del jugador están ocultos):",
+      "hopsShown": "Saltos:"
+    }
   }
 }
