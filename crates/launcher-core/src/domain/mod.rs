@@ -4,6 +4,7 @@
 //! `infrastructure` (enforced by `tests/architecture.rs`).
 
 pub mod account;
+pub mod diagnostics;
 pub mod instance;
 pub mod integrity;
 pub mod java;
