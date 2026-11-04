@@ -78,12 +78,12 @@ pub(super) fn probe(
     if count == 0 {
         // SAFETY: reads the calling thread's last error.
         let code = unsafe { GetLastError() };
-        // A zero count can still carry an IP_STATUS (a hop's "TTL expired",
-        // an unreachable): use the reply when it names a router, as .NET's
-        // Ping does, and count the probe as lost otherwise.
+        // A zero count can still carry a router's answer (a hop's "TTL
+        // expired", an unreachable): use the reply when it names that router,
+        // as .NET's Ping does, and count the probe as lost otherwise.
         return if code == IP_REQ_TIMED_OUT {
             Ok(ProbeOutcome::TimedOut)
-        } else if IP_STATUS_CODES.contains(&code) {
+        } else if ROUTER_STATUSES.contains(&code) {
             Ok(if echo.Address != 0 && echo.Status == code {
                 outcome(&echo, target, rtt)
             } else {
@@ -98,8 +98,16 @@ pub(super) fn probe(
     Ok(outcome(&echo, target, rtt))
 }
 
-/// The `IP_STATUS` values IcmpSendEcho reports (IP_STATUS_BASE 11000 and up).
-const IP_STATUS_CODES: std::ops::RangeInclusive<u32> = 11_000..=11_050;
+/// The statuses a router on the path answers with. Every other status on a
+/// zero count (buffer, resources, hardware) is a local failure and stays an
+/// error, so it is never mistaken for loss on every hop.
+const ROUTER_STATUSES: [u32; 5] = [
+    IP_TTL_EXPIRED_TRANSIT,
+    IP_DEST_HOST_UNREACHABLE,
+    IP_DEST_NET_UNREACHABLE,
+    IP_DEST_PORT_UNREACHABLE,
+    IP_DEST_PROT_UNREACHABLE,
+];
 
 fn outcome(echo: &ICMP_ECHO_REPLY, target: Ipv4Addr, rtt: Duration) -> ProbeOutcome {
     let from = IpAddr::V4(Ipv4Addr::from(echo.Address.to_ne_bytes()));
