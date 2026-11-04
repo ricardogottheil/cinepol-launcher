@@ -62,7 +62,7 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
         │
  launcher-core::infrastructure  adapters: http, auth, mojang, loaders, modrinth,
                                 curseforge, packwiz, java, nbt, server_ping,
-                                process, keychain, fs
+                                diagnostics, process, keychain, fs
 ```
 
 **Dependency rule**: `domain` ← `application` ← `infrastructure`.
@@ -97,6 +97,7 @@ server (the community of the streamer polispol1, server `mc.policarpiers.com`).
 | Real CurseForge E2E (opt-in, needs `CURSEFORGE_API_KEY`, opens the game) | `cargo test -p cinepol-launcher-core --features network-tests --test e2e_curseforge -- --nocapture` (installs Fabulously Optimized 14.1.1 from CurseForge; `CINEPOL_E2E_CURSEFORGE` / `CINEPOL_E2E_CURSEFORGE_FILE` for another project and file; delete `target/e2e-data` afterwards) |
 | Real packwiz E2E (opt-in, opens the game) | `cargo test -p cinepol-launcher-core --features network-tests --test e2e_packwiz -- --nocapture` (installs Fabulously Optimized from its packwiz pack.toml; `CINEPOL_E2E_PACKWIZ` for another URL; delete `target/e2e-data` afterwards) |
 | packwiz network test (opt-in) | `cargo test -p cinepol-launcher-core --features network-tests --test packwiz_network` (reads the real Fabulously Optimized packwiz pack) |
+| Network diagnostics test (opt-in, ~1 min) | `cargo test -p cinepol-launcher-core --features network-tests --test diagnostics_network -- --nocapture` (traces the real path to the CINEPOL server; `CINEPOL_E2E_DIAGNOSE` for another one) |
 | Frontend tests | `pnpm test` |
 | English-only check | `pnpm check:english` |
 | Regenerate bindings | `pnpm bindings` |
