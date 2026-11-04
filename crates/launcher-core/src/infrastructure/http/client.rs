@@ -293,6 +293,9 @@ impl HttpRequester for ReqwestHttpClient {
                     )
                     .body(form)
             }
+            Some(HttpBody::Text { content_type, data }) => {
+                builder.header(CONTENT_TYPE, content_type).body(data)
+            }
         };
         let mut response = builder
             .send()
@@ -627,6 +630,26 @@ mod tests {
             request.headers.get("authorization").map(String::as_str),
             Some("Bearer mc-token")
         );
+    }
+
+    #[tokio::test]
+    async fn sends_a_text_body_with_its_media_type() {
+        let server = TestServer::start(vec![("/post", vec![Reply::ok("{}")])]).await;
+        let body = HttpBody::Text {
+            content_type: "text/plain",
+            data: "report\nhop 1".into(),
+        };
+        client()
+            .send(HttpRequest::post(server.url("/post"), body))
+            .await
+            .unwrap();
+        let request = &server.requests()[0];
+        assert_eq!(request.method, "POST");
+        assert_eq!(
+            request.headers.get("content-type").map(String::as_str),
+            Some("text/plain")
+        );
+        assert_eq!(request.body, b"report\nhop 1");
     }
 
     #[tokio::test]

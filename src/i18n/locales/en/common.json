@@ -147,7 +147,7 @@
     "too_many_dependencies": "This mod needs too many other mods to install it automatically",
     "manual_download": "This mod, or one it needs, can only be downloaded from CurseForge",
     "mod_backup_kept": "The update failed and the previous version could not be put back. A copy was kept in the launcher's temporary folder",
-    "report_rejected": "mclo.gs refused the report; copy it as text instead",
+    "report_rejected": "pastes.dev refused the report; copy it as text instead",
     "catalog_not_configured": "This build cannot use that modpack catalog",
     "invalid_skin": "The image must be a 64×64 or 64×32 PNG",
     "skin_rejected": "Minecraft refused this skin",
@@ -644,7 +644,7 @@
       "afterTest": "The report is ready when the test ends or you stop it.",
       "privateHidden": "Your router and provider stay hidden in the report.",
       "privateShown": "The report includes your router and provider.",
-      "expires": "Links on mclo.gs expire after 90 days.",
+      "expires": "Anyone with the link can read the report.",
       "expiresIn_one": "The link expires in {{count}} day.",
       "expiresIn_other": "The link expires in {{count}} days."
     },

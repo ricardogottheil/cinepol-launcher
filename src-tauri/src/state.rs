@@ -19,7 +19,7 @@ use launcher_core::infrastructure::archive::{
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
 use launcher_core::infrastructure::curseforge::CurseForgeSource;
 use launcher_core::infrastructure::diagnostics::{
-    IcmpHopProber, MclogsReportHost, SystemConnectionTimer,
+    IcmpHopProber, PastesReportHost, SystemConnectionTimer,
 };
 use launcher_core::infrastructure::fs::{
     JsonAccountRepository, JsonInstanceRepository, JsonModRegistryStore, JsonPackManifestStore,
@@ -125,11 +125,11 @@ pub struct AppState {
     pub pinger: MinecraftServerPinger,
     /// Network diagnostics: hop probes, DNS/TCP timing, a quick status ping
     /// (short timeouts so a slow answer never stalls a one-second round) and
-    /// the mclo.gs report host.
+    /// the pastes.dev report host.
     pub hop_prober: IcmpHopProber,
     pub connection_timer: SystemConnectionTimer,
     pub diagnostic_pinger: MinecraftServerPinger,
-    pub report_host: MclogsReportHost<ReqwestHttpClient>,
+    pub report_host: PastesReportHost<ReqwestHttpClient>,
     pub premium_names: MojangPremiumNames<ReqwestHttpClient>,
     /// Microsoft sign-in; `None` when the build has no `MSA_CLIENT_ID`.
     pub msa: Option<MsaClient<ReqwestHttpClient>>,
@@ -273,7 +273,7 @@ impl AppState {
             connection_timer: SystemConnectionTimer::new(),
             diagnostic_pinger: MinecraftServerPinger::new()
                 .with_timeouts(DIAGNOSTIC_PING_TIMEOUT, DIAGNOSTIC_PING_TIMEOUT),
-            report_host: MclogsReportHost::new(http.clone()),
+            report_host: PastesReportHost::new(http.clone()),
             premium_names: MojangPremiumNames::new(http.clone()),
             msa: msa_client_id().map(|client_id| MsaClient::new(http.clone(), client_id)),
             secrets: KeyringSecretStore::new(KEYCHAIN_SERVICE),

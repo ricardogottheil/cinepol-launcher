@@ -96,7 +96,7 @@ pub enum ReportShareError {
     Refused(String),
 }
 
-/// Publishes a plain-text report (mclo.gs).
+/// Publishes a plain-text report (pastes.dev).
 pub trait ReportHost: Send + Sync {
     fn publish(
         &self,

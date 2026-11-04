@@ -38,7 +38,7 @@ mod tests {
 
     fn link() -> SharedReport {
         SharedReport {
-            url: "https://mclo.gs/WnMMikq".into(),
+            url: "https://pastes.dev/aB3dE9fGh2".into(),
             expires_at: Some(1_777_373_979),
         }
     }

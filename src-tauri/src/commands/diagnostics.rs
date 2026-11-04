@@ -57,7 +57,7 @@ pub async fn diagnose_server(
 }
 
 /// Uploads a diagnosis report (plain text written by the frontend) to
-/// mclo.gs and returns its link.
+/// pastes.dev and returns its link.
 #[tauri::command]
 pub async fn share_diagnostic_report(
     state: State<'_, AppState>,

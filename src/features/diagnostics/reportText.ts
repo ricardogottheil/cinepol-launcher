@@ -83,7 +83,7 @@ function hopTable(diagnostic: DiagnosticDto, showPrivate: boolean): string[] {
 
 /**
  * The report a player shares with the server's host or their ISP: plain
- * monospace text (mclo.gs shows it as a log), always in neutral English, with
+ * monospace text (pastes.dev shows it as is), always in neutral English, with
  * the client's local network and ISP hidden unless the player chose to show them.
  */
 export function renderReport(context: ReportContext): string {

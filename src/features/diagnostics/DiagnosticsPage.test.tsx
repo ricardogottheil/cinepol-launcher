@@ -134,23 +134,21 @@ describe("DiagnosticsPage", () => {
   it("creates a link with the private hops hidden", async () => {
     const run = controlledRun();
     client.shareDiagnosticReport.mockResolvedValue({
-      url: "https://mclo.gs/WnMMikq",
-      expiresAt: Math.round(Date.now() / 1000) + 90 * 86_400,
+      url: "https://pastes.dev/aB3dE9fGh2",
+      expiresAt: null,
     });
     renderAt("/diagnostics?server=play.example.net");
     fireEvent.click(await startButton());
     await run.finish(cinepolDiagnostic());
     fireEvent.click(await screen.findByRole("button", { name: labels.share.createLink }));
     expect(
-      await screen.findByRole("link", { name: "https://mclo.gs/WnMMikq" }),
+      await screen.findByRole("link", { name: "https://pastes.dev/aB3dE9fGh2" }),
     ).toBeInTheDocument();
     const [report] = client.shareDiagnosticReport.mock.calls[0] as [string];
     expect(report).toContain(enCommon.diagnostics.report.title);
     expect(report).not.toContain("192.168.68.1");
     expect(report).toContain("Client: Cinepol Launcher 0.5.0");
-    expect(
-      screen.getByText(new RegExp(labels.share.expiresIn_other.replace("{{count}}", "90"))),
-    ).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(labels.share.expires))).toBeInTheDocument();
   });
 
   it("shows why a report could not be shared", async () => {

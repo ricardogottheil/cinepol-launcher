@@ -167,6 +167,11 @@ pub enum HttpBody {
     Json(Secret),
     /// A `multipart/form-data` form.
     Multipart(Vec<MultipartPart>),
+    /// Plain content sent as is, with its media type (a pasted report).
+    Text {
+        content_type: &'static str,
+        data: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

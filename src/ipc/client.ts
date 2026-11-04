@@ -476,7 +476,7 @@ export function diagnoseServer(
   );
 }
 
-/** Uploads a diagnosis report to mclo.gs and returns its link. */
+/** Uploads a diagnosis report to pastes.dev and returns its link. */
 export function shareDiagnosticReport(content: string): Promise<SharedReportDto> {
   return call("share_diagnostic_report", { content });
 }

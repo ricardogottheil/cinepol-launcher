@@ -115,7 +115,7 @@ pub enum ErrorCode {
     /// A mod update failed and the old jar could not be put back; `details`
     /// is where the launcher kept it.
     ModBackupKept,
-    /// The report host (mclo.gs) refused the report.
+    /// The report host (pastes.dev) refused the report.
     ReportRejected,
     Internal,
 }

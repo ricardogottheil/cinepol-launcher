@@ -56,9 +56,14 @@ should run that test for any server and explain the result in plain words.
   in neutral English whatever the UI language, because players send it to the
   server's host or to their ISP. It states the target, the start time with its
   UTC offset, the method, an assessment in third person, and a hop table with
-  a zone column (LAN, ISP, Transit, Server). The core uploads it unchanged to mclo.gs
-  (`POST https://api.mclo.gs/1/log`, JSON `content` and `source`), and links
-  expire after 90 days. "Copy as text" copies the same report. The home and
+  a zone column (LAN, ISP, Transit, Server). The core uploads it unchanged to pastes.dev
+  (`POST https://api.pastes.dev/post`, `text/plain` body, answer
+  `{"key": ...}`, read at `https://pastes.dev/<key>`), once per click and
+  never retried, as its API terms ask. mclo.gs was the first choice, but it
+  replaces every IPv4 address with `**.**.**.**` on the server, with no
+  option to turn that off, which leaves a path report useless to a host or
+  an ISP. pastes.dev does not document how long it keeps pastes, so the UI
+  promises no expiry. "Copy as text" copies the same report. The home and
   provider hops are hidden by default, in the report and in the table; one
   toggle shows both.
 

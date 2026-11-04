@@ -1,10 +1,10 @@
 //! Network diagnostics adapters: hop probes (ICMP), DNS and TCP timing, and
-//! the mclo.gs report host.
+//! the pastes.dev report host.
 
 mod connection;
 mod icmp;
-mod mclogs;
+mod pastes;
 
 pub use connection::{RESOLVE_TIMEOUT, SystemConnectionTimer};
 pub use icmp::IcmpHopProber;
-pub use mclogs::{MCLOGS_API_URL, MclogsReportHost};
+pub use pastes::{PASTES_API_URL, PASTES_VIEW_URL, PastesReportHost};
