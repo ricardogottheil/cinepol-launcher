@@ -115,6 +115,8 @@ pub enum ErrorCode {
     /// A mod update failed and the old jar could not be put back; `details`
     /// is where the launcher kept it.
     ModBackupKept,
+    /// The report host (mclo.gs) refused the report.
+    ReportRejected,
     Internal,
 }
 
@@ -381,6 +383,25 @@ impl From<launcher_core::application::ping_server::PingServerError> for AppError
             }
             PingServerError::Status(status) => Self::from(status),
         }
+    }
+}
+
+impl From<launcher_core::application::diagnose_connection::DiagnoseError> for AppError {
+    fn from(error: launcher_core::application::diagnose_connection::DiagnoseError) -> Self {
+        Self::new(ErrorCode::InvalidInput, error.to_string())
+    }
+}
+
+impl From<launcher_core::application::share_diagnostic_report::ShareReportError> for AppError {
+    fn from(error: launcher_core::application::share_diagnostic_report::ShareReportError) -> Self {
+        use launcher_core::application::share_diagnostic_report::ShareReportError;
+        use launcher_core::domain::diagnostics::ReportShareError;
+        let code = match &error {
+            ShareReportError::Empty | ShareReportError::TooLarge(_) => ErrorCode::InvalidInput,
+            ShareReportError::Host(ReportShareError::Unavailable(_)) => ErrorCode::Network,
+            ShareReportError::Host(ReportShareError::Refused(_)) => ErrorCode::ReportRejected,
+        };
+        Self::new(code, error.to_string())
     }
 }
 

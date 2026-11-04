@@ -61,6 +61,8 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::saved_servers::save_server,
             commands::saved_servers::remove_saved_server,
             commands::saved_servers::ping_server,
+            commands::diagnostics::diagnose_server,
+            commands::diagnostics::share_diagnostic_report,
             commands::accounts::change_account_skin,
             commands::accounts::list_account_capes,
             commands::accounts::refresh_account_profile,

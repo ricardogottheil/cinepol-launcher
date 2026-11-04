@@ -18,6 +18,9 @@ use launcher_core::infrastructure::archive::{
 };
 use launcher_core::infrastructure::cinepol::{HttpServerConfigSource, parse_server_config};
 use launcher_core::infrastructure::curseforge::CurseForgeSource;
+use launcher_core::infrastructure::diagnostics::{
+    IcmpHopProber, MclogsReportHost, SystemConnectionTimer,
+};
 use launcher_core::infrastructure::fs::{
     JsonAccountRepository, JsonInstanceRepository, JsonModRegistryStore, JsonPackManifestStore,
     JsonSavedServerRepository, StdPackFiles, TokioFileSystem,
@@ -80,6 +83,10 @@ const BUNDLED_SERVER_CONFIG: &[u8] = include_bytes!("../../config/server-config.
 /// Contact in the User-Agent, as API providers ask (`<user>/<repo>/<version> (<contact>)`).
 const USER_AGENT_CONTACT: &str = "https://cinepol.policarpiers.com";
 
+/// The diagnostics status ping's connect and exchange limits: its rounds
+/// last one second, so a slow server counts as a lost ping, not a stall.
+const DIAGNOSTIC_PING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// The game installer's dependencies, as wired in this app.
 pub type AppInstallDeps<'a> = InstallDeps<
     'a,
@@ -116,6 +123,13 @@ pub struct AppState {
     pub fs: TokioFileSystem,
     pub servers: NbtServerListStore,
     pub pinger: MinecraftServerPinger,
+    /// Network diagnostics: hop probes, DNS/TCP timing, a quick status ping
+    /// (short timeouts so a slow answer never stalls a one-second round) and
+    /// the mclo.gs report host.
+    pub hop_prober: IcmpHopProber,
+    pub connection_timer: SystemConnectionTimer,
+    pub diagnostic_pinger: MinecraftServerPinger,
+    pub report_host: MclogsReportHost<ReqwestHttpClient>,
     pub premium_names: MojangPremiumNames<ReqwestHttpClient>,
     /// Microsoft sign-in; `None` when the build has no `MSA_CLIENT_ID`.
     pub msa: Option<MsaClient<ReqwestHttpClient>>,
@@ -255,6 +269,11 @@ impl AppState {
             picked_java: Mutex::default(),
             servers: NbtServerListStore::new(paths.clone()),
             pinger: MinecraftServerPinger::new(),
+            hop_prober: IcmpHopProber::new(),
+            connection_timer: SystemConnectionTimer::new(),
+            diagnostic_pinger: MinecraftServerPinger::new()
+                .with_timeouts(DIAGNOSTIC_PING_TIMEOUT, DIAGNOSTIC_PING_TIMEOUT),
+            report_host: MclogsReportHost::new(http.clone()),
             premium_names: MojangPremiumNames::new(http.clone()),
             msa: msa_client_id().map(|client_id| MsaClient::new(http.clone(), client_id)),
             secrets: KeyringSecretStore::new(KEYCHAIN_SERVICE),

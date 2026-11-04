@@ -17,7 +17,7 @@ export type ProgressEvent = { done: number, total: number | null, stage: Progres
  */
 unit: ProgressUnitDto, };
 
-export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "manual_download" | "mod_backup_kept" | "internal";
+export type ErrorCode = "cancelled" | "invalid_input" | "not_found" | "already_exists" | "no_account" | "premium_required" | "not_installed" | "network" | "java_unavailable" | "already_running" | "server_unreachable" | "session_expired" | "sign_in_refused" | "not_entitled" | "app_not_approved" | "invalid_skin" | "skin_rejected" | "cape_not_owned" | "too_many_changes" | "keychain_unavailable" | "microsoft_not_configured" | "loader_unavailable" | "unverified_file" | "rate_limited" | "invalid_modpack" | "catalog_not_configured" | "updates_not_configured" | "update_changed" | "update_failed" | "no_mod_loader" | "mod_incompatible" | "no_compatible_version" | "mod_up_to_date" | "too_many_dependencies" | "manual_download" | "mod_backup_kept" | "report_rejected" | "internal";
 
 export type AppError = { code: ErrorCode, message: string, details?: string, 
 /**
@@ -126,6 +126,60 @@ servers: Array<CommunityServerDto>, minVersion: string, maxVersion: string, reco
 pack: string | null, origin: ConfigOriginDto, };
 
 export type ServerStatusDto = { onlinePlayers: number, maxPlayers: number, versionName: string, motd: string, latencyMs: number | null, };
+
+export type LatencyStatsDto = { sent: number, received: number, lossPercent: number, lastMs: number | null, bestMs: number | null, worstMs: number | null, averageMs: number | null, jitterMs: number | null, 
+/**
+ * The latest samples, oldest first; `null` is a lost probe.
+ */
+history: Array<number | null>, };
+
+export type HopZoneDto = "home" | "provider" | "internet" | "server";
+
+export type HopDto = { ttl: number, 
+/**
+ * `null` while the hop never answered.
+ */
+address: string | null, zone: HopZoneDto, 
+/**
+ * The player's router or provider: hidden from shared reports by default.
+ */
+privateToPlayer: boolean, stats: LatencyStatsDto, };
+
+export type IssueKindDto = "loss" | "latency" | "jitter";
+
+export type VerdictDto = { "kind": "measuring" } | { "kind": "healthy" } | { "kind": "nameNotFound" } | { "kind": "unreachable" } | { "kind": "issue", issue: IssueKindDto, zone: HopZoneDto | null, };
+
+export type DiagnosticStateDto = "running" | "finished" | "stopped";
+
+export type DiagnosticServerStatusDto = { onlinePlayers: number, maxPlayers: number, versionName: string, };
+
+export type DiagnosticDto = { 
+/**
+ * The address as the player wrote it.
+ */
+server: string, 
+/**
+ * The host the game connects to (the SRV target when there is one).
+ */
+host: string | null, 
+/**
+ * The resolved `ip:port`.
+ */
+address: string | null, dnsMs: number | null, tcp: LatencyStatsDto, minecraft: LatencyStatsDto, serverStatus: DiagnosticServerStatusDto | null, hops: Array<HopDto>, 
+/**
+ * Why hops could not be probed; `null` when they could.
+ */
+hopProbingUnavailable: string | null, destinationReached: boolean, 
+/**
+ * The loss to the server: its own hop when it answers probes, else the TCP connects.
+ */
+destinationLossPercent: number, elapsedSecs: number, plannedSecs: number, state: DiagnosticStateDto, verdict: VerdictDto, };
+
+export type SharedReportDto = { url: string, 
+/**
+ * When the link stops working (Unix seconds).
+ */
+expiresAt: number | null, };
 
 export type ModpackSummaryDto = { 
 /**
@@ -358,6 +412,8 @@ export interface Commands {
   save_server: { args: { form: SavedServerFormDto }; result: SavedServerDto };
   remove_saved_server: { args: { serverId: string }; result: null };
   ping_server: { args: { address: string }; result: ServerStatusDto };
+  diagnose_server: { args: { operationId: string; address: string; durationSecs: number; onUpdate: Channel<DiagnosticDto> }; result: DiagnosticDto };
+  share_diagnostic_report: { args: { content: string }; result: SharedReportDto };
   edit_server_list: { args: { instanceId: string; change: ServerEditDto }; result: ServerListDto };
   export_mrpack: { args: { instanceId: string }; result: ModpackExportDto | null };
 }

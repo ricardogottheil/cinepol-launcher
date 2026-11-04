@@ -12,6 +12,10 @@ use launcher_core::application::launch_instance::LaunchOutcome;
 use launcher_core::application::modpack_files::SyncSummary;
 use launcher_core::domain::account::{Account, AccountKind};
 use launcher_core::domain::account::{DeviceCode, SkinVariant};
+use launcher_core::domain::diagnostics::{
+    Diagnostic, DiagnosticState, HopProbing, HopZone, IssueKind, LatencyStats, SharedReport,
+    Verdict,
+};
 use launcher_core::domain::instance::{Instance, InstanceOrigin, JavaSelection};
 use launcher_core::domain::launch::log4j::{LogEntry, LogLevel};
 use launcher_core::domain::launch::{LogStream, VersionSummary};
@@ -1283,5 +1287,222 @@ mod tests {
                 title: "Mod Menu".into(),
             }]
         );
+    }
+}
+
+/// Round-trip statistics of one measured target, in milliseconds.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct LatencyStatsDto {
+    pub sent: u32,
+    pub received: u32,
+    pub loss_percent: f64,
+    pub last_ms: Option<f64>,
+    pub best_ms: Option<f64>,
+    pub worst_ms: Option<f64>,
+    pub average_ms: Option<f64>,
+    pub jitter_ms: Option<f64>,
+    /// The latest samples, oldest first; `null` is a lost probe.
+    pub history: Vec<Option<f64>>,
+}
+
+impl From<&LatencyStats> for LatencyStatsDto {
+    fn from(stats: &LatencyStats) -> Self {
+        Self {
+            sent: stats.sent(),
+            received: stats.received(),
+            loss_percent: stats.loss_percent(),
+            last_ms: stats.last_ms(),
+            best_ms: stats.best_ms(),
+            worst_ms: stats.worst_ms(),
+            average_ms: stats.average_ms(),
+            jitter_ms: stats.jitter_ms(),
+            history: stats.history(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum HopZoneDto {
+    Home,
+    Provider,
+    Internet,
+    Server,
+}
+
+impl From<HopZone> for HopZoneDto {
+    fn from(zone: HopZone) -> Self {
+        match zone {
+            HopZone::Home => Self::Home,
+            HopZone::Provider => Self::Provider,
+            HopZone::Internet => Self::Internet,
+            HopZone::Server => Self::Server,
+        }
+    }
+}
+
+/// One hop of the path to the server.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct HopDto {
+    pub ttl: u8,
+    /// `null` while the hop never answered.
+    pub address: Option<String>,
+    pub zone: HopZoneDto,
+    /// The player's router or provider: hidden from shared reports by default.
+    pub private_to_player: bool,
+    pub stats: LatencyStatsDto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum IssueKindDto {
+    Loss,
+    Latency,
+    Jitter,
+}
+
+/// The plain-language conclusion; `zone` is where an issue starts, when known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum VerdictDto {
+    Measuring,
+    Healthy,
+    NameNotFound,
+    Unreachable,
+    #[serde(rename_all = "camelCase")]
+    Issue {
+        issue: IssueKindDto,
+        zone: Option<HopZoneDto>,
+    },
+}
+
+impl From<Verdict> for VerdictDto {
+    fn from(verdict: Verdict) -> Self {
+        match verdict {
+            Verdict::Measuring => Self::Measuring,
+            Verdict::Healthy => Self::Healthy,
+            Verdict::NameNotFound => Self::NameNotFound,
+            Verdict::Unreachable => Self::Unreachable,
+            Verdict::Issue { kind, zone } => Self::Issue {
+                issue: match kind {
+                    IssueKind::Loss => IssueKindDto::Loss,
+                    IssueKind::Latency => IssueKindDto::Latency,
+                    IssueKind::Jitter => IssueKindDto::Jitter,
+                },
+                zone: zone.map(HopZoneDto::from),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum DiagnosticStateDto {
+    Running,
+    Finished,
+    Stopped,
+}
+
+/// What the server answered to its last status ping.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticServerStatusDto {
+    pub online_players: u32,
+    pub max_players: u32,
+    pub version_name: String,
+}
+
+/// A network diagnosis at one moment.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticDto {
+    /// The address as the player wrote it.
+    pub server: String,
+    /// The host the game connects to (the SRV target when there is one).
+    pub host: Option<String>,
+    /// The resolved `ip:port`.
+    pub address: Option<String>,
+    pub dns_ms: Option<f64>,
+    pub tcp: LatencyStatsDto,
+    pub minecraft: LatencyStatsDto,
+    pub server_status: Option<DiagnosticServerStatusDto>,
+    pub hops: Vec<HopDto>,
+    /// Why hops could not be probed; `null` when they could.
+    pub hop_probing_unavailable: Option<String>,
+    pub destination_reached: bool,
+    /// The loss to the server: its own hop when it answers probes, else the TCP connects.
+    pub destination_loss_percent: f64,
+    pub elapsed_secs: u32,
+    pub planned_secs: u32,
+    pub state: DiagnosticStateDto,
+    pub verdict: VerdictDto,
+}
+
+impl From<&Diagnostic> for DiagnosticDto {
+    fn from(diagnostic: &Diagnostic) -> Self {
+        let secs =
+            |duration: std::time::Duration| u32::try_from(duration.as_secs()).unwrap_or(u32::MAX);
+        let target = diagnostic.target.as_ref();
+        Self {
+            server: diagnostic.server.to_string(),
+            host: target.map(|target| target.host.clone()),
+            address: target.map(|target| target.address.to_string()),
+            dns_ms: target.map(|target| target.dns.as_secs_f64() * 1000.0),
+            tcp: LatencyStatsDto::from(&diagnostic.tcp),
+            minecraft: LatencyStatsDto::from(&diagnostic.minecraft),
+            server_status: diagnostic.server_status.as_ref().map(|status| {
+                DiagnosticServerStatusDto {
+                    online_players: status.online_players,
+                    max_players: status.max_players,
+                    version_name: status.version_name.clone(),
+                }
+            }),
+            hops: diagnostic
+                .hops
+                .iter()
+                .map(|hop| HopDto {
+                    ttl: hop.ttl,
+                    address: hop.address.map(|ip| ip.to_string()),
+                    zone: HopZoneDto::from(hop.zone),
+                    private_to_player: hop.zone.is_private_to_player(),
+                    stats: LatencyStatsDto::from(&hop.stats),
+                })
+                .collect(),
+            hop_probing_unavailable: match &diagnostic.hop_probing {
+                HopProbing::Available => None,
+                HopProbing::Unavailable(reason) => Some(reason.clone()),
+            },
+            destination_reached: diagnostic.destination_reached,
+            destination_loss_percent: diagnostic.destination().loss_percent(),
+            elapsed_secs: secs(diagnostic.elapsed),
+            planned_secs: secs(diagnostic.planned),
+            state: match diagnostic.state {
+                DiagnosticState::Running => DiagnosticStateDto::Running,
+                DiagnosticState::Finished => DiagnosticStateDto::Finished,
+                DiagnosticState::Stopped => DiagnosticStateDto::Stopped,
+            },
+            verdict: VerdictDto::from(diagnostic.verdict),
+        }
+    }
+}
+
+/// A published report link.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedReportDto {
+    pub url: String,
+    /// When the link stops working (Unix seconds).
+    #[ts(type = "number | null")]
+    pub expires_at: Option<u64>,
+}
+
+impl From<SharedReport> for SharedReportDto {
+    fn from(report: SharedReport) -> Self {
+        Self {
+            url: report.url,
+            expires_at: report.expires_at,
+        }
     }
 }

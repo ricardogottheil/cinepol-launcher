@@ -12,15 +12,21 @@ import type {
   Commands,
   CommunityServerDto,
   DeviceCodeDto,
+  DiagnosticDto,
+  DiagnosticStateDto,
   ErrorCode,
   Events,
   GameVersionsDto,
+  HopDto,
+  HopZoneDto,
   InstalledModDto,
   InstallSummaryDto,
   InstanceDto,
   InstanceSettingsDto,
+  IssueKindDto,
   JavaChoiceDto,
   JavaKindDto,
+  LatencyStatsDto,
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLevelDto,
@@ -57,7 +63,9 @@ import type {
   ServerEditDto,
   ServerListDto,
   ServerStatusDto,
+  SharedReportDto,
   SkinDto,
+  VerdictDto,
 } from "./bindings";
 
 /**
@@ -74,14 +82,20 @@ export type {
   CapeDto,
   CommunityServerDto,
   DeviceCodeDto,
+  DiagnosticDto,
+  DiagnosticStateDto,
   ErrorCode,
   GameVersionsDto,
+  HopDto,
+  HopZoneDto,
   InstalledModDto,
   InstallSummaryDto,
   InstanceDto,
   InstanceSettingsDto,
+  IssueKindDto,
   JavaChoiceDto,
   JavaKindDto,
+  LatencyStatsDto,
   LaunchOutcomeDto,
   LoaderReleaseDto,
   LogLevelDto,
@@ -118,7 +132,9 @@ export type {
   ServerEditDto,
   ServerListDto,
   ServerStatusDto,
+  SharedReportDto,
   SkinDto,
+  VerdictDto,
 };
 
 /** Backend error codes plus the one the client raises on its own. */
@@ -161,6 +177,7 @@ const BACKEND_CODES = {
   too_many_dependencies: true,
   manual_download: true,
   mod_backup_kept: true,
+  report_rejected: true,
   internal: true,
 } as const satisfies Record<ErrorCode, true>;
 
@@ -442,6 +459,26 @@ export function removeSavedServer(serverId: string): Promise<null> {
 /** The live status of any server address. */
 export function pingServer(address: string): Promise<ServerStatusDto> {
   return call("ping_server", { address });
+}
+
+/**
+ * Diagnoses the connection to `address` for `durationSecs` (60, 300 or 600).
+ * `onUpdate` receives the diagnosis about once per second; `cancel` stops it
+ * early and `done` still resolves with what was measured.
+ */
+export function diagnoseServer(
+  address: string,
+  durationSecs: number,
+  onUpdate: (diagnostic: DiagnosticDto) => void,
+): RunningOperation<DiagnosticDto> {
+  return startOperation("diagnose_server", (operationId) =>
+    call("diagnose_server", { operationId, address, durationSecs, onUpdate: channel(onUpdate) }),
+  );
+}
+
+/** Uploads a diagnosis report to mclo.gs and returns its link. */
+export function shareDiagnosticReport(content: string): Promise<SharedReportDto> {
+  return call("share_diagnostic_report", { content });
 }
 
 export function killInstance(instanceId: string): Promise<boolean> {

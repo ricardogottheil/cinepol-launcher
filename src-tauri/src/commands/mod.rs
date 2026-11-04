@@ -7,6 +7,7 @@
 pub mod accounts;
 pub mod app;
 pub mod demo;
+pub mod diagnostics;
 pub mod instance_management;
 pub mod instances;
 pub mod modpacks;
