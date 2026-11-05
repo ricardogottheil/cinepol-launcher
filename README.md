@@ -46,11 +46,26 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
   whose authors forbid third-party downloads are picked up from the
   Downloads folder.
 - Automatic Java runtime management.
+- A network diagnosis for any server, without administrator rights: an
+  MTR-style test of 1, 5 or 10 minutes that measures DNS, the TCP connection,
+  the Minecraft ping and every hop on the way, then says in plain words
+  whether lag starts in the player's home network, their internet provider,
+  the internet path or near the server. The report is shared as a
+  [pastes.dev](https://pastes.dev) link in English, ready for the server's
+  host or the player's ISP, with the player's router and provider hidden by
+  default.
 - A server list editor, a log viewer with level and text filters, and crash
   reports one click away.
 - Signed automatic updates: a notice in the sidebar opens a page with what's
   new and installs the update.
 - Windows, macOS and Linux.
+
+<p align="center">
+  <img src="docs/screenshots/01-home.png" alt="Home: Play on CINEPOL" width="49%">
+  <img src="docs/screenshots/06-diagnostics.png" alt="Network diagnosis with a plain-language verdict" width="49%">
+</p>
+
+More screenshots are in [`docs/screenshots/`](docs/screenshots/).
 
 See `AGENTS.md` for the architecture and `docs/adr/` for the decisions.
 
