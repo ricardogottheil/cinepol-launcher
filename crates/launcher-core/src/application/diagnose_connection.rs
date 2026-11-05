@@ -84,7 +84,17 @@ where
         verdict: Verdict::Measuring,
     };
 
-    match deps.connections.resolve(&server).await {
+    // A resolver on a dead network can hang for a long time: Stop must not wait for it.
+    let resolved = match select(
+        pin!(deps.connections.resolve(&server)),
+        pin!(cancel.cancelled()),
+    )
+    .await
+    {
+        Either::Left((resolved, _)) => resolved,
+        Either::Right(_) => return Ok(finish(diagnostic, DiagnosticState::Stopped, sink)),
+    };
+    match resolved {
         Ok(target) => diagnostic.target = Some(target),
         Err(error) => {
             tracing::info!(%server, %error, "diagnosis: the name did not resolve");
@@ -154,10 +164,13 @@ where
                 .iter()
                 .rposition(|hop| hop.stats.answered())
                 .map_or(0, |index| index + 1);
-            // Keep one silent hop after the last answering one.
+            // Keep one silent hop after the last answering one. The limit
+            // follows the path both ways: when that silent hop starts to
+            // answer (a router that rate-limited ICMP at first), the next
+            // one is probed too.
             let keep = (last_answering + 1).min(usize::from(MAX_HOPS));
             diagnostic.hops.truncate(keep);
-            limit = limit.min(u8::try_from(keep).unwrap_or(MAX_HOPS));
+            limit = u8::try_from(keep).unwrap_or(MAX_HOPS);
         }
         diagnostic.elapsed = elapsed_since(deps.clock, started).min(duration);
         diagnostic.refresh_verdict();
@@ -378,6 +391,32 @@ mod tests {
         assert_eq!(diagnostic.hops.len(), 8);
         assert_eq!(world.hops.max_ttl_probed_after_round(TRIM_AFTER_ROUNDS), 8);
         assert_eq!(diagnostic.verdict, Verdict::Healthy);
+    }
+
+    #[tokio::test]
+    async fn a_router_that_answers_late_is_still_measured() {
+        let mut path = CINEPOL_PATH.to_vec();
+        path[7] = None; // The server never answers ICMP.
+        // Hop 7 is silent for the first three rounds, then answers.
+        let world = World::new(FakeHopProber::path(&path).destination_silent().late(7, 3));
+        let diagnostic = world.run(ONE_MINUTE, &CancellationToken::new()).await;
+        assert_eq!(diagnostic.hops.len(), 8);
+        assert!(diagnostic.hops[6].stats.answered());
+        assert_eq!(world.hops.max_ttl_probed_after_round(TRIM_AFTER_ROUNDS), 8);
+    }
+
+    #[tokio::test]
+    async fn stopping_while_the_name_resolves_ends_at_once() {
+        let mut world = World::new(FakeHopProber::path(&CINEPOL_PATH));
+        world.connections = FakeConnectionTimer::resolving("103.195.101.252:25565", 10).hanging();
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        let diagnostic =
+            tokio::time::timeout(Duration::from_secs(5), world.run(ONE_MINUTE, &cancel))
+                .await
+                .expect("Stop must not wait for the resolver");
+        assert_eq!(diagnostic.state, DiagnosticState::Stopped);
+        assert_eq!(world.hops.probes(), 0);
     }
 
     #[tokio::test]

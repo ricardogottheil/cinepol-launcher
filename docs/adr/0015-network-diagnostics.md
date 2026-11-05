@@ -18,7 +18,9 @@ should run that test for any server and explain the result in plain words.
   round. A round lasts at least one second, and every probe waits at most
   one second. Once the server answers at TTL *n*, later rounds probe only up
   to *n*. When the server never answers ICMP, probing stops one hop after the
-  last hop that answered, starting with the third round.
+  last hop that answered, starting with the third round; when that silent
+  hop starts to answer, the limit grows by one again. Stop also cancels the
+  name lookup.
 - **Durations.** 1, 5 (default) or 10 minutes. Intermittent loss needs a few
   hundred samples to show. Stopping early is a result too: the report says
   how long the test ran out of the planned time.

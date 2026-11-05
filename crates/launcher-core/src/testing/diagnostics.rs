@@ -24,6 +24,9 @@ pub struct FakeHopProber {
     destination_silent: bool,
     /// From this ttl on, every `n`th probe is lost.
     losing: Option<(u8, u32)>,
+    /// This ttl stays silent for its first `n` probes (a router that
+    /// rate-limits ICMP at first).
+    late: Option<(u8, u32)>,
     /// Probes sent per ttl, and every probe in order.
     sent: Mutex<HashMap<u8, u32>>,
     log: Mutex<Vec<u8>>,
@@ -51,6 +54,11 @@ impl FakeHopProber {
     /// The destination never answers (it drops ICMP).
     pub fn destination_silent(mut self) -> Self {
         self.destination_silent = true;
+        self
+    }
+
+    pub fn late(mut self, ttl: u8, silent_probes: u32) -> Self {
+        self.late = Some((ttl, silent_probes));
         self
     }
 
@@ -106,6 +114,12 @@ impl HopProber for FakeHopProber {
         {
             return Ok(ProbeOutcome::TimedOut);
         }
+        if self
+            .late
+            .is_some_and(|(late, silent)| late == ttl && count <= silent)
+        {
+            return Ok(ProbeOutcome::TimedOut);
+        }
         let index = usize::from(ttl) - 1;
         let reached = index + 1 >= self.path.len();
         if reached && self.destination_silent {
@@ -132,6 +146,7 @@ impl HopProber for FakeHopProber {
 pub struct FakeConnectionTimer {
     target: Option<SocketAddr>,
     refusing: bool,
+    hanging: bool,
     losing_every: Option<u32>,
     connects: Mutex<u32>,
     resolved: Mutex<u32>,
@@ -143,6 +158,7 @@ impl FakeConnectionTimer {
         Self {
             target: Some(address.parse().unwrap()),
             refusing: false,
+            hanging: false,
             losing_every: None,
             connects: Mutex::new(0),
             resolved: Mutex::new(0),
@@ -155,6 +171,12 @@ impl FakeConnectionTimer {
             target: None,
             ..Self::resolving("127.0.0.1:25565", 0)
         }
+    }
+
+    /// Name resolution never finishes, like a resolver on a dead network.
+    pub fn hanging(mut self) -> Self {
+        self.hanging = true;
+        self
     }
 
     pub fn refusing(mut self) -> Self {
@@ -176,6 +198,9 @@ impl FakeConnectionTimer {
 impl ConnectionTimer for FakeConnectionTimer {
     async fn resolve(&self, server: &ServerAddress) -> Result<ResolvedTarget, ConnectionError> {
         *self.resolved.lock().unwrap() += 1;
+        if self.hanging {
+            std::future::pending::<()>().await;
+        }
         let address = self
             .target
             .ok_or_else(|| ConnectionError::NameNotFound(server.host().to_owned()))?;
