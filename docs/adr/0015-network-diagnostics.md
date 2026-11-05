@@ -73,6 +73,11 @@ should run that test for any server and explain the result in plain words.
 
 - New platform dependencies: `socket2` and `libc` (Unix), and `windows-sys`
   (Windows). All three versions were already in the lockfile.
+- The core crate denies `unsafe_code` instead of forbidding it, so the Linux
+  error-queue module and the Windows `IcmpSendEcho` module can opt in with
+  `#[allow(unsafe_code)]`. Every other module still fails to compile with
+  `unsafe`, and `tests/architecture.rs` fails when any other file adds an
+  `allow(unsafe_code)`.
 - `cargo test -p cinepol-launcher-core --features network-tests --test diagnostics_network -- --nocapture`
   traces the real path to CINEPOL for one minute. It was verified on macOS
   and on Linux as a non-root user. The Windows adapter only type-checks

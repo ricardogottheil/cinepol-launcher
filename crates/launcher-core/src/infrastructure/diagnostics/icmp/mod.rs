@@ -4,7 +4,9 @@
 
 #[cfg(unix)]
 mod unix;
+/// `IcmpSendEcho` FFI.
 #[cfg(windows)]
+#[allow(unsafe_code)]
 mod windows;
 
 use std::net::{IpAddr, Ipv4Addr};

@@ -3,6 +3,7 @@
 //! - `domain` must not import `application` or `infrastructure`.
 //! - `application` must not import `infrastructure`.
 //! - The crate must never depend on `tauri`.
+//! - Only the ICMP FFI modules may opt into `unsafe` code.
 
 // Test-only code: panicking on an unreadable source file is the intended failure.
 #![allow(clippy::expect_used)]
@@ -116,6 +117,43 @@ fn core_crate_does_not_depend_on_tauri() {
     assert!(
         offending.is_empty(),
         "launcher-core must not depend on tauri: {offending:?}"
+    );
+}
+
+/// The files allowed to opt into `unsafe` (the crate root denies it).
+const UNSAFE_OPT_INS: &[&str] = &[
+    "src/infrastructure/diagnostics/icmp/mod.rs",
+    "src/infrastructure/diagnostics/icmp/unix.rs",
+];
+
+#[test]
+fn only_the_icmp_ffi_modules_opt_into_unsafe_code() {
+    let root = Path::new(CRATE_ROOT);
+    let lib = fs::read_to_string(root.join("src/lib.rs")).expect("lib.rs must be readable");
+    assert!(
+        lib.contains("#![deny(unsafe_code)]"),
+        "lib.rs must deny unsafe_code"
+    );
+    let mut offending = Vec::new();
+    for file in rust_files(&root.join("src")) {
+        let source = fs::read_to_string(&file).expect("source file must be readable");
+        let opts_in = source.lines().any(|line| {
+            let line = line.trim_start();
+            !line.starts_with("//")
+                && (line.contains("allow(unsafe_code)") || line.contains("expect(unsafe_code)"))
+        });
+        let relative = file
+            .strip_prefix(root)
+            .unwrap_or(&file)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if opts_in && !UNSAFE_OPT_INS.contains(&relative.as_str()) {
+            offending.push(relative);
+        }
+    }
+    assert!(
+        offending.is_empty(),
+        "only the ICMP FFI modules may allow unsafe_code: {offending:?}"
     );
 }
 

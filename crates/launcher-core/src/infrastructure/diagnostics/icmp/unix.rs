@@ -75,7 +75,9 @@ fn outcome(from: IpAddr, rtt: Duration, reply: Reply, target: Ipv4Addr) -> Probe
     }
 }
 
+/// Linux error-queue FFI (`setsockopt`, `recvmsg`, control messages).
 #[cfg(any(target_os = "linux", target_os = "android"))]
+#[allow(unsafe_code)]
 mod linux {
     use std::mem::{size_of, zeroed};
     use std::net::{IpAddr, Ipv4Addr, UdpSocket};
