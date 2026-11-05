@@ -127,8 +127,10 @@ mod tests {
         let rtt = timer().connect(open, Duration::from_secs(1)).await.unwrap();
         assert!(rtt.is_some());
         drop(listener);
+        // Windows retries the SYN after a reset and reports the refusal only
+        // after about two seconds, so this limit must be longer than that.
         assert!(matches!(
-            timer().connect(open, Duration::from_secs(1)).await,
+            timer().connect(open, Duration::from_secs(5)).await,
             Err(ConnectionError::Failed(_))
         ));
     }
