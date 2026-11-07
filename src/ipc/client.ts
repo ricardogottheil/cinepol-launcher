@@ -490,6 +490,11 @@ export async function openCrashReport(instanceId: string, fileName: string): Pro
   await call("open_crash_report", { instanceId, fileName });
 }
 
+/** Opens the folder with the launcher's log and each game's output. */
+export async function openLogsFolder(): Promise<void> {
+  await call("open_logs_folder");
+}
+
 /** Opens the `hs_err_pid*.log` the JVM wrote in the instance's game folder. */
 export async function openJvmCrashLog(instanceId: string, fileName: string): Promise<void> {
   await call("open_jvm_crash_log", { instanceId, fileName });

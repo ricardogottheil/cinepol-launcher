@@ -414,6 +414,7 @@ export interface Commands {
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
   open_crash_report: { args: { instanceId: string; fileName: string }; result: null };
+  open_logs_folder: { args: Record<string, never>; result: null };
   open_jvm_crash_log: { args: { instanceId: string; fileName: string }; result: null };
   open_instance_folder: { args: { instanceId: string }; result: null };
   list_servers: { args: { instanceId: string }; result: ServerListDto };

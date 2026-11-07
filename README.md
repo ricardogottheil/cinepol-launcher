@@ -55,7 +55,8 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
   host or the player's ISP, with the player's router and provider hidden by
   default.
 - A server list editor, a log viewer with level and text filters, and crash
-  reports one click away.
+  reports one click away: game and JVM crash logs, and the launcher and game
+  logs saved on disk.
 - Signed automatic updates: a notice in the sidebar opens a page with what's
   new and installs the update.
 - Windows, macOS and Linux.

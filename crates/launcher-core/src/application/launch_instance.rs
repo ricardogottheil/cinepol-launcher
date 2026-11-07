@@ -16,8 +16,8 @@ use crate::domain::java::{JavaRequirement, JavaRuntimeError, JavaRuntimeProvider
 use crate::domain::launch::log4j::Log4jSink;
 use crate::domain::launch::{
     ExtractError, Features, GameExit, GameProcessError, GameProcessRunner, LaunchContext,
-    LaunchIdentity, LauncherPaths, LogSink, NativesExtractor, Platform, ProcessSpec, VersionSource,
-    VersionSourceError, build_launch_command, plan_libraries,
+    LaunchIdentity, LauncherPaths, LogSink, MaskingLogSink, NativesExtractor, Platform,
+    ProcessSpec, VersionSource, VersionSourceError, build_launch_command, plan_libraries,
 };
 use crate::domain::ports::{Clock, FileSystem, FileSystemError, ProgressReporter, ProgressUpdate};
 
@@ -243,6 +243,8 @@ where
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
 
+    // Some loaders print their arguments; the token must not reach the screen or a file.
+    let logs = MaskingLogSink::new(logs, &context.identity.access_token);
     let crash_reports = game_dir.join(CRASH_REPORTS_DIR);
     let jvm_logs_dir = game_dir.clone();
     let started = deps.clock.now();
@@ -736,6 +738,40 @@ mod tests {
                 .redacted_args()
                 .iter()
                 .any(|arg| arg.contains("minecraft-token"))
+        );
+    }
+
+    #[tokio::test]
+    async fn the_session_token_never_reaches_the_game_output() {
+        let mut world = World::installed().await;
+        world.sessions = FakeSessions::with_token("minecraft-token");
+        let premium = Account::microsoft(AccountId::new_random(), &sample_profile(), "2535428");
+        world.accounts.save(&premium).await.unwrap();
+        world.accounts.set_active(Some(premium.id)).await.unwrap();
+        world.runner = FakeGameProcess::exiting_with_output(
+            0,
+            vec![(
+                LogStream::Stdout,
+                "Launching with --accessToken minecraft-token".to_owned(),
+            )],
+        );
+        let logs = RecordingLogSink::default();
+
+        launch_instance(
+            &request(),
+            &world.deps(),
+            logs.clone(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            logs.lines(),
+            [(
+                LogStream::Stdout,
+                "Launching with --accessToken <redacted>".to_owned()
+            )]
         );
     }
 

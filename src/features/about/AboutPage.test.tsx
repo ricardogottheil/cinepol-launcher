@@ -4,7 +4,7 @@ import {
   createRouter,
   RouterProvider,
 } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import esCommon from "../../i18n/locales/es/common.json";
 import { IpcError } from "../../ipc/client";
@@ -14,6 +14,7 @@ import { AboutPage } from "./AboutPage";
 const client = vi.hoisted(() => ({
   getAppInfo: vi.fn(),
   checkAppUpdate: vi.fn(),
+  openLogsFolder: vi.fn(),
 }));
 
 vi.mock("../../ipc/client", async (importOriginal) => ({
@@ -33,6 +34,13 @@ function renderAbout() {
 }
 
 describe("AboutPage", () => {
+  it("opens the logs folder", async () => {
+    client.openLogsFolder.mockResolvedValue(undefined);
+    renderAbout();
+    fireEvent.click(await screen.findByRole("button", { name: esCommon.chrome.openLogsFolder }));
+    expect(client.openLogsFolder).toHaveBeenCalledOnce();
+  });
+
   it("shows the version and the legal notice", async () => {
     renderAbout();
     expect(await screen.findByText("0.2.0")).toBeInTheDocument();

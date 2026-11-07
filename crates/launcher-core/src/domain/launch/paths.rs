@@ -92,6 +92,22 @@ impl LauncherPaths {
         self.root.join("servers.json")
     }
 
+    /// The launcher's own log and the output of each game launch.
+    pub fn logs_dir(&self) -> PathBuf {
+        self.root.join("logs")
+    }
+
+    /// The launcher's log of this run.
+    pub fn launcher_log(&self) -> PathBuf {
+        self.logs_dir().join("launcher.log")
+    }
+
+    /// Everything the game printed during its last launch, kept after it
+    /// exits so a crash can be looked at (and shared) later.
+    pub fn game_output_log(&self, id: &InstanceId) -> PathBuf {
+        self.logs_dir().join(format!("game-{}.log", id.as_str()))
+    }
+
     /// Scratch space on the same volume as the data, so renames are atomic.
     pub fn temp_dir(&self) -> PathBuf {
         self.root.join("tmp")
@@ -128,6 +144,14 @@ mod tests {
                 .join("instances")
                 .join("cinepol")
                 .join("natives")
+        );
+        assert_eq!(
+            paths.launcher_log(),
+            Path::new("data").join("logs").join("launcher.log")
+        );
+        assert_eq!(
+            paths.game_output_log(&id),
+            Path::new("data").join("logs").join("game-cinepol.log")
         );
     }
 

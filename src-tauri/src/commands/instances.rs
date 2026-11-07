@@ -8,6 +8,7 @@ use launcher_core::application::prepare_cinepol_instance::cinepol_server_entry;
 use launcher_core::domain::instance::InstanceOrigin;
 use launcher_core::domain::loader::{LoaderKind, LoaderSpec, LoaderVersion};
 use launcher_core::domain::server_list::ServerAddress;
+use launcher_core::infrastructure::process::GameOutputFile;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
@@ -125,7 +126,12 @@ pub async fn launch_instance(
         account: None,
         join_server,
     };
-    let result = launch(&request, &deps, ChannelLogSink::new(on_log), kill).await;
+    // The output is shown live and saved, so a crash can be looked at later.
+    let logs = (
+        ChannelLogSink::new(on_log),
+        GameOutputFile::create(&state.paths.game_output_log(&id)),
+    );
+    let result = launch(&request, &deps, logs, kill).await;
     state.games.finish(id.as_str());
     let outcome = LaunchOutcomeDto::new(id.to_string(), &result?);
     // Other windows and the tray learn about the exit without holding the channel.

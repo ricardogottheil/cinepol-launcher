@@ -43,6 +43,7 @@ game rewrites `servers.dat` when it exits, and writes a crash report into
 ## Consequences
 
 - A crash that writes no report (for example a JVM that dies before the game
-  starts) shows the plain exit code, as before.
+  starts) shows the plain exit code, as before. Superseded by ADR 0016: every
+  failed exit shows the crash notice, and JVM crash logs are detected.
 - The launcher keeps no crash history; the last outcome is shown until the
   next launch.

@@ -31,6 +31,7 @@ const client = vi.hoisted(() => ({
   editServerList: vi.fn(),
   openCrashReport: vi.fn(),
   openJvmCrashLog: vi.fn(),
+  openLogsFolder: vi.fn(),
   openInstanceFolder: vi.fn(),
 }));
 
@@ -974,6 +975,9 @@ describe("InstancesPage", () => {
     expect(await screen.findByText(labels.crashed.replace("{{code}}", "1"))).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: labels.openCrashReport })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: labels.openJvmCrashLog })).not.toBeInTheDocument();
+    client.openLogsFolder.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole("button", { name: esCommon.chrome.openLogsFolder }));
+    expect(client.openLogsFolder).toHaveBeenCalledOnce();
   });
 
   it("opens the log the JVM wrote when it crashed itself", async () => {

@@ -9,6 +9,7 @@ mod commands;
 mod dto;
 mod error;
 mod events;
+mod logfile;
 mod logs;
 mod operations;
 mod progress;
@@ -17,27 +18,22 @@ mod state;
 mod updater;
 
 use tauri::Manager;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 /// Name of the launcher's folder inside the OS data directory.
 const DATA_DIR_NAME: &str = "CinepolLauncher";
 
 /// Builds and runs the Tauri application.
 pub fn run() -> Result<(), tauri::Error> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        // Masks tokens, auth codes and API keys before any line is written.
-        .with_writer(redact::RedactingMakeWriter::new(std::io::stdout))
-        .init();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = app.path().data_dir()?.join(DATA_DIR_NAME);
+            init_logging(
+                &launcher_core::domain::launch::LauncherPaths::new(&data_dir).launcher_log(),
+            );
             let version = app.package_info().version.to_string();
             let state = state::AppState::new(data_dir, &version).map_err(|error| error.message)?;
             app.manage(state);
@@ -46,6 +42,7 @@ pub fn run() -> Result<(), tauri::Error> {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app::get_app_info,
+            commands::app::open_logs_folder,
             commands::updates::check_app_update,
             commands::updates::install_app_update,
             commands::demo::run_progress_demo,
@@ -109,4 +106,20 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::server::play_on_cinepol,
         ])
         .run(tauri::generate_context!())
+}
+
+/// Logs to stdout and to `<data>/logs/launcher.log`. Set up once the data
+/// folder is known, before anything else in the app logs.
+fn init_logging(log_file: &std::path::Path) {
+    let writer = std::io::stdout.and(logfile::LauncherLogFile::create(log_file));
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        // The file must stay readable as plain text.
+        .with_ansi(false)
+        // Masks tokens, auth codes and API keys before any line is written.
+        .with_writer(redact::RedactingMakeWriter::new(writer))
+        .init();
 }

@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { plateLinkClass } from "../../components/ui/Button";
+import { Button, plateLinkClass } from "../../components/ui/Button";
 import { SpecSheet } from "../../components/ui/SpecSheet";
+import { openLogsFolder, toIpcError } from "../../ipc/client";
 import { useAppInfo } from "../system/useAppInfo";
 import { useAppUpdate } from "../system/useAppUpdate";
 
@@ -17,6 +18,16 @@ export function AboutPage() {
   const update = check.data;
   const launcher = useId();
   const legal = useId();
+  const [logsError, setLogsError] = useState<string | null>(null);
+
+  async function openLogs() {
+    setLogsError(null);
+    try {
+      await openLogsFolder();
+    } catch (failure) {
+      setLogsError(t(`errors.${toIpcError(failure).code}`));
+    }
+  }
 
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-10 px-gutter-lg py-10">
@@ -47,9 +58,13 @@ export function AboutPage() {
             },
           ]}
         />
-        <Link to="/updates" className={`${plateLinkClass} self-start`}>
-          {t("about.openUpdates")}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link to="/updates" className={plateLinkClass}>
+            {t("about.openUpdates")}
+          </Link>
+          <Button onClick={() => void openLogs()}>{t("chrome.openLogsFolder")}</Button>
+          {logsError ? <span className="text-stale">{logsError}</span> : null}
+        </div>
       </section>
 
       <section

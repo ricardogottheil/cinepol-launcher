@@ -494,6 +494,7 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
             vec![("instanceId", string()), ("fileName", string())],
             "null".to_owned(),
         ),
+        command("open_logs_folder", vec![], "null".to_owned()),
         command(
             "open_jvm_crash_log",
             vec![("instanceId", string()), ("fileName", string())],
@@ -670,6 +671,7 @@ mod tests {
             "check_mod_updates",
             "open_crash_report",
             "open_jvm_crash_log",
+            "open_logs_folder",
             "open_instance_folder",
             "list_servers",
             "edit_server_list",

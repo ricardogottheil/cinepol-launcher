@@ -11,7 +11,8 @@
     "close": "Close",
     "mainNavigation": "Main navigation",
     "community": "Community",
-    "version": "Version"
+    "version": "Version",
+    "openLogsFolder": "Open logs folder"
   },
   "nav": {
     "home": "Home",

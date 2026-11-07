@@ -11,7 +11,8 @@
     "close": "Cerrar",
     "mainNavigation": "Navegación principal",
     "community": "Comunidad",
-    "version": "Versión"
+    "version": "Versión",
+    "openLogsFolder": "Abrir carpeta de logs"
   },
   "nav": {
     "home": "Inicio",

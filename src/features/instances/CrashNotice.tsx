@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import type { LaunchOutcomeDto } from "../../ipc/client";
-import { openCrashReport, openJvmCrashLog, toIpcError } from "../../ipc/client";
+import { openCrashReport, openJvmCrashLog, openLogsFolder, toIpcError } from "../../ipc/client";
 
 /** The game ended with an error: say so and offer whatever evidence it left. */
 export function CrashNotice({ outcome }: { outcome: LaunchOutcomeDto }) {
@@ -32,6 +32,7 @@ export function CrashNotice({ outcome }: { outcome: LaunchOutcomeDto }) {
           {t("instances.openJvmCrashLog")}
         </Button>
       ) : null}
+      <Button onClick={() => void run(openLogsFolder)}>{t("chrome.openLogsFolder")}</Button>
       {error ? <span>{error}</span> : null}
     </span>
   );

@@ -17,6 +17,7 @@ import { HomePage } from "./HomePage";
 const client = vi.hoisted(() => ({
   openCrashReport: vi.fn(),
   openJvmCrashLog: vi.fn(),
+  openLogsFolder: vi.fn(),
   listAccounts: vi.fn(),
   listInstances: vi.fn(),
   getServerConfig: vi.fn(),

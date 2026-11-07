@@ -70,6 +70,19 @@ pub trait LogSink: Send + Sync + 'static {
     }
 }
 
+/// Both sinks get every line (the screen and a file, for instance).
+impl<A: LogSink, B: LogSink> LogSink for (A, B) {
+    fn line(&self, stream: LogStream, line: String) {
+        self.0.line(stream, line.clone());
+        self.1.line(stream, line);
+    }
+
+    fn entry(&self, entry: super::log4j::LogEntry) {
+        self.0.entry(entry.clone());
+        self.1.entry(entry);
+    }
+}
+
 /// How the game process ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GameExit {
