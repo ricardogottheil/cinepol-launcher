@@ -173,19 +173,19 @@ mod tests {
     fn a_log_past_its_size_limit_starts_over_and_keeps_the_latest_lines() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("game-cinepol.log");
-        let sink = GameOutputFile::with_limit(&path, 64);
-        for index in 0..20 {
+        // Room for the note and three 13-byte lines after starting over.
+        let limit = EARLIER_OUTPUT_DROPPED.len() as u64 + 40;
+        let sink = GameOutputFile::with_limit(&path, limit);
+        for index in 0..19 {
             sink.line(LogStream::Stdout, format!("spam line {index:02}"));
         }
         drop(sink);
         let saved = std::fs::read_to_string(&path).unwrap();
-        assert!(saved.starts_with(EARLIER_OUTPUT_DROPPED), "{saved}");
-        assert!(saved.ends_with("spam line 19\n"), "{saved}");
-        assert!(
-            saved.len() <= 64 + EARLIER_OUTPUT_DROPPED.len() + 13,
-            "{}",
-            saved.len()
+        assert_eq!(
+            saved,
+            format!("{EARLIER_OUTPUT_DROPPED}spam line 16\nspam line 17\nspam line 18\n")
         );
+        assert!(saved.len() as u64 <= limit);
     }
 
     #[test]

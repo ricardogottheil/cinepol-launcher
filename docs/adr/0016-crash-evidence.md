@@ -53,7 +53,8 @@ with nothing to back it up. Two gaps made that impossible to check:
   and of the JVM crash log (128 KiB); and the tail of the game output
   (160 KiB). A cap that cuts through a line drops that partial line, so a
   token is never kept in pieces the redaction cannot recognize. Each file is
-  redacted on its own. Text that grows when decoded is cut to the 512 KiB
+  redacted on its own, and so is the header (it holds the instance name the
+  player chose). Text that grows when decoded is cut to the 512 KiB
   upload limit at whole lines, from the end of the crash report first, then
   the JVM crash log, then the start of the game output, so the end of the
   output is the last thing to go. Only plain crash

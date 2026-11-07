@@ -205,6 +205,9 @@ const CUT_NOTE: &str = "(cut to fit the upload limit)\n";
 /// What does not fit is cut from the earlier sections first, at whole lines,
 /// so the end of the game output is the last thing to go.
 fn assemble(header: &str, mut sections: Vec<Section>) -> String {
+    // The header holds names the player chose: it is cleaned like the files.
+    let header = redact_crash_text(header);
+    let header = header.as_str();
     let size = |sections: &[Section]| {
         header.len() + sections.iter().map(|s| s.render().len()).sum::<usize>()
     };
@@ -227,6 +230,15 @@ fn assemble(header: &str, mut sections: Vec<Section>) -> String {
     let mut report = header.to_owned();
     for section in &sections {
         report.push_str(&section.render());
+    }
+    // Last resort: only a header larger than the limit gets here.
+    if report.len() > MAX_REPORT_BYTES {
+        let mut end = MAX_REPORT_BYTES - CUT_NOTE.len();
+        while !report.is_char_boundary(end) {
+            end -= 1;
+        }
+        report.truncate(end);
+        report.push_str(CUT_NOTE);
     }
     report
 }
@@ -537,6 +549,31 @@ mod tests {
         let report = &world.host.published()[0];
         assert!(report.len() <= MAX_REPORT_BYTES, "{}", report.len());
         assert!(report.ends_with("THE END\n"));
+    }
+
+    #[tokio::test]
+    async fn the_header_is_redacted_too() {
+        let world = World::new().await;
+        let jwt = "eyJhbGciOi.eyJzdWIiOi.c2lnbmF0dXJl";
+        let mut instance = world.instances.get(&id()).await.unwrap();
+        instance.name = InstanceName::parse(&format!("CINEPOL {jwt}")).unwrap();
+        world.instances.save(&instance).await.unwrap();
+        share_crash_report(&request(), &world.deps()).await.unwrap();
+        let report = &world.host.published()[0];
+        assert!(report.contains("Instance: CINEPOL <redacted>"), "{report}");
+        assert!(!report.contains("c2lnbmF0dXJl"), "{report}");
+    }
+
+    #[test]
+    fn a_header_larger_than_the_limit_is_cut_to_it() {
+        let header = format!(
+            "Cinepol Launcher crash report\n{}",
+            "h".repeat(MAX_REPORT_BYTES)
+        );
+        let report = assemble(&header, Vec::new());
+        assert!(report.len() <= MAX_REPORT_BYTES, "{}", report.len());
+        assert!(report.starts_with("Cinepol Launcher crash report\n"));
+        assert!(report.ends_with(CUT_NOTE));
     }
 
     #[tokio::test]
