@@ -10,6 +10,15 @@ pub struct FileSystemError {
     pub reason: String,
 }
 
+/// How much of a text file to read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextCap {
+    /// The first bytes (where a crash report says what failed).
+    Head(usize),
+    /// The last bytes (where a log ends).
+    Tail(usize),
+}
+
 /// The few file-system operations use cases need directly; everything else
 /// (downloads, extraction, repositories) goes through its own port.
 pub trait FileSystem: Send + Sync {
@@ -34,6 +43,13 @@ pub trait FileSystem: Send + Sync {
         since: std::time::SystemTime,
         name_prefix: &str,
     ) -> impl Future<Output = Result<Option<std::path::PathBuf>, FileSystemError>> + Send;
+    /// Up to `cap` bytes of a regular file as text (invalid UTF-8 replaced);
+    /// `None` when it is missing or not a regular file (a symbolic link is not).
+    fn read_text(
+        &self,
+        path: &Path,
+        cap: TextCap,
+    ) -> impl Future<Output = Result<Option<String>, FileSystemError>> + Send;
     /// Copies the directory tree `from` into the new directory `to`. Symbolic
     /// links are skipped, so nothing outside `from` is copied; an existing
     /// `to` is an error, never merged or replaced. When the copy fails after

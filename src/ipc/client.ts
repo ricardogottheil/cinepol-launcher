@@ -481,6 +481,16 @@ export function shareDiagnosticReport(content: string): Promise<SharedReportDto>
   return call("share_diagnostic_report", { content });
 }
 
+/** Uploads what a crash left behind, without secrets, and returns its link. */
+export function shareCrashReport(
+  instanceId: string,
+  exitCode: number | null,
+  crashReport: string | null,
+  jvmCrashLog: string | null,
+): Promise<SharedReportDto> {
+  return call("share_crash_report", { instanceId, exitCode, crashReport, jvmCrashLog });
+}
+
 export function killInstance(instanceId: string): Promise<boolean> {
   return call("kill_instance", { instanceId });
 }

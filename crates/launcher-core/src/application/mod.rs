@@ -52,6 +52,7 @@ pub mod search_mods;
 pub mod select_account;
 pub mod set_cape;
 pub mod set_mod_enabled;
+pub mod share_crash_report;
 pub mod share_diagnostic_report;
 pub mod update_curseforge;
 pub mod update_instance_settings;

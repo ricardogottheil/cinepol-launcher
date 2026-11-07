@@ -4,6 +4,7 @@
 mod artifact;
 mod assets;
 mod command;
+mod crash;
 pub mod log4j;
 mod masking;
 mod paths;
@@ -17,6 +18,10 @@ mod version_id;
 pub use artifact::{Artifact, ArtifactError, MavenCoordinate, RelativePath};
 pub use assets::{AssetIndex, AssetObject};
 pub use command::{LaunchCommand, LaunchContext, LaunchIdentity, build_launch_command, substitute};
+pub use crash::{
+    JVM_CRASH_LOG_PREFIX, is_crash_report_name, is_jvm_crash_log_name, is_plain_file_name,
+    redact_crash_text,
+};
 pub use masking::MaskingLogSink;
 pub use paths::LauncherPaths;
 pub use plan::{LibraryPlan, NativeJar, plan_libraries};

@@ -496,6 +496,16 @@ fn commands(cfg: &Config) -> Vec<CommandSpec> {
         ),
         command("open_logs_folder", vec![], "null".to_owned()),
         command(
+            "share_crash_report",
+            vec![
+                ("instanceId", string()),
+                ("exitCode", "number | null".to_owned()),
+                ("crashReport", format!("{} | null", string())),
+                ("jvmCrashLog", format!("{} | null", string())),
+            ],
+            SharedReportDto::name(cfg),
+        ),
+        command(
             "open_jvm_crash_log",
             vec![("instanceId", string()), ("fileName", string())],
             "null".to_owned(),
@@ -672,6 +682,7 @@ mod tests {
             "open_crash_report",
             "open_jvm_crash_log",
             "open_logs_folder",
+            "share_crash_report",
             "open_instance_folder",
             "list_servers",
             "edit_server_list",

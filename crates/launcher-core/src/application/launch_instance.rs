@@ -309,9 +309,7 @@ async fn newest_since<F: FileSystem>(
 /// Where the game writes crash reports, inside the game folder.
 pub const CRASH_REPORTS_DIR: &str = "crash-reports";
 
-/// The JVM writes `hs_err_pid<pid>.log` into its working folder (the game
-/// folder) when it crashes itself.
-pub const JVM_CRASH_LOG_PREFIX: &str = "hs_err_pid";
+pub use crate::domain::launch::JVM_CRASH_LOG_PREFIX;
 
 /// File times and the launcher clock may disagree by a moment.
 const CLOCK_SKEW: Duration = Duration::from_secs(2);

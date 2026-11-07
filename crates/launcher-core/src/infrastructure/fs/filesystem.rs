@@ -1,7 +1,7 @@
 use std::io::ErrorKind;
 use std::path::Path;
 
-use crate::domain::ports::{FileSystem, FileSystemError};
+use crate::domain::ports::{FileSystem, FileSystemError, TextCap};
 
 /// `FileSystem` backed by `tokio::fs`.
 #[derive(Debug, Default, Clone, Copy)]
@@ -41,6 +41,20 @@ impl FileSystem for TokioFileSystem {
         let owned = dir.to_path_buf();
         let prefix = name_prefix.to_owned();
         tokio::task::spawn_blocking(move || newest(&owned, since, &prefix))
+            .await
+            .map_err(|e| FileSystemError {
+                path: String::new(),
+                reason: e.to_string(),
+            })?
+    }
+
+    async fn read_text(
+        &self,
+        path: &Path,
+        cap: TextCap,
+    ) -> Result<Option<String>, FileSystemError> {
+        let owned = path.to_path_buf();
+        tokio::task::spawn_blocking(move || read_capped(&owned, cap))
             .await
             .map_err(|e| FileSystemError {
                 path: String::new(),
@@ -100,6 +114,31 @@ fn newest(
         }
     }
     Ok(best.map(|(_, path)| path))
+}
+
+fn read_capped(path: &Path, cap: TextCap) -> Result<Option<String>, FileSystemError> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    // `symlink_metadata` does not follow links, so a link is never "a file".
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_file() => {}
+        Ok(_) => return Ok(None),
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(error(path, &e)),
+    }
+    let mut file = std::fs::File::open(path).map_err(|e| error(path, &e))?;
+    let len = file.metadata().map_err(|e| error(path, &e))?.len();
+    let (start, max) = match cap {
+        TextCap::Head(max) => (0, max),
+        TextCap::Tail(max) => (len.saturating_sub(max as u64), max),
+    };
+    file.seek(SeekFrom::Start(start))
+        .map_err(|e| error(path, &e))?;
+    let mut bytes = Vec::new();
+    file.take(max as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| error(path, &e))?;
+    Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
 }
 
 /// `to` is created with `create_dir` (not `create_dir_all`) so an existing
@@ -252,6 +291,46 @@ mod tests {
             fs.newest_file_since(&reports, later, "").await.unwrap(),
             None
         );
+    }
+
+    #[tokio::test]
+    async fn reads_the_head_or_the_tail_of_regular_files_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let fs = TokioFileSystem;
+        let log = dir.path().join("game.log");
+        std::fs::write(&log, b"first line\nlast line\n").unwrap();
+        assert_eq!(
+            fs.read_text(&log, TextCap::Head(5)).await.unwrap(),
+            Some("first".to_owned())
+        );
+        assert_eq!(
+            fs.read_text(&log, TextCap::Tail(10)).await.unwrap(),
+            Some("last line\n".to_owned())
+        );
+        assert_eq!(
+            fs.read_text(&log, TextCap::Tail(1_000)).await.unwrap(),
+            Some("first line\nlast line\n".to_owned())
+        );
+        assert_eq!(
+            fs.read_text(&dir.path().join("missing.log"), TextCap::Head(10))
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            fs.read_text(dir.path(), TextCap::Head(10)).await.unwrap(),
+            None
+        );
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&log, dir.path().join("link.log")).unwrap();
+            assert_eq!(
+                fs.read_text(&dir.path().join("link.log"), TextCap::Head(10))
+                    .await
+                    .unwrap(),
+                None
+            );
+        }
     }
 
     #[cfg(unix)]

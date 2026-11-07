@@ -74,6 +74,7 @@ pub fn run() -> Result<(), tauri::Error> {
             commands::instances::kill_instance,
             commands::instances::open_crash_report,
             commands::instances::open_jvm_crash_log,
+            commands::instances::share_crash_report,
             commands::instances::open_instance_folder,
             commands::instance_management::delete_instance,
             commands::instance_management::duplicate_instance,

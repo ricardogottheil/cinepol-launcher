@@ -5,7 +5,11 @@ use launcher_core::application::launch_instance::{
 };
 use launcher_core::application::list_instances::list_instances as list;
 use launcher_core::application::prepare_cinepol_instance::cinepol_server_entry;
+use launcher_core::application::share_crash_report::{
+    CrashShareRequest, ShareCrashDeps, share_crash_report as share_crash,
+};
 use launcher_core::domain::instance::InstanceOrigin;
+use launcher_core::domain::launch::{is_crash_report_name, is_jvm_crash_log_name};
 use launcher_core::domain::loader::{LoaderKind, LoaderSpec, LoaderVersion};
 use launcher_core::domain::server_list::ServerAddress;
 use launcher_core::infrastructure::process::GameOutputFile;
@@ -13,7 +17,9 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
 use super::parse_instance_id;
-use crate::dto::{InstallSummaryDto, InstanceDto, LaunchOutcomeDto, LogLineDto, ProgressEvent};
+use crate::dto::{
+    InstallSummaryDto, InstanceDto, LaunchOutcomeDto, LogLineDto, ProgressEvent, SharedReportDto,
+};
 use crate::error::{AppError, ErrorCode};
 use crate::events::GAME_EXITED;
 use crate::logs::ChannelLogSink;
@@ -167,7 +173,7 @@ pub fn open_crash_report(
     file_name: String,
 ) -> Result<(), AppError> {
     let id = parse_instance_id(&instance_id)?;
-    if !is_report_name(&file_name) {
+    if !is_crash_report_name(&file_name) {
         return Err(AppError::invalid_input("not a crash report name"));
     }
     let crash_reports = state
@@ -215,6 +221,34 @@ fn open_evidence(
         .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))
 }
 
+/// Uploads what a crash left behind (with the session token and environment
+/// variables removed) to pastes.dev and returns its link. The file names are
+/// the ones the launch outcome reported.
+#[tauri::command]
+pub async fn share_crash_report(
+    state: State<'_, AppState>,
+    instance_id: String,
+    exit_code: Option<i32>,
+    crash_report: Option<String>,
+    jvm_crash_log: Option<String>,
+) -> Result<SharedReportDto, AppError> {
+    let request = CrashShareRequest {
+        instance: parse_instance_id(&instance_id)?,
+        exit_code,
+        crash_report,
+        jvm_crash_log,
+    };
+    let deps = ShareCrashDeps {
+        instances: &state.instances,
+        fs: &state.fs,
+        host: &state.report_host,
+        paths: &state.paths,
+        platform: &state.platform,
+        launcher_version: &state.launcher_version,
+    };
+    Ok(SharedReportDto::from(share_crash(&request, &deps).await?))
+}
+
 /// Opens the instance's game folder (mods, saves, resource packs) in the
 /// system's file manager, creating it when the instance was never installed.
 /// Only folders of instances that exist are opened.
@@ -241,21 +275,6 @@ pub fn open_instance_folder(
         .map_err(|error| AppError::new(ErrorCode::Internal, error.to_string()))
 }
 
-/// A plain file name: no separators, drive letters, NUL or dot segments.
-fn is_report_name(name: &str) -> bool {
-    !name.is_empty() && !name.contains(['/', '\\', ':', '\0']) && name != "." && name != ".."
-}
-
-/// `hs_err_pid<pid>.log`, as a plain file name.
-fn is_jvm_crash_log_name(name: &str) -> bool {
-    use launcher_core::application::launch_instance::JVM_CRASH_LOG_PREFIX;
-    is_report_name(name)
-        && name.starts_with(JVM_CRASH_LOG_PREFIX)
-        && name
-            .rsplit_once('.')
-            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("log"))
-}
-
 /// The file itself: a regular file with `extension` (not a symlink) whose
 /// real path is inside `folder`, so nothing else can be opened with the
 /// default app.
@@ -280,7 +299,7 @@ fn report_path(
 
 #[cfg(test)]
 mod tests {
-    use super::{is_jvm_crash_log_name, is_report_name, report_path};
+    use super::report_path;
 
     #[test]
     fn only_regular_txt_reports_inside_the_folder_open() {
@@ -300,30 +319,6 @@ mod tests {
         assert_eq!(report_path(&reports, "missing.txt", "txt"), None);
         #[cfg(unix)]
         assert_eq!(report_path(&reports, "link.txt", "txt"), None);
-    }
-
-    #[test]
-    fn crash_report_names_are_plain_file_names() {
-        assert!(is_report_name("crash-2026-10-19_12.00.00-client.txt"));
-        for bad in [
-            "", ".", "..", "../x.txt", "a/b.txt", "a\\b.txt", "C:x.txt", "a\0b",
-        ] {
-            assert!(!is_report_name(bad), "{bad:?}");
-        }
-    }
-
-    #[test]
-    fn jvm_crash_logs_are_hs_err_log_files() {
-        assert!(is_jvm_crash_log_name("hs_err_pid4242.log"));
-        for bad in [
-            "hs_err_pid1.txt",
-            "options.log",
-            "../hs_err_pid1.log",
-            "hs_err_pid1",
-            "latest.log",
-        ] {
-            assert!(!is_jvm_crash_log_name(bad), "{bad:?}");
-        }
     }
 
     #[test]

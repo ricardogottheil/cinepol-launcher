@@ -405,6 +405,18 @@ impl From<launcher_core::application::share_diagnostic_report::ShareReportError>
     }
 }
 
+impl From<launcher_core::application::share_crash_report::ShareCrashError> for AppError {
+    fn from(error: launcher_core::application::share_crash_report::ShareCrashError) -> Self {
+        use launcher_core::application::share_crash_report::ShareCrashError;
+        match error {
+            ShareCrashError::Instance(error) => error.into(),
+            ShareCrashError::Share(error) => error.into(),
+            ShareCrashError::InvalidName(_) => Self::invalid_input(error.to_string()),
+            ShareCrashError::FileSystem(_) => Self::new(ErrorCode::Internal, error.to_string()),
+        }
+    }
+}
+
 impl From<launcher_core::domain::server::ServerStatusError> for AppError {
     fn from(error: launcher_core::domain::server::ServerStatusError) -> Self {
         Self::new(ErrorCode::ServerUnreachable, error.to_string())

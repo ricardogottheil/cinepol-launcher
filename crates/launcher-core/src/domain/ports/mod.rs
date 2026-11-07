@@ -13,7 +13,7 @@ mod secrets;
 pub use clock::{Clock, unix_seconds};
 pub use delay::Delay;
 pub use download::{DownloadError, DownloadRequest, DownloadSummary, Downloader};
-pub use filesystem::{FileSystem, FileSystemError};
+pub use filesystem::{FileSystem, FileSystemError, TextCap};
 pub use http::{
     ApiKeyHeader, HttpBody, HttpClient, HttpError, HttpMethod, HttpRequest, HttpRequester,
     HttpResponse, MultipartPart,

@@ -42,8 +42,22 @@ with nothing to back it up. Two gaps made that impossible to check:
     screen or the file (`MaskingLogSink`), because some loaders print their
     arguments.
   - The crash notice and the About page open this folder.
+- **Share report.** The crash notice publishes one text bundle and shows its
+  link (`share_crash_report`): launcher version, system, instance, loader,
+  Java choice, memory and exit code; the head of the crash report (160 KiB)
+  and of the JVM crash log (128 KiB); and the tail of the game output
+  (160 KiB), under the 512 KiB upload limit. Only the file names the launch
+  outcome reported are accepted, checked again in the core. Before upload,
+  `--accessToken <value>` and any JWT are masked and the JVM crash log's
+  environment variables (which may hold API keys) are omitted. It reuses the
+  diagnosis upload (pastes.dev, ADR 0015), one upload per click, and the
+  notice says what the report includes and that anyone with the link can
+  read it.
 
 ## Consequences
 
-- A player can always find what happened, even after closing the launcher.
+- A player can always find what happened, even after closing the launcher,
+  and hand it over as one link.
+- The shared bundle holds file paths with the player's system user name and
+  the mod list; the notice says so before the player shares it.
 - Disk use is bounded: four launcher logs and two output logs per instance.

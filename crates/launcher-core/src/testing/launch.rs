@@ -14,7 +14,9 @@ use crate::domain::launch::{
     LogSink, LogStream, NativeJar, NativesExtractor, Platform, ProcessSpec, RunningGames,
     VersionManifest, VersionSource, VersionSourceError, VersionSpec,
 };
-use crate::domain::ports::{FileSystem, FileSystemError, ProgressReporter, ProgressUpdate};
+use crate::domain::ports::{
+    FileSystem, FileSystemError, ProgressReporter, ProgressUpdate, TextCap,
+};
 
 /// Serves fixed version specs and asset indexes by id.
 #[derive(Debug, Clone)]
@@ -207,6 +209,7 @@ pub struct FakeFileSystem {
     copies: Mutex<Vec<(PathBuf, PathBuf)>>,
     fail_copies: std::sync::atomic::AtomicBool,
     modified: Mutex<Vec<(PathBuf, std::time::SystemTime)>>,
+    texts: Mutex<HashMap<PathBuf, String>>,
 }
 
 impl FakeFileSystem {
@@ -217,7 +220,14 @@ impl FakeFileSystem {
             copies: Mutex::default(),
             fail_copies: Default::default(),
             modified: Mutex::default(),
+            texts: Mutex::default(),
         }
+    }
+
+    /// A regular file with text content, for `read_text`.
+    pub fn add_text(&self, path: PathBuf, text: &str) {
+        self.add(path.clone());
+        self.texts.lock().unwrap().insert(path, text.to_owned());
     }
 
     pub fn add(&self, path: PathBuf) {
@@ -289,6 +299,20 @@ impl FileSystem for FakeFileSystem {
             })
             .max_by_key(|(_, modified)| *modified)
             .map(|(path, _)| path.clone()))
+    }
+
+    async fn read_text(
+        &self,
+        path: &Path,
+        cap: TextCap,
+    ) -> Result<Option<String>, FileSystemError> {
+        Ok(self.texts.lock().unwrap().get(path).map(|text| match cap {
+            TextCap::Head(max) => text.chars().take(max).collect(),
+            TextCap::Tail(max) => {
+                let skip = text.chars().count().saturating_sub(max);
+                text.chars().skip(skip).collect()
+            }
+        }))
     }
 
     async fn copy_dir_all(&self, from: &Path, to: &Path) -> Result<(), FileSystemError> {

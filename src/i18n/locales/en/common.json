@@ -354,7 +354,10 @@
     },
     "crashed": "The game closed because of an error (code {{code}}).",
     "openCrashReport": "Open crash report",
-    "openJvmCrashLog": "Open JVM crash log"
+    "openJvmCrashLog": "Open JVM crash log",
+    "shareCrash": "Share report",
+    "sharingCrash": "Creating link…",
+    "shareCrashNote": "The report includes your system details, mods and the game output, without your session. Anyone with the link can read it."
   },
   "about": {
     "title": "About",

@@ -415,6 +415,7 @@ export interface Commands {
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
   open_crash_report: { args: { instanceId: string; fileName: string }; result: null };
   open_logs_folder: { args: Record<string, never>; result: null };
+  share_crash_report: { args: { instanceId: string; exitCode: number | null; crashReport: string | null; jvmCrashLog: string | null }; result: SharedReportDto };
   open_jvm_crash_log: { args: { instanceId: string; fileName: string }; result: null };
   open_instance_folder: { args: { instanceId: string }; result: null };
   list_servers: { args: { instanceId: string }; result: ServerListDto };

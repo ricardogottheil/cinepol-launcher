@@ -32,6 +32,7 @@ const client = vi.hoisted(() => ({
   openCrashReport: vi.fn(),
   openJvmCrashLog: vi.fn(),
   openLogsFolder: vi.fn(),
+  shareCrashReport: vi.fn(),
   openInstanceFolder: vi.fn(),
 }));
 
@@ -993,6 +994,37 @@ describe("InstancesPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
     fireEvent.click(await screen.findByRole("button", { name: labels.openJvmCrashLog }));
     expect(client.openJvmCrashLog).toHaveBeenCalledWith("survival", log);
+  });
+
+  it("shares the crash and shows the link", async () => {
+    const report = "crash-2026-10-19_12.00.00-client.txt";
+    client.launchInstance.mockResolvedValue({
+      ...outcome,
+      exitCode: 1,
+      crashed: true,
+      crashReport: report,
+    });
+    client.shareCrashReport.mockResolvedValue({
+      url: "https://pastes.dev/aB3dE9fGh2",
+      expiresAt: null,
+    });
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    fireEvent.click(await screen.findByRole("button", { name: labels.shareCrash }));
+    expect(
+      await screen.findByRole("link", { name: "https://pastes.dev/aB3dE9fGh2" }),
+    ).toHaveAttribute("href", "https://pastes.dev/aB3dE9fGh2");
+    expect(client.shareCrashReport).toHaveBeenCalledWith("survival", 1, report, null);
+    expect(screen.getByText(labels.shareCrashNote)).toBeInTheDocument();
+  });
+
+  it("says why a crash could not be shared", async () => {
+    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, crashed: true });
+    client.shareCrashReport.mockRejectedValue(new IpcError("network", "offline"));
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    fireEvent.click(await screen.findByRole("button", { name: labels.shareCrash }));
+    expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
 
   it("shows nothing when the launcher stopped the game", async () => {
