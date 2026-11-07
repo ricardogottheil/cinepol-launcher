@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { cx } from "../../components/ui/cx";
 import { Readout } from "../../components/ui/Readout";
+import { TextField } from "../../components/ui/TextField";
 import { asCatalog, type ModEntryDto, type ModUpdateDto } from "../../ipc/client";
 import { CATALOG_NAMES } from "../modpacks/catalogNames";
 import { modErrorText } from "./modErrorText";
@@ -33,7 +34,10 @@ export function InstalledMods({
   const toggle = useSetModEnabled(instanceId);
   const remove = useRemoveMod(instanceId);
   const [removing, setRemoving] = useState<ModEntryDto | null>(null);
+  const [filter, setFilter] = useState("");
   const entries = mods.data ?? [];
+  const query = foldForSearch(filter.trim());
+  const shown = query ? entries.filter((entry) => matchesFilter(entry, query)) : entries;
   const updateFor = new Map<string, ModUpdateDto>(
     (updates.data?.updates ?? []).map((update) => [update.project, update]),
   );
@@ -50,7 +54,13 @@ export function InstalledMods({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <Readout
           unit={t("mods.count")}
-          value={mods.data ? String(entries.length) : null}
+          value={
+            !mods.data
+              ? null
+              : query
+                ? t("mods.countFiltered", { shown: shown.length, total: entries.length })
+                : String(entries.length)
+          }
           size="sm"
         />
         <div className="flex flex-wrap gap-3">
@@ -70,6 +80,17 @@ export function InstalledMods({
         </p>
       ) : null}
 
+      {entries.length > 0 ? (
+        <TextField
+          label={t("mods.filterLabel")}
+          placeholder={t("mods.filterPlaceholder")}
+          type="search"
+          value={filter}
+          className="max-w-[420px]"
+          onChange={(event) => setFilter(event.target.value)}
+        />
+      ) : null}
+
       {mods.isPending ? (
         <p className="m-0 text-engrave">{t("mods.loading")}</p>
       ) : mods.isError ? (
@@ -78,12 +99,14 @@ export function InstalledMods({
         <p className="m-0 max-w-[65ch] border-t border-hairline pt-5 text-silk-dim">
           {t("mods.empty")}
         </p>
+      ) : shown.length === 0 ? (
+        <p className="m-0 border-t border-hairline pt-5 text-silk-dim">{t("mods.noMatch")}</p>
       ) : (
         <ul
           aria-label={t("mods.installedLabel")}
           className="m-0 list-none divide-y divide-hairline border-y border-hairline p-0"
         >
-          {entries.map((entry) => (
+          {shown.map((entry) => (
             <ModRow
               key={entry.filename}
               entry={entry}
@@ -111,6 +134,18 @@ export function InstalledMods({
         />
       ) : null}
     </div>
+  );
+}
+
+/** Lowercase without accents, so "creperia" finds a title written with accents. */
+function foldForSearch(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** Whether the mod's title, file name or version holds the folded query. */
+function matchesFilter(entry: ModEntryDto, query: string): boolean {
+  return [entry.title, entry.filename, entry.versionNumber ?? ""].some((field) =>
+    foldForSearch(field).includes(query),
   );
 }
 

@@ -513,4 +513,53 @@ describe("ModsPanel", () => {
       within(rows[2] as HTMLElement).queryByText(/Modrinth ·|CurseForge/),
     ).not.toBeInTheDocument();
   });
+
+  it("filters the installed mods by name, file or version, ignoring case and accents", async () => {
+    client.listInstanceMods.mockResolvedValue([
+      iris,
+      sodium,
+      loose,
+      { ...loose, filename: "creperia.jar", title: "Cr\u{ea}per\u{ed}a" },
+    ]);
+    renderWithQuery(<Panel />);
+    const list = await screen.findByRole("list", { name: labels.installedLabel });
+    const filter = screen.getByRole("searchbox", { name: labels.filterLabel });
+
+    fireEvent.change(filter, { target: { value: "IRIS" } });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(list).getByText("Iris Shaders")).toBeInTheDocument();
+    expect(
+      screen.getByText(fill(labels.countFiltered, { shown: 1, total: 4 })),
+    ).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: "private-tweaks" } });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+
+    fireEvent.change(filter, { target: { value: "0.6.0" } });
+    expect(within(list).getByText("Sodium")).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: "creperia" } });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+
+    fireEvent.change(filter, { target: { value: "" } });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
+
+  it("says when no installed mod matches, and acts on the filtered rows", async () => {
+    renderWithQuery(<Panel />);
+    await screen.findByRole("list", { name: labels.installedLabel });
+    const filter = screen.getByRole("searchbox", { name: labels.filterLabel });
+
+    fireEvent.change(filter, { target: { value: "journeymap" } });
+    expect(screen.getByText(labels.noMatch)).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: labels.installedLabel })).not.toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: "sodium" } });
+    const list = screen.getByRole("list", { name: labels.installedLabel });
+    fireEvent.click(within(list).getByRole("button", { name: labels.enable }));
+    await waitFor(() =>
+      expect(client.setModEnabled).toHaveBeenCalledWith("survival", "sodium.jar", true),
+    );
+  });
 });

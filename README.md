@@ -40,7 +40,7 @@ streamer [polispol1](https://twitch.tv/polispol1). Website:
   arguments, window size and a button to open its game folder.
 - Single mods from Modrinth or CurseForge, searched for the instance's
   Minecraft version and loader and installed with the dependencies they need.
-  Turn them on or off, remove them, or update them to a compatible version.
+  Search the installed list, turn mods on or off, remove them, or update them to a compatible version.
 - Modpacks from Modrinth (`.mrpack`), CurseForge (catalog or `.zip`) and
   packwiz, kept up to date without touching the player's own changes. Files
   whose authors forbid third-party downloads are picked up from the
