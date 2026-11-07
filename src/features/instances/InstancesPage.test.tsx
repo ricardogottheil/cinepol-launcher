@@ -1046,6 +1046,8 @@ describe("InstancesPage", () => {
     expect(tail).toHaveTextContent("output line 20");
     expect(tail).toHaveTextContent("output line 9");
     expect(tail).not.toHaveTextContent("output line 8");
+    // The status region announces the crash, not twelve lines of output.
+    expect(tail).toHaveAttribute("aria-live", "off");
   });
 
   it("shows nothing when the launcher stopped the game", async () => {

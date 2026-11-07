@@ -61,7 +61,7 @@ export function CrashNotice({
   }
 
   return (
-    <span className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <span className="flex flex-wrap items-center gap-3 text-stale">
         {t("instances.crashed", { code: outcome.exitCode ?? "-" })}
         {crashReport ? (
@@ -80,7 +80,7 @@ export function CrashNotice({
         </Button>
       </span>
       {lines.length > 0 ? (
-        <figure aria-labelledby={tailCaption} className="m-0 flex flex-col gap-1">
+        <figure aria-labelledby={tailCaption} aria-live="off" className="m-0 flex flex-col gap-1">
           <figcaption id={tailCaption} className="text-[0.8125rem] text-engrave">
             {t("instances.crashTail")}
           </figcaption>
@@ -111,6 +111,6 @@ export function CrashNotice({
       ) : null}
       <span className="text-[0.8125rem] text-engrave">{t("instances.shareCrashNote")}</span>
       {error ? <span className="text-stale">{error}</span> : null}
-    </span>
+    </div>
   );
 }

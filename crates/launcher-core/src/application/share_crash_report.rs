@@ -208,16 +208,17 @@ fn assemble(header: &str, mut sections: Vec<Section>) -> String {
     let size = |sections: &[Section]| {
         header.len() + sections.iter().map(|s| s.render().len()).sum::<usize>()
     };
-    let mut overflow = size(&sections).saturating_sub(MAX_REPORT_BYTES);
-    for section in &mut sections {
+    for index in 0..sections.len() {
+        // Measured again each time: a cut note may be longer than what it replaced.
+        let overflow = size(&sections).saturating_sub(MAX_REPORT_BYTES);
         if overflow == 0 {
             break;
         }
+        let section = &mut sections[index];
         let Some(text) = section.text.take() else {
             continue;
         };
-        let (kept, removed) = shorten(&text, overflow + CUT_NOTE.len(), section.keep);
-        overflow = overflow.saturating_sub(removed.saturating_sub(CUT_NOTE.len()));
+        let kept = shorten(&text, overflow + CUT_NOTE.len(), section.keep);
         section.text = Some(match section.keep {
             Keep::Head => format!("{kept}{CUT_NOTE}"),
             Keep::Tail => format!("{CUT_NOTE}{kept}"),
@@ -231,11 +232,10 @@ fn assemble(header: &str, mut sections: Vec<Section>) -> String {
 }
 
 /// Removes at least `need` bytes from the end (`Keep::Head`) or the start
-/// (`Keep::Tail`) of `text`, at a line boundary; returns what is left and how
-/// many bytes went.
-fn shorten(text: &str, need: usize, keep: Keep) -> (String, usize) {
+/// (`Keep::Tail`) of `text`, at a line boundary.
+fn shorten(text: &str, need: usize, keep: Keep) -> String {
     if need >= text.len() {
-        return (String::new(), text.len());
+        return String::new();
     }
     let kept = match keep {
         Keep::Head => {
@@ -257,7 +257,7 @@ fn shorten(text: &str, need: usize, keep: Keep) -> (String, usize) {
             &text[start..]
         }
     };
-    (kept.to_owned(), text.len() - kept.len())
+    kept.to_owned()
 }
 
 #[cfg(test)]
@@ -507,6 +507,36 @@ mod tests {
         // The whole 160 KiB character window of the output survives (240 KiB here).
         assert!(output.len() > 230_000, "{}", output.len());
         assert!(report.contains("(cut to fit the upload limit)"));
+    }
+
+    #[tokio::test]
+    async fn an_empty_section_replaced_by_the_cut_note_still_fits() {
+        let world = World::new().await;
+        world
+            .fs
+            .add_text(world.game_dir().join("crash-reports").join("c.txt"), "");
+        world.fs.add_text(
+            world.game_dir().join("hs_err_pid1.log"),
+            // Three bytes per character: the two sections alone pass the limit.
+            &"\u{20ac}\n".repeat(200_000),
+        );
+        world.fs.add_text(
+            world.paths.game_output_log(&id()),
+            &format!("{}THE END\n", "\u{20ac}\n".repeat(200_000)),
+        );
+        share_crash_report(
+            &CrashShareRequest {
+                crash_report: Some("c.txt".into()),
+                jvm_crash_log: Some("hs_err_pid1.log".into()),
+                ..request()
+            },
+            &world.deps(),
+        )
+        .await
+        .unwrap();
+        let report = &world.host.published()[0];
+        assert!(report.len() <= MAX_REPORT_BYTES, "{}", report.len());
+        assert!(report.ends_with("THE END\n"));
     }
 
     #[tokio::test]
