@@ -306,11 +306,32 @@ impl FileSystem for FakeFileSystem {
         path: &Path,
         cap: TextCap,
     ) -> Result<Option<String>, FileSystemError> {
-        Ok(self.texts.lock().unwrap().get(path).map(|text| match cap {
-            TextCap::Head(max) => text.chars().take(max).collect(),
-            TextCap::Tail(max) => {
-                let skip = text.chars().count().saturating_sub(max);
-                text.chars().skip(skip).collect()
+        // Caps count characters here; the partial line at the cut is dropped
+        // as the port promises.
+        Ok(self.texts.lock().unwrap().get(path).map(|text| {
+            let chars: Vec<char> = text.chars().collect();
+            match cap {
+                TextCap::Head(max) if chars.len() > max => {
+                    let mut kept = &chars[..max];
+                    if chars[max] != '\n' {
+                        let end = kept.iter().rposition(|c| *c == '\n').map_or(0, |at| at + 1);
+                        kept = &kept[..end];
+                    }
+                    kept.iter().collect()
+                }
+                TextCap::Tail(max) if chars.len() > max => {
+                    let start = chars.len() - max;
+                    let skip = if chars[start - 1] == '\n' {
+                        0
+                    } else {
+                        chars[start..]
+                            .iter()
+                            .position(|c| *c == '\n')
+                            .map_or(max, |at| at + 1)
+                    };
+                    chars[start + skip..].iter().collect()
+                }
+                _ => text.clone(),
             }
         }))
     }

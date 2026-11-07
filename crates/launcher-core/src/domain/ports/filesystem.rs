@@ -45,6 +45,8 @@ pub trait FileSystem: Send + Sync {
     ) -> impl Future<Output = Result<Option<std::path::PathBuf>, FileSystemError>> + Send;
     /// Up to `cap` bytes of a regular file as text (invalid UTF-8 replaced);
     /// `None` when it is missing or not a regular file (a symbolic link is not).
+    /// When the cap cuts through a line, that partial line is dropped, so a
+    /// secret on it is never returned in pieces.
     fn read_text(
         &self,
         path: &Path,

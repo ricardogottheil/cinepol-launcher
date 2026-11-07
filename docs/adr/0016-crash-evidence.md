@@ -36,8 +36,10 @@ with nothing to back it up. Two gaps made that impossible to check:
     the data folder is known (Tauri `setup`).
   - `game-<instance>.log`: everything the game printed during its last
     launch, written line by line next to the live view (a pair of sinks is a
-    sink). The previous launch is kept as `game-<instance>.1.log`. A file that
-    cannot be created never stops the game.
+    sink). The file is started on the first line, so a launch that fails
+    before the game prints anything keeps the previous output; the launch
+    before is kept as `game-<instance>.1.log`. A file that cannot be created
+    never stops the game.
   - The session token is masked in the game output before it reaches the
     screen or the file (`MaskingLogSink`), because some loaders print their
     arguments.
@@ -46,8 +48,13 @@ with nothing to back it up. Two gaps made that impossible to check:
   link (`share_crash_report`): launcher version, system, instance, loader,
   Java choice, memory and exit code; the head of the crash report (160 KiB)
   and of the JVM crash log (128 KiB); and the tail of the game output
-  (160 KiB), under the 512 KiB upload limit. Only the file names the launch
-  outcome reported are accepted, checked again in the core. Before upload,
+  (160 KiB). A cap that cuts through a line drops that partial line, so a
+  token is never kept in pieces the redaction cannot recognize; text that
+  grows when decoded is cut to the 512 KiB upload limit. Only plain crash
+  report (`*.txt`) and `hs_err_pid*.log` names inside the instance's game
+  folder are read, and the final file must not be a symbolic link (a linked
+  folder, which only the player or a mod can create, is followed, as when
+  opening a report). Before upload,
   `--accessToken <value>` and any JWT are masked and the JVM crash log's
   environment variables (which may hold API keys) are omitted. It reuses the
   diagnosis upload (pastes.dev, ADR 0015), one upload per click, and the

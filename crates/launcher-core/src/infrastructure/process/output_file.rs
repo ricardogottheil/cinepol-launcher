@@ -1,7 +1,7 @@
 //! Saves the game's output to a file, so it outlives the launcher window.
 
 use std::io::{LineWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::domain::launch::log4j::LogEntry;
@@ -12,35 +12,46 @@ use crate::infrastructure::fs::create_rotated_log;
 const KEEP_PREVIOUS: usize = 1;
 
 /// `LogSink` that writes every line to the instance's game output log.
+/// The file is started on the first line, so a launch that fails before the
+/// game prints anything keeps the previous output.
 pub struct GameOutputFile {
-    file: Mutex<Option<LineWriter<std::fs::File>>>,
+    path: PathBuf,
+    file: Mutex<Output>,
+}
+
+enum Output {
+    NotStarted,
+    Writing(LineWriter<std::fs::File>),
+    /// It could not be created or written; the game runs on without it.
+    Off,
 }
 
 impl GameOutputFile {
-    /// Starts a new log at `path`. When the file cannot be created the game
-    /// still runs; its output just is not saved.
     pub fn create(path: &Path) -> Self {
-        let file = match create_rotated_log(path, KEEP_PREVIOUS) {
-            Ok(file) => Some(LineWriter::new(file)),
-            Err(error) => {
-                tracing::warn!(path = %path.display(), %error, "could not save the game output");
-                None
-            }
-        };
         Self {
-            file: Mutex::new(file),
+            path: path.to_path_buf(),
+            file: Mutex::new(Output::NotStarted),
         }
     }
 
     fn write(&self, text: &str) {
-        let Ok(mut guard) = self.file.lock() else {
+        let Ok(mut output) = self.file.lock() else {
             return;
         };
-        if let Some(file) = guard.as_mut()
+        if matches!(*output, Output::NotStarted) {
+            *output = match create_rotated_log(&self.path, KEEP_PREVIOUS) {
+                Ok(file) => Output::Writing(LineWriter::new(file)),
+                Err(error) => {
+                    tracing::warn!(path = %self.path.display(), %error, "could not save the game output");
+                    Output::Off
+                }
+            };
+        }
+        if let Output::Writing(file) = &mut *output
             && let Err(error) = writeln!(file, "{text}")
         {
             tracing::warn!(%error, "stopped saving the game output");
-            *guard = None;
+            *output = Output::Off;
         }
     }
 }
@@ -103,6 +114,17 @@ mod tests {
             std::fs::read_to_string(dir.path().join("logs").join("game-cinepol.1.log")).unwrap(),
             "first launch\n"
         );
+    }
+
+    #[test]
+    fn a_launch_that_prints_nothing_keeps_the_previous_output() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("game-cinepol.log");
+        GameOutputFile::create(&path).line(LogStream::Stdout, "the crash".into());
+        // A launch that fails before the game starts (sign-in, Java) prints nothing.
+        drop(GameOutputFile::create(&path));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "the crash\n");
+        assert!(!dir.path().join("game-cinepol.1.log").exists());
     }
 
     #[test]

@@ -128,16 +128,49 @@ fn read_capped(path: &Path, cap: TextCap) -> Result<Option<String>, FileSystemEr
     }
     let mut file = std::fs::File::open(path).map_err(|e| error(path, &e))?;
     let len = file.metadata().map_err(|e| error(path, &e))?.len();
-    let (start, max) = match cap {
-        TextCap::Head(max) => (0, max),
-        TextCap::Tail(max) => (len.saturating_sub(max as u64), max),
+    let bytes = match cap {
+        TextCap::Head(max) => {
+            // One byte more tells whether the cut falls at the end of a line.
+            let mut bytes = Vec::new();
+            (&mut file)
+                .take(max as u64 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|e| error(path, &e))?;
+            if bytes.len() > max {
+                let line_ended = bytes[max] == b'\n';
+                bytes.truncate(max);
+                if !line_ended {
+                    let keep = bytes
+                        .iter()
+                        .rposition(|b| *b == b'\n')
+                        .map_or(0, |at| at + 1);
+                    bytes.truncate(keep);
+                }
+            }
+            bytes
+        }
+        TextCap::Tail(max) => {
+            let start = len.saturating_sub(max as u64);
+            // The byte before the window tells whether it starts a line.
+            let from = start.saturating_sub(1);
+            file.seek(SeekFrom::Start(from))
+                .map_err(|e| error(path, &e))?;
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes).map_err(|e| error(path, &e))?;
+            if start == 0 {
+                bytes
+            } else {
+                let skip = match bytes.first() {
+                    Some(b'\n') => 1,
+                    _ => bytes
+                        .iter()
+                        .position(|b| *b == b'\n')
+                        .map_or(bytes.len(), |at| at + 1),
+                };
+                bytes.split_off(skip)
+            }
+        }
     };
-    file.seek(SeekFrom::Start(start))
-        .map_err(|e| error(path, &e))?;
-    let mut bytes = Vec::new();
-    file.take(max as u64)
-        .read_to_end(&mut bytes)
-        .map_err(|e| error(path, &e))?;
     Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
 }
 
@@ -300,12 +333,21 @@ mod tests {
         let log = dir.path().join("game.log");
         std::fs::write(&log, b"first line\nlast line\n").unwrap();
         assert_eq!(
-            fs.read_text(&log, TextCap::Head(5)).await.unwrap(),
-            Some("first".to_owned())
-        );
-        assert_eq!(
             fs.read_text(&log, TextCap::Tail(10)).await.unwrap(),
             Some("last line\n".to_owned())
+        );
+        // A cut through the middle of a line drops that partial line.
+        assert_eq!(
+            fs.read_text(&log, TextCap::Tail(12)).await.unwrap(),
+            Some("last line\n".to_owned())
+        );
+        assert_eq!(
+            fs.read_text(&log, TextCap::Head(15)).await.unwrap(),
+            Some("first line\n".to_owned())
+        );
+        assert_eq!(
+            fs.read_text(&log, TextCap::Head(10)).await.unwrap(),
+            Some("first line".to_owned())
         );
         assert_eq!(
             fs.read_text(&log, TextCap::Tail(1_000)).await.unwrap(),

@@ -4,7 +4,9 @@
 
 use thiserror::Error;
 
-use crate::application::share_diagnostic_report::{ShareReportError, share_diagnostic_report};
+use crate::application::share_diagnostic_report::{
+    MAX_REPORT_BYTES, ShareReportError, share_diagnostic_report,
+};
 use crate::domain::diagnostics::{ReportHost, SharedReport};
 use crate::domain::instance::{Instance, JavaSelection};
 use crate::domain::instance::{InstanceId, InstanceRepository, InstanceRepositoryError};
@@ -101,7 +103,7 @@ where
         .unwrap_or_default();
     section(&mut report, &format!("Game output: {output_name}"), text);
 
-    let report = redact_crash_text(&report);
+    let report = fit_upload_limit(redact_crash_text(&report));
     Ok(share_diagnostic_report(&report, deps.host).await?)
 }
 
@@ -143,6 +145,22 @@ fn header<I, F, H>(
     )
 }
 
+/// The caps count bytes read, but text that is not UTF-8 grows when decoded:
+/// cut what does not fit rather than fail the upload.
+fn fit_upload_limit(mut report: String) -> String {
+    const CUT_NOTE: &str = "\n(report cut to fit the upload limit)\n";
+    if report.len() <= MAX_REPORT_BYTES {
+        return report;
+    }
+    let mut end = MAX_REPORT_BYTES - CUT_NOTE.len();
+    while !report.is_char_boundary(end) {
+        end -= 1;
+    }
+    report.truncate(end);
+    report.push_str(CUT_NOTE);
+    report
+}
+
 fn section(report: &mut String, title: &str, text: Option<String>) {
     report.push_str(&format!("\n=== {title} ===\n"));
     match text {
@@ -161,7 +179,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::application::share_diagnostic_report::MAX_REPORT_BYTES;
     use crate::domain::diagnostics::ReportShareError;
     use crate::domain::instance::{GameVersion, Instance, InstanceName, InstanceOrigin};
     use crate::domain::launch::{Arch, OsName};
@@ -348,7 +365,7 @@ mod tests {
             .add_text(world.game_dir().join("hs_err_pid1.log"), &huge);
         world.fs.add_text(
             world.paths.game_output_log(&id()),
-            &format!("{huge}THE END"),
+            &format!("{}THE END", "x\n".repeat(MAX_REPORT_BYTES / 2)),
         );
         share_crash_report(
             &CrashShareRequest {
@@ -366,6 +383,54 @@ mod tests {
             report.ends_with("THE END\n"),
             "the end of the output is kept"
         );
+    }
+
+    #[tokio::test]
+    async fn a_token_cut_by_the_size_limit_never_reaches_the_upload() {
+        let world = World::new().await;
+        let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJl";
+        // The 160 KiB tail window starts three characters into the token.
+        let rest = " rest\n";
+        let filler_len = 160 * 1024 - (jwt.len() - 3) - rest.len();
+        let filler = format!(
+            "{}{}",
+            "y\n".repeat(filler_len / 2),
+            "\n".repeat(filler_len % 2)
+        );
+        world.fs.add_text(
+            world.paths.game_output_log(&id()),
+            &format!("{jwt}{rest}{filler}"),
+        );
+        share_crash_report(&request(), &world.deps()).await.unwrap();
+        let report = &world.host.published()[0];
+        assert!(
+            !report.contains("c2lnbmF0dXJl"),
+            "the token's signature leaked"
+        );
+    }
+
+    #[tokio::test]
+    async fn multibyte_text_stays_under_the_upload_limit() {
+        let world = World::new().await;
+        let wide = "\u{e9}".repeat(MAX_REPORT_BYTES);
+        world
+            .fs
+            .add_text(world.game_dir().join("crash-reports").join("c.txt"), &wide);
+        world
+            .fs
+            .add_text(world.game_dir().join("hs_err_pid1.log"), &wide);
+        world.fs.add_text(world.paths.game_output_log(&id()), &wide);
+        share_crash_report(
+            &CrashShareRequest {
+                crash_report: Some("c.txt".into()),
+                jvm_crash_log: Some("hs_err_pid1.log".into()),
+                ..request()
+            },
+            &world.deps(),
+        )
+        .await
+        .unwrap();
+        assert!(world.host.published()[0].len() <= MAX_REPORT_BYTES);
     }
 
     #[tokio::test]
