@@ -1,5 +1,7 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Toaster } from "../../components/ui/Toaster";
 import { TOAST_MS } from "../../components/ui/toastStore";
 import esCommon from "../../i18n/locales/es/common.json";
 import { type InstanceDto, IpcError, type ModEntryDto } from "../../ipc/client";
@@ -536,6 +538,7 @@ describe("ModsPanel", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
 
     fireEvent.change(filter, { target: { value: "0.6.0" } });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
     expect(within(list).getByText("Sodium")).toBeInTheDocument();
 
     fireEvent.change(filter, { target: { value: "creperia" } });
@@ -561,5 +564,25 @@ describe("ModsPanel", () => {
     await waitFor(() =>
       expect(client.setModEnabled).toHaveBeenCalledWith("survival", "sodium.jar", true),
     );
+  });
+
+  it("starts another instance's list unfiltered", async () => {
+    const { client: queries, rerender } = renderWithQuery(<Panel />);
+    await screen.findByRole("list", { name: labels.installedLabel });
+    fireEvent.change(screen.getByRole("searchbox", { name: labels.filterLabel }), {
+      target: { value: "iris" },
+    });
+
+    rerender(
+      <QueryClientProvider client={queries}>
+        <Panel instance={{ ...fabric, id: "creative", name: "Creative" }} />
+        <Toaster />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(client.listInstanceMods).toHaveBeenCalledWith("creative"));
+    const searchbox = await screen.findByRole("searchbox", { name: labels.filterLabel });
+    expect(searchbox).toHaveValue("");
+    const list = screen.getByRole("list", { name: labels.installedLabel });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
   });
 });

@@ -38,6 +38,12 @@ export function InstalledMods({
   const entries = mods.data ?? [];
   const query = foldForSearch(filter.trim());
   const shown = query ? entries.filter((entry) => matchesFilter(entry, query)) : entries;
+  // Nothing while the list loads; "shown of total" while searching.
+  function countText(): string | null {
+    if (!mods.data) return null;
+    if (!query) return String(entries.length);
+    return t("mods.countFiltered", { shown: shown.length, total: entries.length });
+  }
   const updateFor = new Map<string, ModUpdateDto>(
     (updates.data?.updates ?? []).map((update) => [update.project, update]),
   );
@@ -52,17 +58,7 @@ export function InstalledMods({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <Readout
-          unit={t("mods.count")}
-          value={
-            !mods.data
-              ? null
-              : query
-                ? t("mods.countFiltered", { shown: shown.length, total: entries.length })
-                : String(entries.length)
-          }
-          size="sm"
-        />
+        <Readout unit={t("mods.count")} value={countText()} size="sm" />
         <div className="flex flex-wrap gap-3">
           {entries.length > 0 ? (
             <Button onClick={checkUpdates} disabled={updates.isFetching}>

@@ -69,6 +69,8 @@ export function ModsPanel({
         />
       ) : (
         <InstalledMods
+          // Another instance starts fresh: no search text or update check carries over.
+          key={instance.id}
           instanceId={instance.id}
           locked={locked}
           onAdd={() => setBrowsing(true)}
