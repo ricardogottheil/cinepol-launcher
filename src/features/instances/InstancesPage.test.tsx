@@ -30,6 +30,7 @@ const client = vi.hoisted(() => ({
   listServers: vi.fn(),
   editServerList: vi.fn(),
   openCrashReport: vi.fn(),
+  openJvmCrashLog: vi.fn(),
   openInstanceFolder: vi.fn(),
 }));
 
@@ -65,7 +66,9 @@ const outcome = {
   exitCode: 0,
   killed: false,
   playedSecs: 60,
+  crashed: false,
   crashReport: null as string | null,
+  jvmCrashLog: null as string | null,
 };
 
 function deferred<T>() {
@@ -950,20 +953,49 @@ describe("InstancesPage", () => {
 
   it("reports a crash and opens its report", async () => {
     const report = "crash-2026-10-19_12.00.00-client.txt";
-    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, crashReport: report });
+    client.launchInstance.mockResolvedValue({
+      ...outcome,
+      exitCode: 1,
+      crashed: true,
+      crashReport: report,
+    });
     client.openCrashReport.mockResolvedValue(undefined);
     renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
-    expect(await screen.findByText(labels.crashed)).toBeInTheDocument();
+    expect(await screen.findByText(labels.crashed.replace("{{code}}", "1"))).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: labels.openCrashReport }));
     expect(client.openCrashReport).toHaveBeenCalledWith("survival", report);
   });
 
-  it("keeps the plain exit message when the game failed without a report", async () => {
-    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1 });
+  it("reports a crash that left no report, without a report to open", async () => {
+    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, crashed: true });
     renderAt("/instances/survival");
     fireEvent.click(await screen.findByRole("button", { name: labels.play }));
-    expect(await screen.findByText(labels.exited.replace("{{code}}", "1"))).toBeInTheDocument();
+    expect(await screen.findByText(labels.crashed.replace("{{code}}", "1"))).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: labels.openCrashReport })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: labels.openJvmCrashLog })).not.toBeInTheDocument();
+  });
+
+  it("opens the log the JVM wrote when it crashed itself", async () => {
+    const log = "hs_err_pid4242.log";
+    client.launchInstance.mockResolvedValue({
+      ...outcome,
+      exitCode: -1073741819,
+      crashed: true,
+      jvmCrashLog: log,
+    });
+    client.openJvmCrashLog.mockResolvedValue(undefined);
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    fireEvent.click(await screen.findByRole("button", { name: labels.openJvmCrashLog }));
+    expect(client.openJvmCrashLog).toHaveBeenCalledWith("survival", log);
+  });
+
+  it("shows nothing when the launcher stopped the game", async () => {
+    client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, killed: true });
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    await screen.findByRole("button", { name: labels.play });
+    expect(screen.queryByText(labels.crashed.replace("{{code}}", "1"))).not.toBeInTheDocument();
   });
 });

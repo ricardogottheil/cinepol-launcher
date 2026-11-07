@@ -96,9 +96,17 @@ level: LogLevelDto | null, thread: string | null, logger: string | null, };
 
 export type LaunchOutcomeDto = { instanceId: string, exitCode: number | null, killed: boolean, playedSecs: number, 
 /**
+ * The game ended with an error on its own, with or without a report.
+ */
+crashed: boolean, 
+/**
  * File name of the crash report the game wrote, when it crashed.
  */
-crashReport: string | null, };
+crashReport: string | null, 
+/**
+ * File name of the `hs_err_pid*.log` the JVM wrote, when it crashed itself.
+ */
+jvmCrashLog: string | null, };
 
 export type CommunityLinksDto = { website: string, twitch: string, discord: string, };
 
@@ -406,6 +414,7 @@ export interface Commands {
   update_packwiz: { args: { operationId: string; instanceId: string; onProgress: Channel<ProgressEvent> }; result: PackwizUpdateDto };
   check_manual_downloads: { args: { instanceId: string }; result: ManualDownloadsDto };
   open_crash_report: { args: { instanceId: string; fileName: string }; result: null };
+  open_jvm_crash_log: { args: { instanceId: string; fileName: string }; result: null };
   open_instance_folder: { args: { instanceId: string }; result: null };
   list_servers: { args: { instanceId: string }; result: ServerListDto };
   list_saved_servers: { args: Record<string, never>; result: SavedServerDto[] };

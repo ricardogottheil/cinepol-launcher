@@ -824,8 +824,12 @@ pub struct LaunchOutcomeDto {
     pub killed: bool,
     #[ts(type = "number")]
     pub played_secs: u64,
+    /// The game ended with an error on its own, with or without a report.
+    pub crashed: bool,
     /// File name of the crash report the game wrote, when it crashed.
     pub crash_report: Option<String>,
+    /// File name of the `hs_err_pid*.log` the JVM wrote, when it crashed itself.
+    pub jvm_crash_log: Option<String>,
 }
 
 impl LaunchOutcomeDto {
@@ -835,13 +839,16 @@ impl LaunchOutcomeDto {
             exit_code: outcome.exit.code,
             killed: outcome.exit.killed_by_launcher,
             played_secs: outcome.played_secs,
-            crash_report: outcome
-                .crash_report
-                .as_ref()
-                .and_then(|path| path.file_name())
-                .map(|name| name.to_string_lossy().into_owned()),
+            crashed: outcome.crashed(),
+            crash_report: file_name(outcome.crash_report.as_deref()),
+            jvm_crash_log: file_name(outcome.jvm_crash_log.as_deref()),
         }
     }
+}
+
+fn file_name(path: Option<&std::path::Path>) -> Option<String> {
+    path.and_then(std::path::Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

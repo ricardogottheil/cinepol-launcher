@@ -254,7 +254,6 @@
     "cancel": "Cancelar",
     "installed": "Instalada",
     "playing": "Jugando",
-    "exited": "Cerrado con código {{code}}",
     "spec": {
       "version": "Versión",
       "loader": "Loader",
@@ -352,8 +351,9 @@
       "search": "Buscar en el log",
       "count": "{{shown}} de {{total}} líneas"
     },
-    "crashed": "El juego se cerró por un error.",
-    "openCrashReport": "Abrir reporte del error"
+    "crashed": "El juego se cerró por un error (código {{code}}).",
+    "openCrashReport": "Abrir reporte del error",
+    "openJvmCrashLog": "Abrir log del error de Java"
   },
   "about": {
     "title": "Acerca de",

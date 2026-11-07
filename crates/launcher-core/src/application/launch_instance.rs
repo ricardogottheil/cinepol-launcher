@@ -62,6 +62,16 @@ pub struct LaunchOutcome {
     pub played_secs: u64,
     /// The crash report the game wrote, when it exited with an error.
     pub crash_report: Option<PathBuf>,
+    /// The `hs_err_pid*.log` the JVM wrote when it crashed itself (graphics
+    /// drivers, native libraries); the game writes no crash report then.
+    pub jvm_crash_log: Option<PathBuf>,
+}
+
+impl LaunchOutcome {
+    /// The game ended with an error on its own, with or without a report.
+    pub fn crashed(&self) -> bool {
+        !self.exit.success() && !self.exit.killed_by_launcher
+    }
 }
 
 /// Everything the launcher talks to.
@@ -234,6 +244,7 @@ where
         .collect();
 
     let crash_reports = game_dir.join(CRASH_REPORTS_DIR);
+    let jvm_logs_dir = game_dir.clone();
     let started = deps.clock.now();
     let exit = deps
         .runner
@@ -261,29 +272,44 @@ where
     latest.record_playtime(played_secs);
     deps.instances.save(&latest).await?;
 
-    // A crash is a failed exit plus a report written during this session.
-    let crash_report = if exit.success() || exit.killed_by_launcher {
-        None
-    } else {
-        let since = started.checked_sub(CLOCK_SKEW).unwrap_or(started);
-        match deps.fs.newest_file_since(&crash_reports, since).await {
-            Ok(report) => report,
-            Err(error) => {
-                tracing::warn!(%error, "could not look for a crash report");
-                None
-            }
-        }
-    };
-
-    Ok(LaunchOutcome {
+    // Evidence of a crash is a file written during this session.
+    let mut outcome = LaunchOutcome {
         exit,
         played_secs,
-        crash_report,
-    })
+        crash_report: None,
+        jvm_crash_log: None,
+    };
+    if outcome.crashed() {
+        let since = started.checked_sub(CLOCK_SKEW).unwrap_or(started);
+        outcome.crash_report = newest_since(deps.fs, &crash_reports, since, "").await;
+        outcome.jvm_crash_log =
+            newest_since(deps.fs, &jvm_logs_dir, since, JVM_CRASH_LOG_PREFIX).await;
+    }
+    Ok(outcome)
+}
+
+/// A missing piece of evidence must not fail a launch that already ended.
+async fn newest_since<F: FileSystem>(
+    fs: &F,
+    dir: &std::path::Path,
+    since: std::time::SystemTime,
+    prefix: &str,
+) -> Option<PathBuf> {
+    match fs.newest_file_since(dir, since, prefix).await {
+        Ok(found) => found,
+        Err(error) => {
+            tracing::warn!(%error, "could not look for crash evidence");
+            None
+        }
+    }
 }
 
 /// Where the game writes crash reports, inside the game folder.
 pub const CRASH_REPORTS_DIR: &str = "crash-reports";
+
+/// The JVM writes `hs_err_pid<pid>.log` into its working folder (the game
+/// folder) when it crashes itself.
+pub const JVM_CRASH_LOG_PREFIX: &str = "hs_err_pid";
 
 /// File times and the launcher clock may disagree by a moment.
 const CLOCK_SKEW: Duration = Duration::from_secs(2);
@@ -479,6 +505,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_failed_exit_reports_the_new_jvm_crash_log() {
+        let game_dir = PathBuf::from("/data/instances/cinepol/minecraft");
+        let old = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
+        let new = SystemTime::UNIX_EPOCH + Duration::from_secs(1_005);
+
+        let mut world = World::installed().await;
+        world.runner = FakeGameProcess::exiting_with(1);
+        world.fs.add_file_at(game_dir.join("hs_err_pid1.log"), old);
+        world.fs.add_file_at(game_dir.join("hs_err_pid42.log"), new);
+        // The game rewrites its options on exit: not a crash log.
+        world.fs.add_file_at(game_dir.join("options.txt"), new);
+        let outcome = launch_exiting(&world).await;
+        assert_eq!(
+            outcome.jvm_crash_log,
+            Some(game_dir.join("hs_err_pid42.log"))
+        );
+        assert_eq!(outcome.crash_report, None);
+        assert!(outcome.crashed());
+
+        let mut clean = World::installed().await;
+        clean.runner = FakeGameProcess::exiting_with(0);
+        clean.fs.add_file_at(game_dir.join("hs_err_pid42.log"), new);
+        let outcome = launch_exiting(&clean).await;
+        assert_eq!(outcome.jvm_crash_log, None);
+        assert!(!outcome.crashed());
+    }
+
+    #[tokio::test]
+    async fn a_failed_exit_without_any_report_is_still_a_crash() {
+        let mut world = World::installed().await;
+        world.runner = FakeGameProcess::exiting_with(1);
+        let outcome = launch_exiting(&world).await;
+        assert_eq!(outcome.crash_report, None);
+        assert_eq!(outcome.jvm_crash_log, None);
+        assert!(outcome.crashed());
+    }
+
+    #[tokio::test]
     async fn a_game_the_launcher_killed_never_counts_as_a_crash() {
         let mut world = World::installed().await;
         world.runner = FakeGameProcess::running_until_killed();
@@ -493,6 +557,7 @@ mod tests {
             .unwrap();
         assert!(outcome.exit.killed_by_launcher);
         assert_eq!(outcome.crash_report, None);
+        assert!(!outcome.crashed());
     }
 
     #[tokio::test]

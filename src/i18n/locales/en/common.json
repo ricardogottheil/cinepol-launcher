@@ -254,7 +254,6 @@
     "cancel": "Cancel",
     "installed": "Installed",
     "playing": "Playing",
-    "exited": "Closed with code {{code}}",
     "spec": {
       "version": "Version",
       "loader": "Loader",
@@ -352,8 +351,9 @@
       "search": "Search the log",
       "count": "{{shown}} of {{total}} lines"
     },
-    "crashed": "The game closed because of an error.",
-    "openCrashReport": "Open crash report"
+    "crashed": "The game closed because of an error (code {{code}}).",
+    "openCrashReport": "Open crash report",
+    "openJvmCrashLog": "Open JVM crash log"
   },
   "about": {
     "title": "About",

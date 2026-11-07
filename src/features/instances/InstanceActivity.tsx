@@ -81,12 +81,8 @@ export function InstanceStatus({
         <span className="text-silk-dim">{t("instances.playing")}</span>
       ) : activity.kind === "exporting" ? (
         <span className="text-silk-dim">{t("instances.exporting")}</span>
-      ) : lastExit?.crashReport && !lastExit.killed ? (
-        <CrashNotice instanceId={lastExit.instanceId} report={lastExit.crashReport} />
-      ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
-        <span className="text-stale">
-          {t("instances.exited", { code: lastExit.exitCode ?? "-" })}
-        </span>
+      ) : lastExit?.crashed ? (
+        <CrashNotice outcome={lastExit} />
       ) : pendingFilesHint && session.waitingForFiles ? (
         <span className="text-hazard">{t("instances.manual.title")}</span>
       ) : null}

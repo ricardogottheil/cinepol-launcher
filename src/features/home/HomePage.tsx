@@ -147,12 +147,8 @@ function QuickPlay({ recommended }: { recommended: string }) {
               </Link>
             ) : null}
           </>
-        ) : lastExit?.crashReport && !lastExit.killed ? (
-          <CrashNotice instanceId={lastExit.instanceId} report={lastExit.crashReport} />
-        ) : lastExit && lastExit.exitCode !== 0 && !lastExit.killed ? (
-          <span className="text-stale">
-            {t("instances.exited", { code: lastExit.exitCode ?? "-" })}
-          </span>
+        ) : lastExit?.crashed ? (
+          <CrashNotice outcome={lastExit} />
         ) : null}
       </p>
     </div>

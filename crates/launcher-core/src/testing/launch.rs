@@ -273,13 +273,20 @@ impl FileSystem for FakeFileSystem {
         &self,
         dir: &Path,
         since: std::time::SystemTime,
+        name_prefix: &str,
     ) -> Result<Option<PathBuf>, FileSystemError> {
         Ok(self
             .modified
             .lock()
             .unwrap()
             .iter()
-            .filter(|(path, modified)| path.parent() == Some(dir) && *modified >= since)
+            .filter(|(path, modified)| {
+                path.parent() == Some(dir)
+                    && *modified >= since
+                    && path
+                        .file_name()
+                        .is_some_and(|name| name.to_string_lossy().starts_with(name_prefix))
+            })
             .max_by_key(|(_, modified)| *modified)
             .map(|(path, _)| path.clone()))
     }

@@ -160,8 +160,6 @@ pub fn open_crash_report(
     instance_id: String,
     file_name: String,
 ) -> Result<(), AppError> {
-    use tauri_plugin_opener::OpenerExt;
-
     let id = parse_instance_id(&instance_id)?;
     if !is_report_name(&file_name) {
         return Err(AppError::invalid_input("not a crash report name"));
@@ -170,7 +168,37 @@ pub fn open_crash_report(
         .paths
         .game_dir(&id)
         .join(launcher_core::application::launch_instance::CRASH_REPORTS_DIR);
-    let Some(path) = report_path(&crash_reports, &file_name) else {
+    open_evidence(
+        &app,
+        report_path(&crash_reports, &file_name, "txt"),
+        &file_name,
+    )
+}
+
+/// Opens the `hs_err_pid*.log` the JVM wrote in the instance's game folder.
+#[tauri::command]
+pub fn open_jvm_crash_log(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    instance_id: String,
+    file_name: String,
+) -> Result<(), AppError> {
+    let id = parse_instance_id(&instance_id)?;
+    if !is_jvm_crash_log_name(&file_name) {
+        return Err(AppError::invalid_input("not a JVM crash log name"));
+    }
+    let game_dir = state.paths.game_dir(&id);
+    open_evidence(&app, report_path(&game_dir, &file_name, "log"), &file_name)
+}
+
+fn open_evidence(
+    app: &AppHandle,
+    path: Option<std::path::PathBuf>,
+    file_name: &str,
+) -> Result<(), AppError> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let Some(path) = path else {
         return Err(AppError::new(
             ErrorCode::NotFound,
             format!("{file_name} was not found"),
@@ -212,26 +240,41 @@ fn is_report_name(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\', ':', '\0']) && name != "." && name != ".."
 }
 
-/// The report itself: a regular `.txt` file (not a symlink) whose real path
-/// is inside `crash_reports`, so nothing else can be opened with the default app.
-fn report_path(crash_reports: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
-    let path = crash_reports.join(name);
-    let is_txt = path
+/// `hs_err_pid<pid>.log`, as a plain file name.
+fn is_jvm_crash_log_name(name: &str) -> bool {
+    use launcher_core::application::launch_instance::JVM_CRASH_LOG_PREFIX;
+    is_report_name(name)
+        && name.starts_with(JVM_CRASH_LOG_PREFIX)
+        && name
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("log"))
+}
+
+/// The file itself: a regular file with `extension` (not a symlink) whose
+/// real path is inside `folder`, so nothing else can be opened with the
+/// default app.
+fn report_path(
+    folder: &std::path::Path,
+    name: &str,
+    extension: &str,
+) -> Option<std::path::PathBuf> {
+    let path = folder.join(name);
+    let has_extension = path
         .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"));
+        .is_some_and(|found| found.eq_ignore_ascii_case(extension));
     // `symlink_metadata` does not follow links, so a link is never "a file".
     let regular = std::fs::symlink_metadata(&path).is_ok_and(|meta| meta.is_file());
-    if !is_txt || !regular {
+    if !has_extension || !regular {
         return None;
     }
     let real = std::fs::canonicalize(&path).ok()?;
-    let folder = std::fs::canonicalize(crash_reports).ok()?;
+    let folder = std::fs::canonicalize(folder).ok()?;
     real.starts_with(&folder).then_some(real)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{is_report_name, report_path};
+    use super::{is_jvm_crash_log_name, is_report_name, report_path};
 
     #[test]
     fn only_regular_txt_reports_inside_the_folder_open() {
@@ -245,12 +288,12 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&outside, reports.join("link.txt")).unwrap();
 
-        let opened = report_path(&reports, "crash-a.txt").unwrap();
+        let opened = report_path(&reports, "crash-a.txt", "txt").unwrap();
         assert_eq!(opened.file_name().unwrap(), "crash-a.txt");
-        assert_eq!(report_path(&reports, "run.command"), None);
-        assert_eq!(report_path(&reports, "missing.txt"), None);
+        assert_eq!(report_path(&reports, "run.command", "txt"), None);
+        assert_eq!(report_path(&reports, "missing.txt", "txt"), None);
         #[cfg(unix)]
-        assert_eq!(report_path(&reports, "link.txt"), None);
+        assert_eq!(report_path(&reports, "link.txt", "txt"), None);
     }
 
     #[test]
@@ -261,5 +304,27 @@ mod tests {
         ] {
             assert!(!is_report_name(bad), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn jvm_crash_logs_are_hs_err_log_files() {
+        assert!(is_jvm_crash_log_name("hs_err_pid4242.log"));
+        for bad in [
+            "hs_err_pid1.txt",
+            "options.log",
+            "../hs_err_pid1.log",
+            "hs_err_pid1",
+            "latest.log",
+        ] {
+            assert!(!is_jvm_crash_log_name(bad), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn only_regular_hs_err_logs_in_the_game_folder_open() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("hs_err_pid9.log"), b"crash").unwrap();
+        assert!(report_path(dir.path(), "hs_err_pid9.log", "log").is_some());
+        assert_eq!(report_path(dir.path(), "hs_err_pid9.log", "txt"), None);
     }
 }

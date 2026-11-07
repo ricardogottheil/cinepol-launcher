@@ -62,7 +62,9 @@ describe("playCinepol", () => {
     expect(session()?.logs).toHaveLength(1);
 
     const outcome: LaunchOutcomeDto = {
+      crashed: false,
       crashReport: null,
+      jvmCrashLog: null,
       instanceId: "cinepol",
       exitCode: 0,
       killed: false,

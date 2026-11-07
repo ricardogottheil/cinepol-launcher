@@ -36,9 +36,11 @@ impl FileSystem for TokioFileSystem {
         &self,
         dir: &Path,
         since: std::time::SystemTime,
+        name_prefix: &str,
     ) -> Result<Option<std::path::PathBuf>, FileSystemError> {
         let owned = dir.to_path_buf();
-        tokio::task::spawn_blocking(move || newest(&owned, since))
+        let prefix = name_prefix.to_owned();
+        tokio::task::spawn_blocking(move || newest(&owned, since, &prefix))
             .await
             .map_err(|e| FileSystemError {
                 path: String::new(),
@@ -60,6 +62,7 @@ impl FileSystem for TokioFileSystem {
 fn newest(
     dir: &Path,
     since: std::time::SystemTime,
+    name_prefix: &str,
 ) -> Result<Option<std::path::PathBuf>, FileSystemError> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -77,6 +80,9 @@ fn newest(
                 continue;
             }
         };
+        if !entry.file_name().to_string_lossy().starts_with(name_prefix) {
+            continue;
+        }
         // `metadata` from the entry does not follow symlinks.
         let modified = match entry
             .metadata()
@@ -215,7 +221,7 @@ mod tests {
         let fs = TokioFileSystem;
         let reports = dir.path().join("crash-reports");
         assert_eq!(
-            fs.newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH)
+            fs.newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH, "")
                 .await
                 .unwrap(),
             None
@@ -225,11 +231,27 @@ mod tests {
         std::fs::write(reports.join("crash-a.txt"), b"a").unwrap();
         std::fs::create_dir(reports.join("folder")).unwrap();
         assert_eq!(
-            fs.newest_file_since(&reports, before).await.unwrap(),
+            fs.newest_file_since(&reports, before, "").await.unwrap(),
             Some(reports.join("crash-a.txt"))
         );
+        assert_eq!(
+            fs.newest_file_since(&reports, before, "hs_err_pid")
+                .await
+                .unwrap(),
+            None
+        );
+        std::fs::write(reports.join("hs_err_pid7.log"), b"b").unwrap();
+        assert_eq!(
+            fs.newest_file_since(&reports, before, "hs_err_pid")
+                .await
+                .unwrap(),
+            Some(reports.join("hs_err_pid7.log"))
+        );
         let later = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
-        assert_eq!(fs.newest_file_since(&reports, later).await.unwrap(), None);
+        assert_eq!(
+            fs.newest_file_since(&reports, later, "").await.unwrap(),
+            None
+        );
     }
 
     #[cfg(unix)]
@@ -249,7 +271,7 @@ mod tests {
         }
 
         let result = TokioFileSystem
-            .newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH)
+            .newest_file_since(&reports, std::time::SystemTime::UNIX_EPOCH, "")
             .await;
 
         std::fs::set_permissions(&reports, std::fs::Permissions::from_mode(0o755)).unwrap();

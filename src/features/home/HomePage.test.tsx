@@ -16,6 +16,7 @@ import { HomePage } from "./HomePage";
 
 const client = vi.hoisted(() => ({
   openCrashReport: vi.fn(),
+  openJvmCrashLog: vi.fn(),
   listAccounts: vi.fn(),
   listInstances: vi.fn(),
   getServerConfig: vi.fn(),
@@ -465,13 +466,17 @@ describe("HomePage", () => {
             exitCode: 255,
             killed: false,
             playedSecs: 30,
+            crashed: true,
             crashReport: report,
+            jvmCrashLog: null,
           },
         },
       },
     });
     renderHome();
-    expect(await screen.findByText(esCommon.instances.crashed)).toBeInTheDocument();
+    expect(
+      await screen.findByText(esCommon.instances.crashed.replace("{{code}}", "255")),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: esCommon.instances.openCrashReport }));
     expect(client.openCrashReport).toHaveBeenCalledWith("cinepol", report);
   });

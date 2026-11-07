@@ -23,14 +23,16 @@ pub trait FileSystem: Send + Sync {
         &self,
         path: &Path,
     ) -> impl Future<Output = Result<(), FileSystemError>> + Send;
-    /// The newest regular file directly inside `dir` modified at or after
-    /// `since` (crash reports written during a launch); `None` when there is
-    /// none or the folder is missing. Entries that cannot be read are
-    /// skipped; only an unreadable folder is an error.
+    /// The newest regular file directly inside `dir` whose name starts with
+    /// `name_prefix` (`""` for any) and that was modified at or after `since`
+    /// (crash reports written during a launch); `None` when there is none or
+    /// the folder is missing. Entries that cannot be read are skipped; only
+    /// an unreadable folder is an error.
     fn newest_file_since(
         &self,
         dir: &Path,
         since: std::time::SystemTime,
+        name_prefix: &str,
     ) -> impl Future<Output = Result<Option<std::path::PathBuf>, FileSystemError>> + Send;
     /// Copies the directory tree `from` into the new directory `to`. Symbolic
     /// links are skipped, so nothing outside `from` is copied; an existing
