@@ -20,8 +20,9 @@ with nothing to back it up. Two gaps made that impossible to check:
 ## Decision
 
 - **Every failed exit is a crash.** A launch that ends with a non-zero exit
-  the launcher did not cause shows the crash notice, with the exit code,
-  whether or not the game left a report (ADR 0008 required a report).
+  the launcher did not cause shows the crash notice, with the exit code and
+  the last 12 lines of that launch's output, whether or not the game left a
+  report (ADR 0008 required a report).
 - **JVM crash logs.** After such an exit, the newest `hs_err_pid*.log` in the
   game folder modified since the launch started (the same two seconds of
   clock skew as crash reports) is part of the outcome. `FileSystem::newest_file_since`
@@ -38,8 +39,10 @@ with nothing to back it up. Two gaps made that impossible to check:
     launch, written line by line next to the live view (a pair of sinks is a
     sink). The file is started on the first line, so a launch that fails
     before the game prints anything keeps the previous output; the launch
-    before is kept as `game-<instance>.1.log`. A file that cannot be created
-    never stops the game.
+    before is kept as `game-<instance>.1.log`. Past 32 MiB the file starts
+    over with a note, so a mod that floods its output cannot fill the disk
+    and the file always holds the latest lines. A file that cannot be
+    created never stops the game.
   - The session token is masked in the game output before it reaches the
     screen or the file (`MaskingLogSink`), because some loaders print their
     arguments.
@@ -49,8 +52,11 @@ with nothing to back it up. Two gaps made that impossible to check:
   Java choice, memory and exit code; the head of the crash report (160 KiB)
   and of the JVM crash log (128 KiB); and the tail of the game output
   (160 KiB). A cap that cuts through a line drops that partial line, so a
-  token is never kept in pieces the redaction cannot recognize; text that
-  grows when decoded is cut to the 512 KiB upload limit. Only plain crash
+  token is never kept in pieces the redaction cannot recognize. Each file is
+  redacted on its own. Text that grows when decoded is cut to the 512 KiB
+  upload limit at whole lines, from the end of the crash report first, then
+  the JVM crash log, then the start of the game output, so the end of the
+  output is the last thing to go. Only plain crash
   report (`*.txt`) and `hs_err_pid*.log` names inside the instance's game
   folder are read, and the final file must not be a symbolic link (a linked
   folder, which only the player or a mod can create, is followed, as when
@@ -67,4 +73,5 @@ with nothing to back it up. Two gaps made that impossible to check:
   and hand it over as one link.
 - The shared bundle holds file paths with the player's system user name and
   the mod list; the notice says so before the player shares it.
-- Disk use is bounded: four launcher logs and two output logs per instance.
+- Disk use is bounded: four launcher logs, and two output logs of at most
+  32 MiB each per instance.

@@ -80,20 +80,28 @@ where
     let instance = deps.instances.get(&request.instance).await?;
     let game_dir = deps.paths.game_dir(&instance.id);
 
-    let mut report = header(&instance, request.exit_code, deps);
+    let mut sections = Vec::new();
     if let Some(name) = &request.crash_report {
         let path = game_dir
             .join(crate::application::launch_instance::CRASH_REPORTS_DIR)
             .join(name);
         let text = deps.fs.read_text(&path, CRASH_REPORT_CAP).await?;
-        section(&mut report, &format!("Crash report: {name}"), text);
+        sections.push(Section::new(
+            format!("Crash report: {name}"),
+            text,
+            Keep::Head,
+        ));
     }
     if let Some(name) = &request.jvm_crash_log {
         let text = deps
             .fs
             .read_text(&game_dir.join(name), JVM_CRASH_LOG_CAP)
             .await?;
-        section(&mut report, &format!("JVM crash log: {name}"), text);
+        sections.push(Section::new(
+            format!("JVM crash log: {name}"),
+            text,
+            Keep::Head,
+        ));
     }
     let output = deps.paths.game_output_log(&instance.id);
     let text = deps.fs.read_text(&output, GAME_OUTPUT_CAP).await?;
@@ -101,9 +109,13 @@ where
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    section(&mut report, &format!("Game output: {output_name}"), text);
+    sections.push(Section::new(
+        format!("Game output: {output_name}"),
+        text,
+        Keep::Tail,
+    ));
 
-    let report = fit_upload_limit(redact_crash_text(&report));
+    let report = assemble(&header(&instance, request.exit_code, deps), sections);
     Ok(share_diagnostic_report(&report, deps.host).await?)
 }
 
@@ -145,33 +157,107 @@ fn header<I, F, H>(
     )
 }
 
-/// The caps count bytes read, but text that is not UTF-8 grows when decoded:
-/// cut what does not fit rather than fail the upload.
-fn fit_upload_limit(mut report: String) -> String {
-    const CUT_NOTE: &str = "\n(report cut to fit the upload limit)\n";
-    if report.len() <= MAX_REPORT_BYTES {
-        return report;
+/// Which end of a section holds what matters when it must be shortened.
+#[derive(Clone, Copy)]
+enum Keep {
+    /// A crash report or JVM crash log says what failed at the top.
+    Head,
+    /// The game output ends with what happened last.
+    Tail,
+}
+
+struct Section {
+    title: String,
+    /// Already redacted; `None` when the file was not found.
+    text: Option<String>,
+    keep: Keep,
+}
+
+impl Section {
+    /// Each file is redacted on its own, so nothing one file holds (an
+    /// unfinished environment block) can affect the next one.
+    fn new(title: String, text: Option<String>, keep: Keep) -> Self {
+        Self {
+            title,
+            text: text.map(|text| redact_crash_text(&text)),
+            keep,
+        }
     }
-    let mut end = MAX_REPORT_BYTES - CUT_NOTE.len();
-    while !report.is_char_boundary(end) {
-        end -= 1;
+
+    fn render(&self) -> String {
+        let mut out = format!("\n=== {} ===\n", self.title);
+        match &self.text {
+            Some(text) => {
+                out.push_str(text);
+                if !text.ends_with('\n') {
+                    out.push('\n');
+                }
+            }
+            None => out.push_str("(not found)\n"),
+        }
+        out
     }
-    report.truncate(end);
-    report.push_str(CUT_NOTE);
+}
+
+const CUT_NOTE: &str = "(cut to fit the upload limit)\n";
+
+/// The caps count bytes read, but text that is not UTF-8 grows when decoded.
+/// What does not fit is cut from the earlier sections first, at whole lines,
+/// so the end of the game output is the last thing to go.
+fn assemble(header: &str, mut sections: Vec<Section>) -> String {
+    let size = |sections: &[Section]| {
+        header.len() + sections.iter().map(|s| s.render().len()).sum::<usize>()
+    };
+    let mut overflow = size(&sections).saturating_sub(MAX_REPORT_BYTES);
+    for section in &mut sections {
+        if overflow == 0 {
+            break;
+        }
+        let Some(text) = section.text.take() else {
+            continue;
+        };
+        let (kept, removed) = shorten(&text, overflow + CUT_NOTE.len(), section.keep);
+        overflow = overflow.saturating_sub(removed.saturating_sub(CUT_NOTE.len()));
+        section.text = Some(match section.keep {
+            Keep::Head => format!("{kept}{CUT_NOTE}"),
+            Keep::Tail => format!("{CUT_NOTE}{kept}"),
+        });
+    }
+    let mut report = header.to_owned();
+    for section in &sections {
+        report.push_str(&section.render());
+    }
     report
 }
 
-fn section(report: &mut String, title: &str, text: Option<String>) {
-    report.push_str(&format!("\n=== {title} ===\n"));
-    match text {
-        Some(text) => {
-            report.push_str(&text);
-            if !text.ends_with('\n') {
-                report.push('\n');
-            }
-        }
-        None => report.push_str("(not found)\n"),
+/// Removes at least `need` bytes from the end (`Keep::Head`) or the start
+/// (`Keep::Tail`) of `text`, at a line boundary; returns what is left and how
+/// many bytes went.
+fn shorten(text: &str, need: usize, keep: Keep) -> (String, usize) {
+    if need >= text.len() {
+        return (String::new(), text.len());
     }
+    let kept = match keep {
+        Keep::Head => {
+            let mut end = text.len() - need;
+            while !text.is_char_boundary(end) {
+                end -= 1;
+            }
+            let end = text[..end].rfind('\n').map_or(0, |at| at + 1);
+            &text[..end]
+        }
+        Keep::Tail => {
+            let mut start = need;
+            while !text.is_char_boundary(start) {
+                start += 1;
+            }
+            let start = text[start..]
+                .find('\n')
+                .map_or(text.len(), |at| start + at + 1);
+            &text[start..]
+        }
+    };
+    (kept.to_owned(), text.len() - kept.len())
 }
 
 #[cfg(test)]
@@ -354,38 +440,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn keeps_the_bundle_under_the_upload_limit() {
-        let world = World::new().await;
-        let huge = "x".repeat(MAX_REPORT_BYTES);
-        world
-            .fs
-            .add_text(world.game_dir().join("crash-reports").join("c.txt"), &huge);
-        world
-            .fs
-            .add_text(world.game_dir().join("hs_err_pid1.log"), &huge);
-        world.fs.add_text(
-            world.paths.game_output_log(&id()),
-            &format!("{}THE END", "x\n".repeat(MAX_REPORT_BYTES / 2)),
-        );
-        share_crash_report(
-            &CrashShareRequest {
-                crash_report: Some("c.txt".into()),
-                jvm_crash_log: Some("hs_err_pid1.log".into()),
-                ..request()
-            },
-            &world.deps(),
-        )
-        .await
-        .unwrap();
-        let report = &world.host.published()[0];
-        assert!(report.len() <= MAX_REPORT_BYTES, "{}", report.len());
-        assert!(
-            report.ends_with("THE END\n"),
-            "the end of the output is kept"
-        );
-    }
-
-    #[tokio::test]
     async fn a_token_cut_by_the_size_limit_never_reaches_the_upload() {
         let world = World::new().await;
         let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJl";
@@ -409,17 +463,27 @@ mod tests {
         );
     }
 
+    /// Lines of a two-byte character: the caps of the fake count characters,
+    /// so the decoded bundle is larger than the upload limit.
+    fn wide_lines(chars: usize) -> String {
+        "\u{e9}\n".repeat(chars / 2)
+    }
+
     #[tokio::test]
-    async fn multibyte_text_stays_under_the_upload_limit() {
+    async fn an_oversized_bundle_trims_the_earlier_sections_and_keeps_the_output_end() {
         let world = World::new().await;
-        let wide = "\u{e9}".repeat(MAX_REPORT_BYTES);
-        world
-            .fs
-            .add_text(world.game_dir().join("crash-reports").join("c.txt"), &wide);
-        world
-            .fs
-            .add_text(world.game_dir().join("hs_err_pid1.log"), &wide);
-        world.fs.add_text(world.paths.game_output_log(&id()), &wide);
+        world.fs.add_text(
+            world.game_dir().join("crash-reports").join("c.txt"),
+            &format!("Description: Rendering overlay\n{}", wide_lines(400_000)),
+        );
+        world.fs.add_text(
+            world.game_dir().join("hs_err_pid1.log"),
+            &format!("# EXCEPTION_ACCESS_VIOLATION\n{}", wide_lines(400_000)),
+        );
+        world.fs.add_text(
+            world.paths.game_output_log(&id()),
+            &format!("{}THE END\n", wide_lines(400_000)),
+        );
         share_crash_report(
             &CrashShareRequest {
                 crash_report: Some("c.txt".into()),
@@ -430,7 +494,19 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(world.host.published()[0].len() <= MAX_REPORT_BYTES);
+
+        let report = &world.host.published()[0];
+        assert!(report.len() <= MAX_REPORT_BYTES, "{}", report.len());
+        assert!(report.starts_with("Cinepol Launcher crash report\n"));
+        assert!(
+            report.contains("Description: Rendering overlay"),
+            "the head of the crash report stays"
+        );
+        assert!(report.ends_with("THE END\n"), "the end of the output stays");
+        let output = &report[report.find("=== Game output").unwrap()..];
+        // The whole 160 KiB character window of the output survives (240 KiB here).
+        assert!(output.len() > 230_000, "{}", output.len());
+        assert!(report.contains("(cut to fit the upload limit)"));
     }
 
     #[tokio::test]

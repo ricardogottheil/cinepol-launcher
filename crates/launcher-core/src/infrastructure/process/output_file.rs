@@ -1,6 +1,6 @@
 //! Saves the game's output to a file, so it outlives the launcher window.
 
-use std::io::{LineWriter, Write};
+use std::io::{LineWriter, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -11,25 +11,43 @@ use crate::infrastructure::fs::create_rotated_log;
 /// The previous launch is kept next to the new one.
 const KEEP_PREVIOUS: usize = 1;
 
+/// A mod that floods its output must not fill the disk: past this size the
+/// file starts over, so it always holds the latest lines.
+const MAX_LOG_BYTES: u64 = 32 * 1024 * 1024;
+
+/// The first line of a file that started over.
+const EARLIER_OUTPUT_DROPPED: &str =
+    "(earlier output was dropped to keep this file small; the game's own logs/latest.log has it)\n";
+
 /// `LogSink` that writes every line to the instance's game output log.
 /// The file is started on the first line, so a launch that fails before the
 /// game prints anything keeps the previous output.
 pub struct GameOutputFile {
     path: PathBuf,
+    max_bytes: u64,
     file: Mutex<Output>,
 }
 
 enum Output {
     NotStarted,
-    Writing(LineWriter<std::fs::File>),
+    Writing {
+        file: LineWriter<std::fs::File>,
+        written: u64,
+    },
     /// It could not be created or written; the game runs on without it.
     Off,
 }
 
 impl GameOutputFile {
     pub fn create(path: &Path) -> Self {
+        Self::with_limit(path, MAX_LOG_BYTES)
+    }
+
+    /// Like `create`, starting over once the file would pass `max_bytes`.
+    pub fn with_limit(path: &Path, max_bytes: u64) -> Self {
         Self {
             path: path.to_path_buf(),
+            max_bytes,
             file: Mutex::new(Output::NotStarted),
         }
     }
@@ -40,20 +58,44 @@ impl GameOutputFile {
         };
         if matches!(*output, Output::NotStarted) {
             *output = match create_rotated_log(&self.path, KEEP_PREVIOUS) {
-                Ok(file) => Output::Writing(LineWriter::new(file)),
+                Ok(file) => Output::Writing {
+                    file: LineWriter::new(file),
+                    written: 0,
+                },
                 Err(error) => {
                     tracing::warn!(path = %self.path.display(), %error, "could not save the game output");
                     Output::Off
                 }
             };
         }
-        if let Output::Writing(file) = &mut *output
-            && let Err(error) = writeln!(file, "{text}")
+        if let Output::Writing { file, written } = &mut *output
+            && let Err(error) = append(file, written, self.max_bytes, text)
         {
             tracing::warn!(%error, "stopped saving the game output");
             *output = Output::Off;
         }
     }
+}
+
+/// Writes one line, emptying the file first when it would pass `max_bytes`.
+fn append(
+    file: &mut LineWriter<std::fs::File>,
+    written: &mut u64,
+    max_bytes: u64,
+    text: &str,
+) -> std::io::Result<()> {
+    let line_len = text.len() as u64 + 1;
+    if *written > 0 && *written + line_len > max_bytes {
+        file.flush()?;
+        let inner = file.get_mut();
+        inner.set_len(0)?;
+        inner.seek(SeekFrom::Start(0))?;
+        file.write_all(EARLIER_OUTPUT_DROPPED.as_bytes())?;
+        *written = EARLIER_OUTPUT_DROPPED.len() as u64;
+    }
+    writeln!(file, "{text}")?;
+    *written += line_len;
+    Ok(())
 }
 
 impl LogSink for GameOutputFile {
@@ -125,6 +167,25 @@ mod tests {
         drop(GameOutputFile::create(&path));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "the crash\n");
         assert!(!dir.path().join("game-cinepol.1.log").exists());
+    }
+
+    #[test]
+    fn a_log_past_its_size_limit_starts_over_and_keeps_the_latest_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("game-cinepol.log");
+        let sink = GameOutputFile::with_limit(&path, 64);
+        for index in 0..20 {
+            sink.line(LogStream::Stdout, format!("spam line {index:02}"));
+        }
+        drop(sink);
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(saved.starts_with(EARLIER_OUTPUT_DROPPED), "{saved}");
+        assert!(saved.ends_with("spam line 19\n"), "{saved}");
+        assert!(
+            saved.len() <= 64 + EARLIER_OUTPUT_DROPPED.len() + 13,
+            "{}",
+            saved.len()
+        );
     }
 
     #[test]
