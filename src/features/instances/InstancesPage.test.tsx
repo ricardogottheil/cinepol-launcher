@@ -1027,6 +1027,27 @@ describe("InstancesPage", () => {
     expect(await screen.findByText(esCommon.errors.network)).toBeInTheDocument();
   });
 
+  it("shows the last lines of the game output in the crash notice", async () => {
+    client.launchInstance.mockImplementation((_id: string, handler: (line: LogLineDto) => void) => {
+      for (let index = 1; index <= 20; index += 1) {
+        handler({
+          stream: index === 20 ? "stderr" : "stdout",
+          line: `output line ${index}`,
+          level: null,
+          thread: null,
+          logger: null,
+        });
+      }
+      return Promise.resolve({ ...outcome, exitCode: 1, crashed: true });
+    });
+    renderAt("/instances/survival");
+    fireEvent.click(await screen.findByRole("button", { name: labels.play }));
+    const tail = await screen.findByRole("figure", { name: labels.crashTail });
+    expect(tail).toHaveTextContent("output line 20");
+    expect(tail).toHaveTextContent("output line 9");
+    expect(tail).not.toHaveTextContent("output line 8");
+  });
+
   it("shows nothing when the launcher stopped the game", async () => {
     client.launchInstance.mockResolvedValue({ ...outcome, exitCode: 1, killed: true });
     renderAt("/instances/survival");

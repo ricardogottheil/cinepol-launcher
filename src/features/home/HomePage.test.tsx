@@ -461,7 +461,15 @@ describe("HomePage", () => {
       byInstance: {
         [CINEPOL_SESSION]: {
           activity: { kind: "idle" },
-          logs: [],
+          logs: [
+            {
+              stream: "stderr",
+              line: "Exception in thread main",
+              level: null,
+              thread: null,
+              logger: null,
+            },
+          ],
           error: null,
           lastExit: {
             instanceId: "cinepol",
@@ -479,6 +487,9 @@ describe("HomePage", () => {
     expect(
       await screen.findByText(esCommon.instances.crashed.replace("{{code}}", "255")),
     ).toBeInTheDocument();
+    expect(screen.getByRole("figure", { name: esCommon.instances.crashTail })).toHaveTextContent(
+      "Exception in thread main",
+    );
     fireEvent.click(screen.getByRole("button", { name: esCommon.instances.openCrashReport }));
     expect(client.openCrashReport).toHaveBeenCalledWith("cinepol", report);
   });

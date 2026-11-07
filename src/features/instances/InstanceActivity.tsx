@@ -72,9 +72,9 @@ export function InstanceStatus({
   pendingFilesHint?: boolean;
 }) {
   const { t } = useTranslation();
-  const { error, activity, lastExit } = session;
+  const { error, activity, lastExit, logs } = session;
   return (
-    <p role="status" className="m-0 text-[0.875rem] empty:hidden">
+    <div role="status" className="text-[0.875rem] empty:hidden">
       {error ? (
         <span className="text-stale">{t(`errors.${error}`)}</span>
       ) : activity.kind === "running" ? (
@@ -82,10 +82,10 @@ export function InstanceStatus({
       ) : activity.kind === "exporting" ? (
         <span className="text-silk-dim">{t("instances.exporting")}</span>
       ) : lastExit?.crashed ? (
-        <CrashNotice outcome={lastExit} />
+        <CrashNotice outcome={lastExit} lines={logs} />
       ) : pendingFilesHint && session.waitingForFiles ? (
         <span className="text-hazard">{t("instances.manual.title")}</span>
       ) : null}
-    </p>
+    </div>
   );
 }

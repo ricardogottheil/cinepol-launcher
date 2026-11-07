@@ -357,7 +357,8 @@
     "openJvmCrashLog": "Open JVM crash log",
     "shareCrash": "Share report",
     "sharingCrash": "Creating link…",
-    "shareCrashNote": "The report includes your system details, mods and the game output, without your session. Anyone with the link can read it."
+    "shareCrashNote": "The report includes your system details, mods and the game output, without your session. Anyone with the link can read it.",
+    "crashTail": "Last lines of the game output"
   },
   "about": {
     "title": "About",

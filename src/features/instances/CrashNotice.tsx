@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { toast } from "../../components/ui/toastStore";
-import type { LaunchOutcomeDto } from "../../ipc/client";
+import type { LaunchOutcomeDto, LogLineDto } from "../../ipc/client";
 import {
   openCrashReport,
   openJvmCrashLog,
@@ -11,15 +11,26 @@ import {
   toIpcError,
 } from "../../ipc/client";
 
+/** How much of the game output the notice shows. */
+const TAIL_LINES = 12;
+
 /**
- * The game ended with an error: say so, offer whatever evidence it left, and
- * a link the player can hand to the staff.
+ * The game ended with an error: say so, show how its output ended, offer
+ * whatever evidence it left, and a link the player can hand to the staff.
  */
-export function CrashNotice({ outcome }: { outcome: LaunchOutcomeDto }) {
+export function CrashNotice({
+  outcome,
+  lines,
+}: {
+  outcome: LaunchOutcomeDto;
+  /** The output of the launch that crashed, oldest first. */
+  lines: LogLineDto[];
+}) {
   const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [link, setLink] = useState<string | null>(null);
+  const tailCaption = useId();
   const { instanceId, crashReport, jvmCrashLog } = outcome;
 
   async function run(action: () => Promise<void>) {
@@ -68,6 +79,22 @@ export function CrashNotice({ outcome }: { outcome: LaunchOutcomeDto }) {
           {sharing ? t("instances.sharingCrash") : t("instances.shareCrash")}
         </Button>
       </span>
+      {lines.length > 0 ? (
+        <figure aria-labelledby={tailCaption} className="m-0 flex flex-col gap-1">
+          <figcaption id={tailCaption} className="text-[0.8125rem] text-engrave">
+            {t("instances.crashTail")}
+          </figcaption>
+          <pre
+            data-readout
+            className="readout-sm m-0 max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-control border border-hairline bg-panel p-3 text-silk-dim"
+          >
+            {lines
+              .slice(-TAIL_LINES)
+              .map((entry) => entry.line)
+              .join("\n")}
+          </pre>
+        </figure>
+      ) : null}
       {link ? (
         <span className="flex flex-wrap items-center gap-3">
           <a

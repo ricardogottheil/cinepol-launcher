@@ -357,7 +357,8 @@
     "openJvmCrashLog": "Abrir log del error de Java",
     "shareCrash": "Compartir reporte",
     "sharingCrash": "Creando enlace…",
-    "shareCrashNote": "El reporte incluye los datos de tu sistema, los mods y la salida del juego, sin tu sesión. Cualquiera con el enlace puede leerlo."
+    "shareCrashNote": "El reporte incluye los datos de tu sistema, los mods y la salida del juego, sin tu sesión. Cualquiera con el enlace puede leerlo.",
+    "crashTail": "Últimas líneas de la salida del juego"
   },
   "about": {
     "title": "Acerca de",

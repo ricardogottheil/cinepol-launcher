@@ -84,7 +84,7 @@ function HomeInstances() {
  */
 function QuickPlay({ recommended }: { recommended: string }) {
   const { t } = useTranslation();
-  const { activity, error, lastExit } = useInstanceActivity(CINEPOL_SESSION);
+  const { activity, error, lastExit, logs } = useInstanceActivity(CINEPOL_SESSION);
   const playCinepol = useActivityStore((state) => state.playCinepol);
   const queryClient = useQueryClient();
   const previousKind = useRef(activity.kind);
@@ -137,7 +137,7 @@ function QuickPlay({ recommended }: { recommended: string }) {
           ) : null}
         </div>
       )}
-      <p role="status" className="m-0 text-[0.875rem]">
+      <div role="status" className="text-[0.875rem]">
         {error ? (
           <>
             <span className="text-stale">{t(`errors.${error}`)}</span>
@@ -148,9 +148,9 @@ function QuickPlay({ recommended }: { recommended: string }) {
             ) : null}
           </>
         ) : lastExit?.crashed ? (
-          <CrashNotice outcome={lastExit} />
+          <CrashNotice outcome={lastExit} lines={logs} />
         ) : null}
-      </p>
+      </div>
     </div>
   );
 }
