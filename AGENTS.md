@@ -210,3 +210,13 @@ Conventional Commits in English: `feat(core): ...`, `fix(ui): ...`,
 - [ ] `pnpm bindings` produces no diff.
 - [ ] Docs and ADRs updated if behavior or architecture changed.
 - [ ] `pnpm check:english` passes.
+
+## 12. Disk usage: Rust `target/`
+
+Cargo never prunes stale artifacts, and `target/debug` once grew to ~140 GB.
+
+- Before running a `cargo` or `tauri` build, check `du -sh target`.
+- If `target/` is over 20 GB, tell the user and run `cargo clean` (or
+  `cargo sweep --time 14` if `cargo-sweep` is installed) before building.
+- After toolchain updates (Rust, Xcode or Command Line Tools), expect a full
+  rebuild and check the size of `target/` afterwards.
